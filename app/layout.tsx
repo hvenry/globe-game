@@ -8,7 +8,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Globe — Country Guessing Game",
+  title: "globe",
   description: "Test your geography knowledge on an interactive 3D globe",
 };
 
