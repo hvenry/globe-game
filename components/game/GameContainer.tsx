@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import GlobeDynamic from "@/components/globe/GlobeDynamic";
 import CountryPrompt from "./CountryPrompt";
 import TriesIndicator from "./TriesIndicator";
@@ -9,7 +9,6 @@ import ResultFeedback from "./ResultFeedback";
 import ClickFeedback from "./ClickFeedback";
 import StartScreen from "./StartScreen";
 import GameOver from "./GameOver";
-import SkipButton from "./SkipButton";
 import { useGameStore } from "@/lib/store/game-store";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
 
@@ -21,6 +20,8 @@ export default function GameContainer() {
   const makeGuess = useGameStore((s) => s.makeGuess);
   const resetGame = useGameStore((s) => s.resetGame);
   const addFloatingLabel = useGameStore((s) => s.addFloatingLabel);
+  const goNext = useGameStore((s) => s.goNext);
+  const goPrev = useGameStore((s) => s.goPrev);
 
   const allFeatures = useMemo(() => getAllFeatures(), []);
   const guessableCountries = useMemo(() => getGuessableCountries(), []);
@@ -50,6 +51,21 @@ export default function GameContainer() {
     [phase, makeGuess, allFeatures, addFloatingLabel]
   );
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (phase !== "playing") return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [phase, goNext, goPrev]);
+
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-black">
       <div className="absolute inset-0">
@@ -66,7 +82,6 @@ export default function GameContainer() {
       <CountryPrompt />
       <ScoreBoard />
       <TriesIndicator />
-      <SkipButton />
       <ClickFeedback />
       <ResultFeedback />
 

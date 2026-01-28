@@ -16,8 +16,12 @@ export interface FloatingLabel {
 
 interface GameState {
   phase: GamePhase;
-  countryPool: CountryData[];
+  unansweredCountries: CountryData[];
+  currentIndex: number;
   currentCountry: CountryData | null;
+  countryTries: Map<string, number>;
+  countryWrongGuesses: Map<string, Set<string>>;
+  totalCountries: number;
   triesRemaining: number;
   wrongGuessIds: Set<string>;
   isCorrect: boolean | null;
@@ -33,14 +37,36 @@ interface GameState {
   makeGuess: (countryId: string) => void;
   addFloatingLabel: (name: string, position: [number, number, number]) => void;
   removeFloatingLabel: (id: string) => void;
+  goNext: () => void;
+  goPrev: () => void;
   nextCountry: () => void;
   resetGame: () => void;
 }
 
+function saveCurrentTriesState(state: GameState): { countryTries: Map<string, number>; countryWrongGuesses: Map<string, Set<string>> } {
+  if (!state.currentCountry) return { countryTries: state.countryTries, countryWrongGuesses: state.countryWrongGuesses };
+  const newTries = new Map(state.countryTries);
+  newTries.set(state.currentCountry.id, state.triesRemaining);
+  const newWrong = new Map(state.countryWrongGuesses);
+  newWrong.set(state.currentCountry.id, new Set(state.wrongGuessIds));
+  return { countryTries: newTries, countryWrongGuesses: newWrong };
+}
+
+function loadTriesState(country: CountryData, countryTries: Map<string, number>, countryWrongGuesses: Map<string, Set<string>>) {
+  return {
+    triesRemaining: countryTries.get(country.id) ?? GAME_CONFIG.maxTries,
+    wrongGuessIds: countryWrongGuesses.get(country.id) ?? new Set<string>(),
+  };
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   phase: "idle",
-  countryPool: [],
+  unansweredCountries: [],
+  currentIndex: 0,
   currentCountry: null,
+  countryTries: new Map(),
+  countryWrongGuesses: new Map(),
+  totalCountries: 0,
   triesRemaining: GAME_CONFIG.maxTries,
   wrongGuessIds: new Set(),
   isCorrect: null,
@@ -54,11 +80,20 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startGame: (countries) => {
     const shuffled = shuffle(countries);
-    const [first, ...rest] = shuffled;
+    const tries = new Map<string, number>();
+    const wrongGuesses = new Map<string, Set<string>>();
+    for (const c of shuffled) {
+      tries.set(c.id, GAME_CONFIG.maxTries);
+      wrongGuesses.set(c.id, new Set());
+    }
     set({
       phase: "playing",
-      countryPool: rest,
-      currentCountry: first,
+      unansweredCountries: shuffled,
+      currentIndex: 0,
+      currentCountry: shuffled[0],
+      countryTries: tries,
+      countryWrongGuesses: wrongGuesses,
+      totalCountries: shuffled.length,
       triesRemaining: GAME_CONFIG.maxTries,
       wrongGuessIds: new Set(),
       isCorrect: null,
@@ -87,6 +122,45 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
+  goNext: () => {
+    const state = get();
+    if (state.phase !== "playing" || state.unansweredCountries.length <= 1) return;
+    const saved = saveCurrentTriesState(state);
+    const newIndex = (state.currentIndex + 1) % state.unansweredCountries.length;
+    const nextCountry = state.unansweredCountries[newIndex];
+    const loaded = loadTriesState(nextCountry, saved.countryTries, saved.countryWrongGuesses);
+    set({
+      ...saved,
+      currentIndex: newIndex,
+      currentCountry: nextCountry,
+      triesRemaining: loaded.triesRemaining,
+      wrongGuessIds: loaded.wrongGuessIds,
+      isCorrect: null,
+      lastClickedCountryName: null,
+      floatingLabels: [],
+    });
+  },
+
+  goPrev: () => {
+    const state = get();
+    if (state.phase !== "playing" || state.unansweredCountries.length <= 1) return;
+    const saved = saveCurrentTriesState(state);
+    const len = state.unansweredCountries.length;
+    const newIndex = (state.currentIndex - 1 + len) % len;
+    const prevCountry = state.unansweredCountries[newIndex];
+    const loaded = loadTriesState(prevCountry, saved.countryTries, saved.countryWrongGuesses);
+    set({
+      ...saved,
+      currentIndex: newIndex,
+      currentCountry: prevCountry,
+      triesRemaining: loaded.triesRemaining,
+      wrongGuessIds: loaded.wrongGuessIds,
+      isCorrect: null,
+      lastClickedCountryName: null,
+      floatingLabels: [],
+    });
+  },
+
   makeGuess: (countryId) => {
     const state = get();
     if (state.phase !== "playing" || !state.currentCountry) return;
@@ -108,6 +182,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       const newResolved = new Map(state.resolvedCountries);
       newResolved.set(state.currentCountry.id, resolution);
 
+      // Remove country from unanswered list
+      const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
+      const newTries = new Map(state.countryTries);
+      newTries.delete(state.currentCountry.id);
+      const newWrong = new Map(state.countryWrongGuesses);
+      newWrong.delete(state.currentCountry.id);
+      const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
+
       set({
         phase: "feedback",
         isCorrect: true,
@@ -116,6 +198,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         resolvedCountries: newResolved,
         questionsAnswered: state.questionsAnswered + 1,
         questionsCorrect: state.questionsCorrect + 1,
+        unansweredCountries: newUnanswered,
+        currentIndex: newIndex,
+        countryTries: newTries,
+        countryWrongGuesses: newWrong,
       });
     } else {
       const newTries = state.triesRemaining - 1;
@@ -126,6 +212,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         const newResolved = new Map(state.resolvedCountries);
         newResolved.set(state.currentCountry.id, "failed");
 
+        // Remove country from unanswered list
+        const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
+        const newTriesMap = new Map(state.countryTries);
+        newTriesMap.delete(state.currentCountry.id);
+        const newWrong = new Map(state.countryWrongGuesses);
+        newWrong.delete(state.currentCountry.id);
+        const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
+
         set({
           phase: "feedback",
           isCorrect: false,
@@ -135,6 +229,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           lastClickedCountryName: guessedCountryName,
           resolvedCountries: newResolved,
           questionsAnswered: state.questionsAnswered + 1,
+          unansweredCountries: newUnanswered,
+          currentIndex: newIndex,
+          countryTries: newTriesMap,
+          countryWrongGuesses: newWrong,
         });
       } else {
         set({
@@ -148,17 +246,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   nextCountry: () => {
     const state = get();
-    if (state.countryPool.length === 0) {
+    if (state.unansweredCountries.length === 0) {
       set({ phase: "gameover" });
       return;
     }
-    const [next, ...rest] = state.countryPool;
+    const country = state.unansweredCountries[state.currentIndex];
+    const loaded = loadTriesState(country, state.countryTries, state.countryWrongGuesses);
     set({
       phase: "playing",
-      countryPool: rest,
-      currentCountry: next,
-      triesRemaining: GAME_CONFIG.maxTries,
-      wrongGuessIds: new Set(),
+      currentCountry: country,
+      triesRemaining: loaded.triesRemaining,
+      wrongGuessIds: loaded.wrongGuessIds,
       isCorrect: null,
       lastResolution: null,
       lastClickedCountryName: null,
@@ -169,8 +267,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   resetGame: () => {
     set({
       phase: "idle",
-      countryPool: [],
+      unansweredCountries: [],
+      currentIndex: 0,
       currentCountry: null,
+      countryTries: new Map(),
+      countryWrongGuesses: new Map(),
+      totalCountries: 0,
       triesRemaining: GAME_CONFIG.maxTries,
       wrongGuessIds: new Set(),
       isCorrect: null,
