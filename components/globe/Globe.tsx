@@ -15,6 +15,7 @@ import {
 } from "d3-geo";
 import GlobeSphere from "./GlobeSphere";
 import GlobeGrid from "./GlobeGrid";
+import Stars from "./Stars";
 import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
 import type { CountryFeature } from "@/lib/geo/types";
@@ -344,6 +345,8 @@ function GlobeScene({
 
   return (
     <>
+      <Stars />
+
       <ambientLight intensity={0.15} />
       <directionalLight position={[5, 3, 5]} intensity={0.8} />
 
