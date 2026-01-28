@@ -14,6 +14,7 @@ import {
   geoDistance,
 } from "d3-geo";
 import GlobeSphere from "./GlobeSphere";
+import GlobeGrid from "./GlobeGrid";
 import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
 import type { CountryFeature } from "@/lib/geo/types";
@@ -348,6 +349,7 @@ function GlobeScene({
 
       {/* Dark base sphere */}
       <GlobeSphere />
+      <GlobeGrid />
       <Atmosphere />
 
       {/* Country fill texture sphere (sits on top of base) */}
