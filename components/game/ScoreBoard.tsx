@@ -1,11 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/lib/store/game-store";
+import { formatTime } from "@/lib/utils";
 
 export default function ScoreBoard() {
   const phase = useGameStore((s) => s.phase);
   const questionsAnswered = useGameStore((s) => s.questionsAnswered);
   const questionsCorrect = useGameStore((s) => s.questionsCorrect);
+  const gameStartTime = useGameStore((s) => s.gameStartTime);
+  const totalPausedTime = useGameStore((s) => s.totalPausedTime);
+  const gamePausedAt = useGameStore((s) => s.gamePausedAt);
+
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  useEffect(() => {
+    if (gameStartTime === null) {
+      setElapsedTime(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      const now = Date.now();
+      const pausedDuration = gamePausedAt !== null ? now - gamePausedAt : 0;
+      const elapsed = (now - gameStartTime - totalPausedTime - pausedDuration) / 1000;
+      setElapsedTime(elapsed);
+    };
+
+    // Update immediately
+    updateElapsed();
+
+    // Update every second
+    const interval = setInterval(updateElapsed, 1000);
+    return () => clearInterval(interval);
+  }, [gameStartTime, totalPausedTime, gamePausedAt]);
 
   if (phase !== "playing" && phase !== "feedback") return null;
 
@@ -25,6 +53,11 @@ export default function ScoreBoard() {
       <p className="text-white/40 text-xs mt-1 tabular-nums">
         {questionsCorrect} / {questionsAnswered} correct
       </p>
+      {gameStartTime !== null && (
+        <p className="text-white/30 text-xs mt-2 tabular-nums">
+          {formatTime(elapsedTime)}
+        </p>
+      )}
     </div>
   );
 }

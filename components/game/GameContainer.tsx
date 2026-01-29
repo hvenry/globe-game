@@ -10,6 +10,7 @@ import ClickFeedback from "./ClickFeedback";
 import StartScreen from "./StartScreen";
 import GameOver from "./GameOver";
 import PauseMenu from "./PauseMenu";
+import CountdownTimer from "./CountdownTimer";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
@@ -33,6 +34,10 @@ export default function GameContainer() {
   const expertMode = useSettingsStore((s) => s.expertMode);
   const allowSkips = useSettingsStore((s) => s.allowSkips);
   const showHints = useSettingsStore((s) => s.showHints);
+  const timerLimit = useSettingsStore((s) => s.timerLimit);
+
+  const pauseTimer = useGameStore((s) => s.pauseTimer);
+  const resumeTimer = useGameStore((s) => s.resumeTimer);
 
   const allFeatures = useMemo(() => getAllFeatures(), []);
   const guessableCountries = useMemo(() => getGuessableCountries(), []);
@@ -48,16 +53,16 @@ export default function GameContainer() {
 
   const handleStart = useCallback(() => {
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, expertMode);
+    startGame(countries, expertMode, timerLimit);
     setIsPaused(false);
-  }, [startGame, filteredCountries, guessableCountries, expertMode]);
+  }, [startGame, filteredCountries, guessableCountries, expertMode, timerLimit]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, expertMode);
+    startGame(countries, expertMode, timerLimit);
     setIsPaused(false);
-  }, [resetGame, startGame, filteredCountries, guessableCountries, expertMode]);
+  }, [resetGame, startGame, filteredCountries, guessableCountries, expertMode, timerLimit]);
 
   const handleMainMenu = useCallback(() => {
     resetGame();
@@ -110,7 +115,15 @@ export default function GameContainer() {
       // Escape key toggles pause during gameplay
       if (e.key === "Escape" && (phase === "playing" || phase === "feedback")) {
         e.preventDefault();
-        setIsPaused((p) => !p);
+        setIsPaused((p) => {
+          const newPaused = !p;
+          if (newPaused) {
+            pauseTimer();
+          } else {
+            resumeTimer();
+          }
+          return newPaused;
+        });
         return;
       }
 
@@ -126,7 +139,7 @@ export default function GameContainer() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, isPaused, goNext, goPrev, allowSkips]);
+  }, [phase, isPaused, goNext, goPrev, allowSkips, pauseTimer, resumeTimer]);
 
   const isGameActive = phase === "playing" || phase === "feedback";
 
@@ -144,6 +157,7 @@ export default function GameContainer() {
       </div>
 
       <CountryPrompt />
+      <CountdownTimer />
       <ScoreBoard />
       <TriesIndicator />
       <ClickFeedback />

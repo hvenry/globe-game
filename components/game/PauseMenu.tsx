@@ -112,7 +112,7 @@ export default function PauseMenu({
             onClick={onMainMenu}
             className="text-white/30 hover:text-white/50 text-sm transition-colors w-full cursor-pointer"
           >
-            Exit Game
+            Quit Game
           </button>
         </div>
       </div>

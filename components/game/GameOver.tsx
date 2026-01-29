@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useGameStore } from "@/lib/store/game-store";
 import { useStatsStore } from "@/lib/store/stats-store";
+import { formatTime } from "@/lib/utils";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -48,8 +49,23 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   const currentCountry = useGameStore((s) => s.currentCountry);
   const lastClickedCountryName = useGameStore((s) => s.lastClickedCountryName);
   const lastResolution = useGameStore((s) => s.lastResolution);
-  const { bestScore, recordGame } = useStatsStore();
+  const gameStartTime = useGameStore((s) => s.gameStartTime);
+  const totalPausedTime = useGameStore((s) => s.totalPausedTime);
+  const { bestScore, expertBestScore, recordGame } = useStatsStore();
   const recorded = useRef(false);
+  const previousBestScore = useRef(bestScore);
+  const previousExpertBestScore = useRef(expertBestScore);
+
+  // Capture the previous best scores before they get updated
+  if (!recorded.current) {
+    previousBestScore.current = bestScore;
+    previousExpertBestScore.current = expertBestScore;
+  }
+
+  const elapsedSeconds =
+    gameStartTime !== null
+      ? (Date.now() - gameStartTime - totalPausedTime) / 1000
+      : 0;
 
   const accuracy =
     questionsAnswered > 0
@@ -62,7 +78,8 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
       : 0;
 
   const scorePercentage = Math.round((questionsCorrect / 195) * 100);
-  const isNewBest = questionsCorrect > bestScore;
+  const isNewBest = !expertMode && questionsCorrect > previousBestScore.current;
+  const isNewExpertBest = expertMode && questionsCorrect > previousExpertBestScore.current;
 
   let perfectCount = 0;
   let imperfectCount = 0;
@@ -105,6 +122,11 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               <p className="text-amber-400/40 text-sm mt-2 tabular-nums">
                 {questionsCorrect} / {totalCountries}
               </p>
+              {isNewExpertBest && (
+                <Badge className="mt-2 bg-amber-500/20 text-amber-400 border-amber-500/30">
+                  New Best!
+                </Badge>
+              )}
             </div>
 
             {lastResolution === "failed" && currentCountry && lastClickedCountryName && (
@@ -181,6 +203,25 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               </div>
             </div>
           </>
+        )}
+
+        {gameStartTime !== null && (
+          <div className={`my-4 rounded-lg p-3 ${
+            expertMode
+              ? "bg-amber-500/10 border border-amber-500/20"
+              : "bg-white/5"
+          }`}>
+            <p className={`text-xs uppercase tracking-wider ${
+              expertMode ? "text-amber-400/60" : "text-white/40"
+            }`}>
+              Total Time
+            </p>
+            <p className={`text-2xl font-bold tabular-nums mt-1 ${
+              expertMode ? "text-amber-400" : "text-white"
+            }`}>
+              {formatTime(elapsedSeconds)}
+            </p>
+          </div>
         )}
 
         <div className="space-y-3">

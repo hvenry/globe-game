@@ -23,6 +23,15 @@ export const GAME_CONFIG = {
   totalCountries: 195,
 } as const;
 
+export const TIMER_CONFIG = {
+  availableLimits: [null, 5, 10, 30, 60] as const,
+  defaultLimit: null as number | null,
+  expertModeLimit: 5, // Expert mode is locked to 5 seconds
+  updateInterval: 100, // ms
+  warningThreshold: 0.3, // 30% remaining
+  criticalThreshold: 0.6, // 60% remaining for yellow transition
+} as const;
+
 export const GLOBE_CONFIG = {
   radius: 100,
   meshRadius: 100.2,

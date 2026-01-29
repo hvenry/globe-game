@@ -8,6 +8,7 @@ import {
   getAvailableCountrySets,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
+import { TIMER_CONFIG } from "@/lib/constants";
 
 interface StartScreenProps {
   onStart: () => void;
@@ -122,6 +123,74 @@ function GameModeSelect({
   );
 }
 
+function TimerLimitSelect({
+  value,
+  onChange,
+  disabled = false,
+  expertMode = false,
+}: {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  disabled?: boolean;
+  expertMode?: boolean;
+}) {
+  const options: Array<{ label: string; value: number | null }> = [
+    { label: "None", value: null },
+    { label: "5s", value: 5 },
+    { label: "10s", value: 10 },
+    { label: "30s", value: 30 },
+    { label: "1m", value: 60 },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+        Time Restriction
+      </p>
+      <div className="grid grid-cols-5 gap-2">
+        {options.map((option) => {
+          const isSelected = value === option.value;
+          const is5Second = option.value === 5;
+          const useExpertStyling = expertMode && is5Second;
+
+          return (
+            <button
+              key={option.label}
+              onClick={() => !disabled && onChange(option.value)}
+              disabled={disabled}
+              className={`p-2 rounded-lg text-center transition-all duration-200 ${
+                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              } ${
+                useExpertStyling
+                  ? isSelected
+                    ? "bg-amber-500/15 border border-amber-500/50"
+                    : "bg-white/5 border border-amber-500/20"
+                  : isSelected
+                    ? "bg-emerald/20 border border-emerald/50"
+                    : "bg-white/5 hover:bg-white/10 border border-transparent"
+              }`}
+            >
+              <p
+                className={`text-xs font-medium ${
+                  useExpertStyling
+                    ? isSelected
+                      ? "text-amber-400"
+                      : "text-white"
+                    : isSelected
+                      ? "text-emerald"
+                      : "text-white"
+                }`}
+              >
+                {option.label}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function StartScreen({ onStart }: StartScreenProps) {
   const [hydrated, setHydrated] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -132,18 +201,28 @@ export default function StartScreen({ onStart }: StartScreenProps) {
   const allowSkips = useSettingsStore((s) => s.allowSkips);
   const expertMode = useSettingsStore((s) => s.expertMode);
   const showHints = useSettingsStore((s) => s.showHints);
+  const timerLimit = useSettingsStore((s) => s.timerLimit);
   const setCountrySet = useSettingsStore((s) => s.setCountrySet);
   const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
+  const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
 
   // Store previous settings state when expert mode is toggled on
   const previousAllowSkips = useRef<boolean>(allowSkips);
   const previousShowHints = useRef<boolean>(showHints);
+  const previousTimerLimit = useRef<number | null>(timerLimit);
 
   useEffect(() => {
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    // If expert mode is enabled and timer isn't 5 seconds, set it to 5 seconds
+    if (expertMode && timerLimit !== TIMER_CONFIG.expertModeLimit) {
+      setTimerLimit(TIMER_CONFIG.expertModeLimit);
+    }
+  }, [expertMode, timerLimit, setTimerLimit]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -196,6 +275,13 @@ export default function StartScreen({ onStart }: StartScreenProps) {
 
         {showSettings ? (
           <div className="space-y-4 mb-6 text-left">
+            <TimerLimitSelect
+              value={timerLimit}
+              onChange={setTimerLimit}
+              disabled={expertMode}
+              expertMode={expertMode}
+            />
+
             <GameModeSelect value={countrySet} onChange={setCountrySet} />
 
             <div className="space-y-2">
@@ -224,12 +310,15 @@ export default function StartScreen({ onStart }: StartScreenProps) {
                       // Save current state before disabling
                       previousAllowSkips.current = allowSkips;
                       previousShowHints.current = showHints;
+                      previousTimerLimit.current = timerLimit;
                       setAllowSkips(false);
                       setShowHints(false);
+                      setTimerLimit(TIMER_CONFIG.expertModeLimit);
                     } else {
                       // Restore previous state
                       setAllowSkips(previousAllowSkips.current);
                       setShowHints(previousShowHints.current);
+                      setTimerLimit(previousTimerLimit.current);
                     }
                     setExpertMode(value);
                   }}

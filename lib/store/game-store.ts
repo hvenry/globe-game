@@ -34,7 +34,15 @@ interface GameState {
   questionsAnswered: number;
   questionsCorrect: number;
 
-  startGame: (countries: CountryData[], expertMode?: boolean) => void;
+  // Timer state
+  countdownRemaining: number;
+  countdownTimerLimit: number | null;
+  gameStartTime: number | null;
+  gamePausedAt: number | null;
+  totalPausedTime: number;
+  countryCountdowns: Map<string, number>;
+
+  startGame: (countries: CountryData[], expertMode?: boolean, timerLimit?: number | null) => void;
   makeGuess: (countryId: string) => void;
   addFloatingLabel: (name: string, position: [number, number, number]) => void;
   removeFloatingLabel: (id: string) => void;
@@ -43,21 +51,44 @@ interface GameState {
   nextCountry: () => void;
   forfeitGame: () => void;
   resetGame: () => void;
+  setCountdownRemaining: (time: number) => void;
+  handleTimerExpired: () => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
 }
 
-function saveCurrentTriesState(state: GameState): { countryTries: Map<string, number>; countryWrongGuesses: Map<string, Set<string>> } {
-  if (!state.currentCountry) return { countryTries: state.countryTries, countryWrongGuesses: state.countryWrongGuesses };
+function saveCurrentTriesState(state: GameState): {
+  countryTries: Map<string, number>;
+  countryWrongGuesses: Map<string, Set<string>>;
+  countryCountdowns: Map<string, number>;
+} {
+  if (!state.currentCountry) {
+    return {
+      countryTries: state.countryTries,
+      countryWrongGuesses: state.countryWrongGuesses,
+      countryCountdowns: state.countryCountdowns,
+    };
+  }
   const newTries = new Map(state.countryTries);
   newTries.set(state.currentCountry.id, state.triesRemaining);
   const newWrong = new Map(state.countryWrongGuesses);
   newWrong.set(state.currentCountry.id, new Set(state.wrongGuessIds));
-  return { countryTries: newTries, countryWrongGuesses: newWrong };
+  const newCountdowns = new Map(state.countryCountdowns);
+  newCountdowns.set(state.currentCountry.id, state.countdownRemaining);
+  return { countryTries: newTries, countryWrongGuesses: newWrong, countryCountdowns: newCountdowns };
 }
 
-function loadTriesState(country: CountryData, countryTries: Map<string, number>, countryWrongGuesses: Map<string, Set<string>>) {
+function loadTriesState(
+  country: CountryData,
+  countryTries: Map<string, number>,
+  countryWrongGuesses: Map<string, Set<string>>,
+  countryCountdowns: Map<string, number>,
+  timerLimit: number | null
+) {
   return {
     triesRemaining: countryTries.get(country.id) ?? GAME_CONFIG.maxTries,
     wrongGuessIds: countryWrongGuesses.get(country.id) ?? new Set<string>(),
+    countdownRemaining: countryCountdowns.get(country.id) ?? (timerLimit ?? 0),
   };
 }
 
@@ -81,13 +112,23 @@ export const useGameStore = create<GameState>((set, get) => ({
   questionsAnswered: 0,
   questionsCorrect: 0,
 
-  startGame: (countries, expertMode = false) => {
+  // Timer state
+  countdownRemaining: 0,
+  countdownTimerLimit: null,
+  gameStartTime: null,
+  gamePausedAt: null,
+  totalPausedTime: 0,
+  countryCountdowns: new Map(),
+
+  startGame: (countries, expertMode = false, timerLimit = null) => {
     const shuffled = shuffle(countries);
     const tries = new Map<string, number>();
     const wrongGuesses = new Map<string, Set<string>>();
+    const countdowns = new Map<string, number>();
     for (const c of shuffled) {
       tries.set(c.id, GAME_CONFIG.maxTries);
       wrongGuesses.set(c.id, new Set());
+      countdowns.set(c.id, timerLimit ?? 0);
     }
     set({
       phase: "playing",
@@ -96,6 +137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentCountry: shuffled[0],
       countryTries: tries,
       countryWrongGuesses: wrongGuesses,
+      countryCountdowns: countdowns,
       totalCountries: shuffled.length,
       triesRemaining: GAME_CONFIG.maxTries,
       wrongGuessIds: new Set(),
@@ -107,6 +149,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      countdownRemaining: timerLimit ?? 0,
+      countdownTimerLimit: timerLimit,
+      gameStartTime: Date.now(),
+      gamePausedAt: null,
+      totalPausedTime: 0,
     });
   },
 
@@ -132,13 +179,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     const saved = saveCurrentTriesState(state);
     const newIndex = (state.currentIndex + 1) % state.unansweredCountries.length;
     const nextCountry = state.unansweredCountries[newIndex];
-    const loaded = loadTriesState(nextCountry, saved.countryTries, saved.countryWrongGuesses);
+    const loaded = loadTriesState(
+      nextCountry,
+      saved.countryTries,
+      saved.countryWrongGuesses,
+      saved.countryCountdowns,
+      state.countdownTimerLimit
+    );
     set({
       ...saved,
       currentIndex: newIndex,
       currentCountry: nextCountry,
       triesRemaining: loaded.triesRemaining,
       wrongGuessIds: loaded.wrongGuessIds,
+      countdownRemaining: loaded.countdownRemaining,
       isCorrect: null,
       lastClickedCountryName: null,
       floatingLabels: [],
@@ -152,13 +206,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     const len = state.unansweredCountries.length;
     const newIndex = (state.currentIndex - 1 + len) % len;
     const prevCountry = state.unansweredCountries[newIndex];
-    const loaded = loadTriesState(prevCountry, saved.countryTries, saved.countryWrongGuesses);
+    const loaded = loadTriesState(
+      prevCountry,
+      saved.countryTries,
+      saved.countryWrongGuesses,
+      saved.countryCountdowns,
+      state.countdownTimerLimit
+    );
     set({
       ...saved,
       currentIndex: newIndex,
       currentCountry: prevCountry,
       triesRemaining: loaded.triesRemaining,
       wrongGuessIds: loaded.wrongGuessIds,
+      countdownRemaining: loaded.countdownRemaining,
       isCorrect: null,
       lastClickedCountryName: null,
       floatingLabels: [],
@@ -204,6 +265,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       newTries.delete(state.currentCountry.id);
       const newWrong = new Map(state.countryWrongGuesses);
       newWrong.delete(state.currentCountry.id);
+      const newCountdowns = new Map(state.countryCountdowns);
+      newCountdowns.delete(state.currentCountry.id);
       const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
 
       set({
@@ -218,6 +281,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         currentIndex: newIndex,
         countryTries: newTries,
         countryWrongGuesses: newWrong,
+        countryCountdowns: newCountdowns,
       });
     } else {
       // Expert mode: one wrong click = game over
@@ -254,6 +318,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         newTriesMap.delete(state.currentCountry.id);
         const newWrong = new Map(state.countryWrongGuesses);
         newWrong.delete(state.currentCountry.id);
+        const newCountdowns = new Map(state.countryCountdowns);
+        newCountdowns.delete(state.currentCountry.id);
         const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
 
         set({
@@ -269,6 +335,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           currentIndex: newIndex,
           countryTries: newTriesMap,
           countryWrongGuesses: newWrong,
+          countryCountdowns: newCountdowns,
         });
       } else {
         set({
@@ -287,12 +354,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
     const country = state.unansweredCountries[state.currentIndex];
-    const loaded = loadTriesState(country, state.countryTries, state.countryWrongGuesses);
+    const loaded = loadTriesState(
+      country,
+      state.countryTries,
+      state.countryWrongGuesses,
+      state.countryCountdowns,
+      state.countdownTimerLimit
+    );
     set({
       phase: "playing",
       currentCountry: country,
       triesRemaining: loaded.triesRemaining,
       wrongGuessIds: loaded.wrongGuessIds,
+      countdownRemaining: loaded.countdownRemaining,
       isCorrect: null,
       lastResolution: null,
       lastClickedCountryName: null,
@@ -312,6 +386,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentCountry: null,
       countryTries: new Map(),
       countryWrongGuesses: new Map(),
+      countryCountdowns: new Map(),
       totalCountries: 0,
       triesRemaining: GAME_CONFIG.maxTries,
       wrongGuessIds: new Set(),
@@ -323,6 +398,82 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      countdownRemaining: 0,
+      countdownTimerLimit: null,
+      gameStartTime: null,
+      gamePausedAt: null,
+      totalPausedTime: 0,
     });
+  },
+
+  setCountdownRemaining: (time) => {
+    set({ countdownRemaining: time });
+  },
+
+  handleTimerExpired: () => {
+    const state = get();
+    if (state.phase !== "playing" || !state.currentCountry) return;
+
+    const newResolved = new Map(state.resolvedCountries);
+    newResolved.set(state.currentCountry.id, "failed");
+
+    // Expert mode: time expired = game over
+    if (state.expertMode) {
+      set({
+        phase: "gameover",
+        isCorrect: false,
+        triesRemaining: 0,
+        countdownRemaining: 0,
+        lastResolution: "failed",
+        lastClickedCountryName: "Time's up!",
+        resolvedCountries: newResolved,
+        questionsAnswered: state.questionsAnswered + 1,
+      });
+      return;
+    }
+
+    // Normal mode: remove country from unanswered list and continue
+    const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
+    const newTries = new Map(state.countryTries);
+    newTries.delete(state.currentCountry.id);
+    const newWrong = new Map(state.countryWrongGuesses);
+    newWrong.delete(state.currentCountry.id);
+    const newCountdowns = new Map(state.countryCountdowns);
+    newCountdowns.delete(state.currentCountry.id);
+    const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
+
+    set({
+      phase: "feedback",
+      isCorrect: false,
+      triesRemaining: 0,
+      countdownRemaining: 0,
+      lastResolution: "failed",
+      lastClickedCountryName: "Time's up!",
+      resolvedCountries: newResolved,
+      questionsAnswered: state.questionsAnswered + 1,
+      unansweredCountries: newUnanswered,
+      currentIndex: newIndex,
+      countryTries: newTries,
+      countryWrongGuesses: newWrong,
+      countryCountdowns: newCountdowns,
+    });
+  },
+
+  pauseTimer: () => {
+    const state = get();
+    if (state.gamePausedAt === null) {
+      set({ gamePausedAt: Date.now() });
+    }
+  },
+
+  resumeTimer: () => {
+    const state = get();
+    if (state.gamePausedAt !== null) {
+      const pauseDuration = Date.now() - state.gamePausedAt;
+      set({
+        totalPausedTime: state.totalPausedTime + pauseDuration,
+        gamePausedAt: null,
+      });
+    }
   },
 }));

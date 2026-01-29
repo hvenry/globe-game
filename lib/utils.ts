@@ -13,3 +13,16 @@ export function shuffle<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+
+export function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+export function formatCountdown(seconds: number): string {
+  if (seconds >= 10) {
+    return Math.floor(seconds).toString();
+  }
+  return seconds.toFixed(1);
+}
