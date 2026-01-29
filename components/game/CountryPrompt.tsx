@@ -16,7 +16,9 @@ export default function CountryPrompt() {
   if ((phase !== "playing" && phase !== "feedback") || !currentCountry)
     return null;
 
-  const current = questionsAnswered + 1;
+  // During feedback phase, questionsAnswered has already been incremented
+  // During playing phase, we need to add 1 since we're on the next question
+  const current = phase === "feedback" ? questionsAnswered : questionsAnswered + 1;
   const showArrows = allowSkips && phase === "playing" && unansweredCountries.length > 1;
 
   return (
