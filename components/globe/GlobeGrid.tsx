@@ -10,9 +10,9 @@ const noopRaycast = () => {};
 const LAT_STEP = 15; // degrees between latitude lines
 const LNG_STEP = 15; // degrees between longitude lines
 const SEGMENTS_PER_LINE = 64;
-const GRID_RADIUS = GLOBE_CONFIG.radius + 0.05; // Just above base sphere
-const GRID_COLOR = "#333333";
-const GRID_OPACITY = 0.4;
+const GRID_RADIUS = GLOBE_CONFIG.meshRadius + 0.05; // Above country fill texture sphere
+const GRID_COLOR = "#666666";
+const GRID_OPACITY = 0.3;
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -70,6 +70,7 @@ export default function GlobeGrid() {
         color={GRID_COLOR}
         transparent
         opacity={GRID_OPACITY}
+        depthTest={true}
         depthWrite={false}
       />
     </lineSegments>

@@ -7,12 +7,12 @@ interface StatsState {
   totalCorrect: number;
   bestScore: number;
   bestStreak: number;
+  expertBestScore: number;
+  expertGamesPlayed: number;
 
   recordGame: (
-    score: number,
-    streak: number,
-    answered: number,
-    correct: number
+    correct: number,
+    expertMode?: boolean
   ) => void;
 }
 
@@ -24,16 +24,22 @@ export const useStatsStore = create<StatsState>()(
       totalCorrect: 0,
       bestScore: 0,
       bestStreak: 0,
+      expertBestScore: 0,
+      expertGamesPlayed: 0,
 
-      recordGame: (score, streak, answered, correct) => {
+      recordGame: (correct, expertMode = false) => {
         const state = get();
-        set({
-          gamesPlayed: state.gamesPlayed + 1,
-          totalAnswered: state.totalAnswered + answered,
-          totalCorrect: state.totalCorrect + correct,
-          bestScore: Math.max(state.bestScore, score),
-          bestStreak: Math.max(state.bestStreak, streak),
-        });
+        if (expertMode) {
+          set({
+            expertGamesPlayed: state.expertGamesPlayed + 1,
+            expertBestScore: Math.max(state.expertBestScore, correct),
+          });
+        } else {
+          set({
+            gamesPlayed: state.gamesPlayed + 1,
+            bestScore: Math.max(state.bestScore, correct),
+          });
+        }
       },
     }),
     {

@@ -37,8 +37,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-emerald: #10B981;
-  --color-error: #EF4444;
+  --color-emerald: #10b981;
+  --color-gold: #f59e0b;
+  --color-gold-light: #fbbf24;
+  --color-error: #ef4444;
   --color-surface: #111111;
   --color-surface-border: #222222;
   --radius-sm: calc(var(--radius) - 4px);
@@ -53,36 +55,36 @@
 :root {
   --radius: 0.625rem;
   --background: #000000;
-  --foreground: #FFFFFF;
+  --foreground: #ffffff;
   --card: #111111;
-  --card-foreground: #FFFFFF;
+  --card-foreground: #ffffff;
   --popover: #111111;
-  --popover-foreground: #FFFFFF;
-  --primary: #10B981;
+  --popover-foreground: #ffffff;
+  --primary: #10b981;
   --primary-foreground: #000000;
   --secondary: #222222;
-  --secondary-foreground: #FFFFFF;
+  --secondary-foreground: #ffffff;
   --muted: #222222;
-  --muted-foreground: #A0A0A0;
-  --accent: #10B981;
+  --muted-foreground: #a0a0a0;
+  --accent: #10b981;
   --accent-foreground: #000000;
-  --destructive: #EF4444;
+  --destructive: #ef4444;
   --border: #222222;
   --input: #222222;
-  --ring: #10B981;
-  --chart-1: #10B981;
+  --ring: #10b981;
+  --chart-1: #10b981;
   --chart-2: #059669;
   --chart-3: #047857;
-  --chart-4: #065F46;
-  --chart-5: #064E3B;
+  --chart-4: #065f46;
+  --chart-5: #064e3b;
   --sidebar: #111111;
-  --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #10B981;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #000000;
   --sidebar-accent: #222222;
-  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #222222;
-  --sidebar-ring: #10B981;
+  --sidebar-ring: #10b981;
 }
 
 @layer base {
@@ -118,7 +120,8 @@
 }
 
 @keyframes shake {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(0);
   }
   25% {
@@ -130,7 +133,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
   }
   50% {
@@ -152,4 +156,35 @@
 
 .animate-pulse-glow {
   animation: pulse-glow 1s ease-in-out infinite;
+}
+
+@keyframes fade-blur-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(24px);
+  }
+}
+
+@keyframes flash-red {
+  0% {
+    background-color: white;
+  }
+  20% {
+    background-color: #ef4444;
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.animate-fade-blur-in {
+  animation: fade-blur-in 0.05 ease-out forwards;
+}
+
+.animate-flash-red {
+  animation: flash-red 0.8s ease-in-out forwards;
 }

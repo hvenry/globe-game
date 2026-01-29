@@ -28,18 +28,20 @@ interface GameState {
   lastResolution: Resolution | null;
   lastClickedCountryName: string | null;
   floatingLabels: FloatingLabel[];
+  expertMode: boolean;
 
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
   questionsCorrect: number;
 
-  startGame: (countries: CountryData[]) => void;
+  startGame: (countries: CountryData[], expertMode?: boolean) => void;
   makeGuess: (countryId: string) => void;
   addFloatingLabel: (name: string, position: [number, number, number]) => void;
   removeFloatingLabel: (id: string) => void;
   goNext: () => void;
   goPrev: () => void;
   nextCountry: () => void;
+  forfeitGame: () => void;
   resetGame: () => void;
 }
 
@@ -73,12 +75,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastResolution: null,
   lastClickedCountryName: null,
   floatingLabels: [],
+  expertMode: false,
 
   resolvedCountries: new Map(),
   questionsAnswered: 0,
   questionsCorrect: 0,
 
-  startGame: (countries) => {
+  startGame: (countries, expertMode = false) => {
     const shuffled = shuffle(countries);
     const tries = new Map<string, number>();
     const wrongGuesses = new Map<string, Set<string>>();
@@ -100,6 +103,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastResolution: null,
       lastClickedCountryName: null,
       floatingLabels: [],
+      expertMode,
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
@@ -168,6 +172,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     const guessBase = baseId(countryId);
     const isCorrect = guessBase === state.currentCountry.id;
 
+    // Check if this country has already been resolved (correctly guessed in a previous question)
+    if (state.resolvedCountries.has(guessBase)) {
+      // Don't penalize for clicking an already-resolved country
+      return;
+    }
+
+    // Check if this country has already been incorrectly guessed for the current question
+    if (state.wrongGuessIds.has(guessBase)) {
+      // Don't penalize for re-clicking an already-wrong guess (allows reviewing)
+      return;
+    }
+
     // Get the name of the guessed country
     let guessedCountryName = "";
     if (!isCorrect) {
@@ -204,6 +220,26 @@ export const useGameStore = create<GameState>((set, get) => ({
         countryWrongGuesses: newWrong,
       });
     } else {
+      // Expert mode: one wrong click = game over
+      if (state.expertMode) {
+        const newResolved = new Map(state.resolvedCountries);
+        newResolved.set(state.currentCountry.id, "failed");
+        const newWrongIds = new Set(state.wrongGuessIds);
+        newWrongIds.add(guessBase);
+
+        set({
+          phase: "gameover",
+          isCorrect: false,
+          triesRemaining: 0,
+          wrongGuessIds: newWrongIds,
+          lastResolution: "failed",
+          lastClickedCountryName: guessedCountryName,
+          resolvedCountries: newResolved,
+          questionsAnswered: state.questionsAnswered + 1,
+        });
+        return;
+      }
+
       const newTries = state.triesRemaining - 1;
       const newWrongIds = new Set(state.wrongGuessIds);
       newWrongIds.add(guessBase);
@@ -264,6 +300,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  forfeitGame: () => {
+    set({ phase: "gameover" });
+  },
+
   resetGame: () => {
     set({
       phase: "idle",
@@ -279,6 +319,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastResolution: null,
       lastClickedCountryName: null,
       floatingLabels: [],
+      expertMode: false,
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,

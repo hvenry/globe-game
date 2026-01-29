@@ -8,7 +8,6 @@ export default function ScoreBoard() {
   const questionsCorrect = useGameStore((s) => s.questionsCorrect);
 
   if (phase !== "playing" && phase !== "feedback") return null;
-  if (questionsAnswered === 0 && phase === "playing") return null;
 
   const accuracy =
     questionsAnswered > 0

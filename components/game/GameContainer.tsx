@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useEffect } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import GlobeDynamic from "@/components/globe/GlobeDynamic";
 import CountryPrompt from "./CountryPrompt";
 import TriesIndicator from "./TriesIndicator";
@@ -9,10 +9,15 @@ import ResultFeedback from "./ResultFeedback";
 import ClickFeedback from "./ClickFeedback";
 import StartScreen from "./StartScreen";
 import GameOver from "./GameOver";
+import PauseMenu from "./PauseMenu";
 import { useGameStore } from "@/lib/store/game-store";
+import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
+import { getCountrySet } from "@/lib/geo/country-sets";
 
 export default function GameContainer() {
+  const [isPaused, setIsPaused] = useState(false);
+
   const phase = useGameStore((s) => s.phase);
   const wrongGuessIds = useGameStore((s) => s.wrongGuessIds);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
@@ -22,38 +27,95 @@ export default function GameContainer() {
   const addFloatingLabel = useGameStore((s) => s.addFloatingLabel);
   const goNext = useGameStore((s) => s.goNext);
   const goPrev = useGameStore((s) => s.goPrev);
+  const forfeitGame = useGameStore((s) => s.forfeitGame);
+
+  const countrySetId = useSettingsStore((s) => s.countrySet);
+  const expertMode = useSettingsStore((s) => s.expertMode);
+  const allowSkips = useSettingsStore((s) => s.allowSkips);
+  const showHints = useSettingsStore((s) => s.showHints);
 
   const allFeatures = useMemo(() => getAllFeatures(), []);
   const guessableCountries = useMemo(() => getGuessableCountries(), []);
 
+  const filteredCountries = useMemo(() => {
+    const set = getCountrySet(countrySetId);
+    if (!set.countryIds) {
+      return guessableCountries;
+    }
+    const idSet = new Set(set.countryIds);
+    return guessableCountries.filter((c) => idSet.has(c.id));
+  }, [countrySetId, guessableCountries]);
+
   const handleStart = useCallback(() => {
-    startGame(guessableCountries);
-  }, [startGame, guessableCountries]);
+    const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
+    startGame(countries, expertMode);
+    setIsPaused(false);
+  }, [startGame, filteredCountries, guessableCountries, expertMode]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
-    startGame(guessableCountries);
-  }, [resetGame, startGame, guessableCountries]);
+    const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
+    startGame(countries, expertMode);
+    setIsPaused(false);
+  }, [resetGame, startGame, filteredCountries, guessableCountries, expertMode]);
+
+  const handleMainMenu = useCallback(() => {
+    resetGame();
+    setIsPaused(false);
+  }, [resetGame]);
+
+  const handleForfeit = useCallback(() => {
+    setIsPaused(false);
+    forfeitGame();
+  }, [forfeitGame]);
+
+  const handleResume = useCallback(() => {
+    setIsPaused(false);
+  }, []);
 
   const handleCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
-      if (phase !== "playing") return;
+      if (phase !== "playing" || isPaused) return;
 
-      // Show floating label with country name
+      const currentCountry = useGameStore.getState().currentCountry;
       const base = baseId(countryId);
-      const feature = allFeatures.find((f) => baseId(f.id) === base);
-      if (feature) {
-        addFloatingLabel(feature.properties.name, position);
+      const isCorrectGuess = currentCountry && base === currentCountry.id;
+      const isAlreadyResolved = resolvedCountries.has(base);
+      const isAlreadyWrongGuess = wrongGuessIds.has(base);
+
+      // Show floating label when hints are enabled for:
+      // 1. Already resolved countries (allows user to review what they got)
+      // 2. Already incorrectly guessed countries (allows user to review their mistakes)
+      // 3. New incorrect guesses
+      const shouldShowLabel = showHints && (
+        isAlreadyResolved ||
+        isAlreadyWrongGuess ||
+        !isCorrectGuess
+      );
+
+      if (shouldShowLabel) {
+        const feature = allFeatures.find((f) => baseId(f.id) === base);
+        if (feature) {
+          addFloatingLabel(feature.properties.name, position);
+        }
       }
 
       makeGuess(countryId);
     },
-    [phase, makeGuess, allFeatures, addFloatingLabel]
+    [phase, isPaused, makeGuess, allFeatures, addFloatingLabel, showHints, resolvedCountries, wrongGuessIds]
   );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (phase !== "playing") return;
+      // Escape key toggles pause during gameplay
+      if (e.key === "Escape" && (phase === "playing" || phase === "feedback")) {
+        e.preventDefault();
+        setIsPaused((p) => !p);
+        return;
+      }
+
+      // Arrow keys for navigation (only when not paused and skips allowed)
+      if (phase !== "playing" || isPaused || !allowSkips) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         goPrev();
@@ -64,7 +126,9 @@ export default function GameContainer() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, goNext, goPrev]);
+  }, [phase, isPaused, goNext, goPrev, allowSkips]);
+
+  const isGameActive = phase === "playing" || phase === "feedback";
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-black">
@@ -73,7 +137,7 @@ export default function GameContainer() {
           features={allFeatures}
           wrongGuessIds={wrongGuessIds}
           resolvedCountries={resolvedCountries}
-          interactive={phase === "playing"}
+          interactive={phase === "playing" && !isPaused}
           autoRotate={phase === "idle" || phase === "gameover"}
           onCountryClick={handleCountryClick}
         />
@@ -86,7 +150,16 @@ export default function GameContainer() {
       <ResultFeedback />
 
       {phase === "idle" && <StartScreen onStart={handleStart} />}
-      {phase === "gameover" && <GameOver onPlayAgain={handlePlayAgain} />}
+      {phase === "gameover" && (
+        <GameOver onPlayAgain={handlePlayAgain} onMainMenu={handleMainMenu} />
+      )}
+      {isPaused && isGameActive && (
+        <PauseMenu
+          onResume={handleResume}
+          onRestart={handlePlayAgain}
+          onMainMenu={handleForfeit}
+        />
+      )}
     </div>
   );
 }

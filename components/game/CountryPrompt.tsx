@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/game-store";
+import { useSettingsStore } from "@/lib/store/settings-store";
 
 export default function CountryPrompt() {
   const phase = useGameStore((s) => s.phase);
@@ -10,12 +11,13 @@ export default function CountryPrompt() {
   const unansweredCountries = useGameStore((s) => s.unansweredCountries);
   const goNext = useGameStore((s) => s.goNext);
   const goPrev = useGameStore((s) => s.goPrev);
+  const allowSkips = useSettingsStore((s) => s.allowSkips);
 
   if ((phase !== "playing" && phase !== "feedback") || !currentCountry)
     return null;
 
   const current = questionsAnswered + 1;
-  const showArrows = phase === "playing" && unansweredCountries.length > 1;
+  const showArrows = allowSkips && phase === "playing" && unansweredCountries.length > 1;
 
   return (
     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
