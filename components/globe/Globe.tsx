@@ -23,6 +23,37 @@ import { GLOBE_CONFIG, COLORS, SMALL_COUNTRIES } from "@/lib/constants";
 import { baseId } from "@/lib/geo/countries";
 import type { Resolution, FloatingLabel } from "@/lib/store/game-store";
 import { useGameStore } from "@/lib/store/game-store";
+import type { CountrySetId } from "@/lib/geo/country-sets";
+
+// ── Continent camera targets ────────────────────────────────────────────────
+
+/** Approximate [lng, lat] centers for each continent game mode */
+const CONTINENT_CENTERS: Partial<Record<CountrySetId, [number, number]>> = {
+  africa: [20, 5],
+  asia: [80, 30],
+  europe: [15, 50],
+  north_america: [-95, 35],
+  south_america: [-58, -15],
+  oceania: [145, -10],
+};
+
+/**
+ * Convert [lng, lat] to a Three.js camera position at the given distance.
+ * Coordinate convention matches three-geojson-geometry / pointToCoords.
+ */
+function lngLatToCameraPos(
+  lng: number,
+  lat: number,
+  distance: number,
+): THREE.Vector3 {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (90 - lng) * (Math.PI / 180);
+  return new THREE.Vector3(
+    distance * Math.sin(phi) * Math.cos(theta),
+    distance * Math.cos(phi),
+    distance * Math.sin(phi) * Math.sin(theta),
+  );
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,6 +209,82 @@ function GlobeScene({
     null,
   );
   const readySignaled = useRef(false);
+  const validCountryIds = useGameStore((s) => s.validCountryIds);
+  const { camera } = useThree();
+
+  // ── Camera animation (continent targeting + zoom reset) ─────────────────
+
+  const gamePhase = useGameStore((s) => s.phase);
+  const gameCountrySetId = useGameStore((s) => s.countrySetId);
+  const prevPhaseRef = useRef(gamePhase);
+  const animTargetRef = useRef<THREE.Vector3 | null>(null);
+  const animDistanceRef = useRef<number | null>(null);
+  const hasAnimatedForGame = useRef(false);
+
+  const cancelAnim = useCallback(() => {
+    animTargetRef.current = null;
+    animDistanceRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const wasInGame = prevPhaseRef.current === "playing" || prevPhaseRef.current === "feedback";
+
+    // Only animate once per game session (idle/gameover → playing)
+    if (gamePhase === "playing" && !wasInGame && !hasAnimatedForGame.current) {
+      hasAnimatedForGame.current = true;
+      const center = CONTINENT_CENTERS[gameCountrySetId];
+      if (center) {
+        // Full position animation to face the continent
+        animTargetRef.current = lngLatToCameraPos(center[0], center[1], GLOBE_CONFIG.cameraZ);
+      } else {
+        // "all" mode — distance-only reset
+        animDistanceRef.current = GLOBE_CONFIG.cameraZ;
+      }
+    }
+
+    if ((gamePhase === "idle" || gamePhase === "gameover") && wasInGame) {
+      hasAnimatedForGame.current = false;
+      // Distance-only animation so autoRotate can spin freely
+      animDistanceRef.current = GLOBE_CONFIG.cameraZ;
+    }
+
+    prevPhaseRef.current = gamePhase;
+  }, [gamePhase, gameCountrySetId, camera]);
+
+  // Cancel camera animation on any user interaction (drag, scroll/zoom)
+  useEffect(() => {
+    const el = document.body;
+    el.addEventListener("pointerdown", cancelAnim);
+    el.addEventListener("wheel", cancelAnim);
+    return () => {
+      el.removeEventListener("pointerdown", cancelAnim);
+      el.removeEventListener("wheel", cancelAnim);
+    };
+  }, [cancelAnim]);
+
+  useFrame(() => {
+    // Full position animation (game start → continent)
+    if (animTargetRef.current) {
+      camera.position.lerp(animTargetRef.current, 0.05);
+      if (camera.position.distanceTo(animTargetRef.current) < 0.5) {
+        camera.position.copy(animTargetRef.current);
+        animTargetRef.current = null;
+      }
+      return;
+    }
+
+    // Distance-only animation (game end → reset zoom)
+    if (animDistanceRef.current !== null) {
+      const currentDist = camera.position.length();
+      const targetDist = animDistanceRef.current;
+      const newDist = THREE.MathUtils.lerp(currentDist, targetDist, 0.05);
+      camera.position.normalize().multiplyScalar(newDist);
+      if (Math.abs(newDist - targetDist) < 0.5) {
+        camera.position.normalize().multiplyScalar(targetDist);
+        animDistanceRef.current = null;
+      }
+    }
+  });
 
   // ── d3 projection (equirectangular rotated to match Three.js sphere UVs) ──
 
@@ -302,13 +409,17 @@ function GlobeScene({
         return;
       }
       const id = findCountryAtPoint(e.point);
-      const base = id ? baseId(id) : null;
+      let base = id ? baseId(id) : null;
+      // Ignore countries outside the active game set
+      if (base && validCountryIds.size > 0 && !validCountryIds.has(base)) {
+        base = null;
+      }
       if (base !== hoveredCountryBase) {
         setHoveredCountryBase(base);
         document.body.style.cursor = base ? "pointer" : "auto";
       }
     },
-    [interactive, findCountryAtPoint, hoveredCountryBase],
+    [interactive, findCountryAtPoint, hoveredCountryBase, validCountryIds],
   );
 
   const handlePointerOut = useCallback(() => {
@@ -336,9 +447,14 @@ function GlobeScene({
       }
 
       const id = findCountryAtPoint(e.point);
-      if (id) onCountryClick(id, [e.point.x, e.point.y, e.point.z]);
+      if (id) {
+        const base = baseId(id);
+        // Ignore countries outside the active game set
+        if (validCountryIds.size > 0 && !validCountryIds.has(base)) return;
+        onCountryClick(id, [e.point.x, e.point.y, e.point.z]);
+      }
     },
-    [interactive, onCountryClick, findCountryAtPoint],
+    [interactive, onCountryClick, findCountryAtPoint, validCountryIds],
   );
 
   // ── Border line elements (static, no state dependency) ────────────────────

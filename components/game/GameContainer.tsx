@@ -33,6 +33,7 @@ export default function GameContainer() {
   const goNext = useGameStore((s) => s.goNext);
   const goPrev = useGameStore((s) => s.goPrev);
   const forfeitGame = useGameStore((s) => s.forfeitGame);
+  const validCountryIds = useGameStore((s) => s.validCountryIds);
 
   const countrySetId = useSettingsStore((s) => s.countrySet);
   const expertMode = useSettingsStore((s) => s.expertMode);
@@ -100,6 +101,10 @@ export default function GameContainer() {
 
       const currentCountry = useGameStore.getState().currentCountry;
       const base = baseId(countryId);
+
+      // Ignore clicks on countries outside the active game set
+      if (!validCountryIds.has(base)) return;
+
       const isCorrectGuess = currentCountry && base === currentCountry.id;
       const isAlreadyResolved = resolvedCountries.has(base);
       const isAlreadyWrongGuess = wrongGuessIds.has(base);
@@ -123,7 +128,7 @@ export default function GameContainer() {
 
       makeGuess(countryId);
     },
-    [phase, isPaused, makeGuess, allFeatures, addFloatingLabel, showHints, resolvedCountries, wrongGuessIds]
+    [phase, isPaused, makeGuess, allFeatures, addFloatingLabel, showHints, resolvedCountries, wrongGuessIds, validCountryIds]
   );
 
   useEffect(() => {

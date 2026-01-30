@@ -31,6 +31,7 @@ interface GameState {
   floatingLabels: FloatingLabel[];
   expertMode: boolean;
   countrySetId: CountrySetId; // Track which country set is being played
+  validCountryIds: Set<string>;
 
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
@@ -110,6 +111,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   floatingLabels: [],
   expertMode: false,
   countrySetId: "all",
+  validCountryIds: new Set(),
 
   resolvedCountries: new Map(),
   questionsAnswered: 0,
@@ -150,6 +152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       floatingLabels: [],
       expertMode,
       countrySetId,
+      validCountryIds: new Set(shuffled.map(c => c.id)),
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
@@ -235,6 +238,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.phase !== "playing" || !state.currentCountry) return;
 
     const guessBase = baseId(countryId);
+
+    // Ignore clicks on countries outside the active game set
+    if (!state.validCountryIds.has(guessBase)) return;
+
     const isCorrect = guessBase === state.currentCountry.id;
 
     // Check if this country has already been resolved (correctly guessed in a previous question)
@@ -402,6 +409,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       floatingLabels: [],
       expertMode: false,
       countrySetId: "all",
+      validCountryIds: new Set(),
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
