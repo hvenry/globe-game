@@ -12,7 +12,13 @@ interface GameOverProps {
   onMainMenu: () => void;
 }
 
-function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?: number }) {
+function AnimatedCounter({
+  value,
+  duration = 1000,
+}: {
+  value: number;
+  duration?: number;
+}) {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
@@ -78,11 +84,13 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
       ? Math.round((questionsCorrect / totalCountries) * 100)
       : 0;
 
-  const scorePercentage = totalCountries > 0
-    ? Math.round((questionsCorrect / totalCountries) * 100)
-    : 0;
+  const scorePercentage =
+    totalCountries > 0
+      ? Math.round((questionsCorrect / totalCountries) * 100)
+      : 0;
   const isNewBest = !expertMode && questionsCorrect > previousBestScore.current;
-  const isNewExpertBest = expertMode && questionsCorrect > previousExpertBestScore.current;
+  const isNewExpertBest =
+    expertMode && questionsCorrect > previousExpertBestScore.current;
 
   let perfectCount = 0;
   let imperfectCount = 0;
@@ -115,22 +123,40 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               : "bg-black/80 border border-white/10"
         }`}
       >
-        <h2 className={`text-2xl font-bold mb-1 ${expertMode ? "text-amber-400" : "text-white"}`}>
-          {isPerfectScore ? (expertMode ? "Perfect Expert!" : "Perfect Score!") : (expertMode ? "Expert Mode" : "Game Complete")}
-        </h2>
+        {isPerfectScore ? (
+          <>
+            <h2
+              className={`text-2xl font-bold mb-1 ${expertMode ? "text-amber-400" : "text-white"}`}
+            >
+              Perfect Score!
+            </h2>
+            <p className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}>
+              {questionsCorrect} / {totalCountries}
+            </p>
+          </>
+        ) : expertMode ? (
+          <>
+            <h2 className="text-2xl font-bold mb-1 text-error">Game Over</h2>
+            <p className="text-xs text-amber-400/40 tabular-nums">
+              {questionsCorrect} / {totalCountries}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold mb-1 text-white">Game Overview</h2>
+            <p className="text-xs text-white/40 tabular-nums">
+              {questionsCorrect} / {totalCountries}
+            </p>
+          </>
+        )}
 
         {expertMode ? (
           <>
-            <div className="mt-6 mb-4">
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-amber-400/60 text-xs uppercase tracking-wider">
-                  Countries Found
-                </p>
-                <p className="text-amber-400/40 text-xs tabular-nums">
-                  {questionsCorrect} / {totalCountries}
-                </p>
-              </div>
-              <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-5xl md:text-6xl font-bold tabular-nums mt-1">
+            <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+              <p className="text-amber-400/60 text-xs uppercase tracking-wider">
+                Score
+              </p>
+              <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-4xl md:text-5xl font-bold tabular-nums mt-1">
                 <AnimatedCounter value={expertPercentage} duration={1200} />%
               </p>
               {isNewExpertBest && (
@@ -140,96 +166,112 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               )}
             </div>
 
-            {lastResolution === "failed" && currentCountry && lastClickedCountryName && (
-              <div className="mb-6 space-y-3">
-                <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-3">
-                  <p className="text-red-400/60 text-[10px] uppercase tracking-wider mb-1">
-                    Your Guess
-                  </p>
-                  <p className="text-red-400 text-base font-semibold">
-                    {lastClickedCountryName}
-                  </p>
+            {lastResolution === "failed" &&
+              currentCountry &&
+              lastClickedCountryName && (
+                <div className="mb-4 space-y-2">
+                  <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-2">
+                    <p className="text-red-400/60 text-[10px] uppercase tracking-wider mb-0.5">
+                      Your Guess
+                    </p>
+                    <p className="text-red-400 text-sm font-semibold">
+                      {lastClickedCountryName}
+                    </p>
+                  </div>
+                  <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-2">
+                    <p className="text-emerald-400/60 text-[10px] uppercase tracking-wider mb-0.5">
+                      Correct Answer
+                    </p>
+                    <p className="text-emerald-400 text-sm font-semibold">
+                      {currentCountry.name}
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-3">
-                  <p className="text-emerald-400/60 text-[10px] uppercase tracking-wider mb-1">
-                    Correct Answer
-                  </p>
-                  <p className="text-emerald-400 text-base font-semibold">
-                    {currentCountry.name}
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
           </>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 mt-6 mb-6">
-              <div>
-                <p className="text-white/40 text-xs uppercase tracking-wider">
-                  Accuracy
-                </p>
-                <p className="text-white text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                  <AnimatedCounter value={accuracy} duration={1200} />%
-                </p>
-              </div>
-              <div>
-                <p className="text-white/40 text-xs uppercase tracking-wider">
-                  Score
-                </p>
-                <p className="text-white text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                  <AnimatedCounter value={scorePercentage} duration={1200} />%
-                </p>
-                {isNewBest && (
-                  <Badge className="mt-2 bg-emerald/20 text-emerald border-emerald/30">
-                    New Best!
-                  </Badge>
-                )}
+            <div className="mt-4 mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-white/30 text-xs uppercase tracking-wider">
+                    Accuracy
+                  </p>
+                  <p className="text-white/60 text-3xl md:text-4xl font-bold tabular-nums mt-1">
+                    <AnimatedCounter value={accuracy} duration={1200} />%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/30 text-xs uppercase tracking-wider">
+                    Score
+                  </p>
+                  <p className={`text-3xl md:text-4xl font-bold tabular-nums mt-1 ${
+                    scorePercentage === 100
+                      ? "text-emerald"
+                      : "text-white"
+                  }`}>
+                    <AnimatedCounter value={scorePercentage} duration={1200} />%
+                  </p>
+                  {isNewBest && (
+                    <Badge className="mt-2 bg-emerald/20 text-emerald border-emerald/30">
+                      New Best!
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 my-6">
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-emerald text-[10px] uppercase tracking-wider">
-                  Perfect
-                </p>
-                <p className="text-emerald text-lg font-bold tabular-nums">
-                  {perfectCount}
-                </p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
-                  Imperfect
-                </p>
-                <p className="text-yellow-400 text-lg font-bold tabular-nums">
-                  {imperfectCount}
-                </p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-error text-[10px] uppercase tracking-wider">
-                  Failed
-                </p>
-                <p className="text-error text-lg font-bold tabular-nums">
-                  {failedCount}
-                </p>
+            <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-emerald text-[10px] uppercase tracking-wider">
+                    Perfect
+                  </p>
+                  <p className="text-emerald text-lg font-bold tabular-nums">
+                    {perfectCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
+                    Imperfect
+                  </p>
+                  <p className="text-yellow-400 text-lg font-bold tabular-nums">
+                    {imperfectCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-error text-[10px] uppercase tracking-wider">
+                    Failed
+                  </p>
+                  <p className="text-error text-lg font-bold tabular-nums">
+                    {failedCount}
+                  </p>
+                </div>
               </div>
             </div>
           </>
         )}
 
         {gameStartTime !== null && (
-          <div className={`my-4 rounded-lg p-3 ${
-            expertMode
-              ? "bg-amber-500/10 border border-amber-500/20"
-              : "bg-white/5"
-          }`}>
-            <p className={`text-xs uppercase tracking-wider ${
-              expertMode ? "text-amber-400/60" : "text-white/40"
-            }`}>
+          <div
+            className={`my-4 rounded-lg p-3 ${
+              expertMode
+                ? "bg-amber-500/10 border border-amber-500/20"
+                : "bg-white/5 border border-white/10"
+            }`}
+          >
+            <p
+              className={`text-xs uppercase tracking-wider ${
+                expertMode ? "text-amber-400/60" : "text-white/40"
+              }`}
+            >
               Total Time
             </p>
-            <p className={`text-2xl font-bold tabular-nums mt-1 ${
-              expertMode ? "text-amber-400" : "text-white"
-            }`}>
+            <p
+              className={`text-2xl font-bold tabular-nums mt-1 ${
+                expertMode ? "text-amber-400" : "text-white"
+              }`}
+            >
               {formatTime(elapsedSeconds)}
             </p>
           </div>

@@ -25,6 +25,11 @@ export default function PauseMenu({
       ? Math.round((questionsCorrect / questionsAnswered) * 100)
       : 0;
 
+  const scorePercentage =
+    totalCountries > 0
+      ? Math.round((questionsCorrect / totalCountries) * 100)
+      : 0;
+
   let perfectCount = 0;
   let imperfectCount = 0;
   let failedCount = 0;
@@ -50,7 +55,7 @@ export default function PauseMenu({
           Press ESC to resume
         </p>
 
-        <div className="mb-6">
+        <div className="mb-6 px-4">
           <p className={`text-xs uppercase tracking-wider ${
             expertMode ? "text-amber-400/60" : "text-white/40"
           }`}>
@@ -75,43 +80,54 @@ export default function PauseMenu({
 
         {!expertMode && (
           <>
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-emerald text-[10px] uppercase tracking-wider">
-                  Perfect
-                </p>
-                <p className="text-emerald text-lg font-bold tabular-nums">
-                  {perfectCount}
-                </p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
-                  Imperfect
-                </p>
-                <p className="text-yellow-400 text-lg font-bold tabular-nums">
-                  {imperfectCount}
-                </p>
-              </div>
-              <div className="bg-white/5 rounded-lg p-3">
-                <p className="text-error text-[10px] uppercase tracking-wider">
-                  Failed
-                </p>
-                <p className="text-error text-lg font-bold tabular-nums">
-                  {failedCount}
-                </p>
+            <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-white/30 text-xs uppercase tracking-wider">
+                    Accuracy
+                  </p>
+                  <p className="text-white/60 text-2xl md:text-3xl font-bold tabular-nums mt-1">
+                    {accuracy}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/30 text-xs uppercase tracking-wider">
+                    Score
+                  </p>
+                  <p className="text-white text-2xl md:text-3xl font-bold tabular-nums mt-1">
+                    {scorePercentage}%
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white/5 rounded-lg p-3 mb-6">
-              <p className="text-white/40 text-xs uppercase tracking-wider">
-                Accuracy
-              </p>
-              <p className="text-white text-xl font-bold tabular-nums">
-                {accuracy}%
-              </p>
-              <p className="text-white/30 text-xs tabular-nums">
-                {questionsCorrect} / {questionsAnswered} correct
-              </p>
+            <div className="mb-6 bg-white/5 border border-white/10 rounded-lg p-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-emerald text-[10px] uppercase tracking-wider">
+                    Perfect
+                  </p>
+                  <p className="text-emerald text-lg font-bold tabular-nums">
+                    {perfectCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
+                    Imperfect
+                  </p>
+                  <p className="text-yellow-400 text-lg font-bold tabular-nums">
+                    {imperfectCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-error text-[10px] uppercase tracking-wider">
+                    Failed
+                  </p>
+                  <p className="text-error text-lg font-bold tabular-nums">
+                    {failedCount}
+                  </p>
+                </div>
+              </div>
             </div>
           </>
         )}
