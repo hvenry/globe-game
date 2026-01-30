@@ -32,6 +32,7 @@ interface GameState {
   expertMode: boolean;
   countrySetId: CountrySetId; // Track which country set is being played
   validCountryIds: Set<string>;
+  maxTries: number; // Maximum attempts per country
 
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
@@ -45,7 +46,7 @@ interface GameState {
   totalPausedTime: number;
   countryCountdowns: Map<string, number>;
 
-  startGame: (countries: CountryData[], countrySetId: CountrySetId, expertMode?: boolean, timerLimit?: number | null) => void;
+  startGame: (countries: CountryData[], countrySetId: CountrySetId, expertMode?: boolean, timerLimit?: number | null, maxTries?: number) => void;
   makeGuess: (countryId: string) => void;
   addFloatingLabel: (name: string, position: [number, number, number]) => void;
   removeFloatingLabel: (id: string) => void;
@@ -86,10 +87,11 @@ function loadTriesState(
   countryTries: Map<string, number>,
   countryWrongGuesses: Map<string, Set<string>>,
   countryCountdowns: Map<string, number>,
-  timerLimit: number | null
+  timerLimit: number | null,
+  maxTries: number
 ) {
   return {
-    triesRemaining: countryTries.get(country.id) ?? GAME_CONFIG.maxTries,
+    triesRemaining: countryTries.get(country.id) ?? maxTries,
     wrongGuessIds: countryWrongGuesses.get(country.id) ?? new Set<string>(),
     countdownRemaining: countryCountdowns.get(country.id) ?? (timerLimit ?? 0),
   };
@@ -112,6 +114,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   expertMode: false,
   countrySetId: "all",
   validCountryIds: new Set(),
+  maxTries: GAME_CONFIG.maxTries,
 
   resolvedCountries: new Map(),
   questionsAnswered: 0,
@@ -125,13 +128,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   totalPausedTime: 0,
   countryCountdowns: new Map(),
 
-  startGame: (countries, countrySetId, expertMode = false, timerLimit = null) => {
+  startGame: (countries, countrySetId, expertMode = false, timerLimit = null, maxTries = GAME_CONFIG.maxTries) => {
     const shuffled = shuffle(countries);
     const tries = new Map<string, number>();
     const wrongGuesses = new Map<string, Set<string>>();
     const countdowns = new Map<string, number>();
     for (const c of shuffled) {
-      tries.set(c.id, GAME_CONFIG.maxTries);
+      tries.set(c.id, maxTries);
       wrongGuesses.set(c.id, new Set());
       countdowns.set(c.id, timerLimit ?? 0);
     }
@@ -144,7 +147,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       countryWrongGuesses: wrongGuesses,
       countryCountdowns: countdowns,
       totalCountries: shuffled.length,
-      triesRemaining: GAME_CONFIG.maxTries,
+      triesRemaining: maxTries,
       wrongGuessIds: new Set(),
       isCorrect: null,
       lastResolution: null,
@@ -153,6 +156,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       expertMode,
       countrySetId,
       validCountryIds: new Set(shuffled.map(c => c.id)),
+      maxTries,
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
@@ -191,7 +195,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       saved.countryTries,
       saved.countryWrongGuesses,
       saved.countryCountdowns,
-      state.countdownTimerLimit
+      state.countdownTimerLimit,
+      state.maxTries
     );
     set({
       ...saved,
@@ -218,7 +223,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       saved.countryTries,
       saved.countryWrongGuesses,
       saved.countryCountdowns,
-      state.countdownTimerLimit
+      state.countdownTimerLimit,
+      state.maxTries
     );
     set({
       ...saved,
@@ -266,7 +272,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (isCorrect) {
       const resolution: Resolution =
-        state.triesRemaining === GAME_CONFIG.maxTries ? "perfect" : "imperfect";
+        state.triesRemaining === state.maxTries ? "perfect" : "imperfect";
       const newResolved = new Map(state.resolvedCountries);
       newResolved.set(state.currentCountry.id, resolution);
 
@@ -371,7 +377,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       state.countryTries,
       state.countryWrongGuesses,
       state.countryCountdowns,
-      state.countdownTimerLimit
+      state.countdownTimerLimit,
+      state.maxTries
     );
     set({
       phase: "playing",
@@ -410,6 +417,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       expertMode: false,
       countrySetId: "all",
       validCountryIds: new Set(),
+      maxTries: GAME_CONFIG.maxTries,
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,

@@ -40,6 +40,7 @@ export default function GameContainer() {
   const allowSkips = useSettingsStore((s) => s.allowSkips);
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const maxTries = useSettingsStore((s) => s.maxTries);
   const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
   const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
 
@@ -60,16 +61,16 @@ export default function GameContainer() {
 
   const handleStart = useCallback(() => {
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, countrySetId, expertMode, timerLimit);
+    startGame(countries, countrySetId, expertMode, timerLimit, maxTries);
     setIsPaused(false);
-  }, [startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit]);
+  }, [startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, countrySetId, expertMode, timerLimit);
+    startGame(countries, countrySetId, expertMode, timerLimit, maxTries);
     setIsPaused(false);
-  }, [resetGame, startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit]);
+  }, [resetGame, startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
 
   const handleMainMenu = useCallback(() => {
     resetGame();

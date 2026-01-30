@@ -1,12 +1,12 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/game-store";
-import { GAME_CONFIG } from "@/lib/constants";
 import { useEffect, useState } from "react";
 
 export default function TriesIndicator() {
   const phase = useGameStore((s) => s.phase);
   const triesRemaining = useGameStore((s) => s.triesRemaining);
+  const maxTries = useGameStore((s) => s.maxTries);
   const [shaking, setShaking] = useState(false);
   const [prevTries, setPrevTries] = useState(triesRemaining);
 
@@ -25,7 +25,7 @@ export default function TriesIndicator() {
   return (
     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
       <div className={`flex gap-2 ${shaking ? "animate-shake" : ""}`}>
-        {Array.from({ length: GAME_CONFIG.maxTries }).map((_, i) => (
+        {Array.from({ length: maxTries }).map((_, i) => (
           <div
             key={i}
             className={`w-3 h-3 rounded-full transition-colors duration-200 ${

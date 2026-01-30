@@ -351,6 +351,71 @@ function Slider({
   );
 }
 
+function MaxTriesSelect({
+  value,
+  onChange,
+  disabled = false,
+  expertMode = false,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  expertMode?: boolean;
+}) {
+  const options = [1, 2, 3, 4, 5];
+
+  return (
+    <div className="space-y-2">
+      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+        Max Tries
+      </p>
+      <div className="grid grid-cols-5 gap-2">
+        {options.map((tries) => {
+          const isSelected = value === tries;
+          const is1Try = tries === 1;
+          const useExpertStyling = expertMode && is1Try;
+
+          return (
+            <button
+              key={tries}
+              onClick={() => !disabled && onChange(tries)}
+              disabled={disabled}
+              className={`p-2 rounded-lg text-center transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
+                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              } ${
+                useExpertStyling
+                  ? isSelected
+                    ? "bg-amber-500/15 border border-amber-500/50"
+                    : "bg-white/5 border border-amber-500/20"
+                  : isSelected
+                    ? "bg-emerald/20 border border-emerald/50"
+                    : "bg-white/5 hover:bg-white/10 border border-transparent"
+              }`}
+            >
+              <div className="flex gap-0.5">
+                {Array.from({ length: tries }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      useExpertStyling
+                        ? isSelected
+                          ? "bg-amber-400"
+                          : "bg-white/40"
+                        : isSelected
+                          ? "bg-emerald"
+                          : "bg-white/40"
+                    }`}
+                  />
+                ))}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function TimerLimitSelect({
   value,
   onChange,
@@ -433,6 +498,7 @@ export default function StartScreen({
   const expertMode = useSettingsStore((s) => s.expertMode);
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const maxTries = useSettingsStore((s) => s.maxTries);
   const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
   const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
   const setCountrySet = useSettingsStore((s) => s.setCountrySet);
@@ -440,6 +506,7 @@ export default function StartScreen({
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
   const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
+  const setMaxTries = useSettingsStore((s) => s.setMaxTries);
   const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
   const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
 
@@ -452,7 +519,11 @@ export default function StartScreen({
     if (expertMode && timerLimit !== TIMER_CONFIG.expertModeLimit) {
       setTimerLimit(TIMER_CONFIG.expertModeLimit);
     }
-  }, [expertMode, timerLimit, setTimerLimit]);
+    // If expert mode is enabled and max tries isn't 1, set it to 1
+    if (expertMode && maxTries !== 1) {
+      setMaxTries(1);
+    }
+  }, [expertMode, timerLimit, maxTries, setTimerLimit, setMaxTries]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -609,6 +680,14 @@ export default function StartScreen({
               disabled={expertMode}
               expertMode={expertMode}
             />
+
+            <MaxTriesSelect
+              value={maxTries}
+              onChange={setMaxTries}
+              disabled={expertMode}
+              expertMode={expertMode}
+            />
+
             <div className="space-y-2">
               <p className="text-white/50 text-xs uppercase tracking-wider px-1">
                 Game Options
