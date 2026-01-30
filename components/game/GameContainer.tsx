@@ -40,6 +40,8 @@ export default function GameContainer() {
   const allowSkips = useSettingsStore((s) => s.allowSkips);
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
+  const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
 
   const pauseTimer = useGameStore((s) => s.pauseTimer);
   const resumeTimer = useGameStore((s) => s.resumeTimer);
@@ -177,6 +179,8 @@ export default function GameContainer() {
           autoRotate={phase === "idle" || phase === "gameover"}
           onCountryClick={handleCountryClick}
           onReady={handleGlobeReady}
+          zoomSpeed={zoomSpeed}
+          rotateSpeed={rotateSpeed}
         />
       </div>
 

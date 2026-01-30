@@ -45,37 +45,58 @@ export const GLOBE_CONFIG = {
 
 // Small countries that need clickable markers (ISO numeric codes)
 export const SMALL_COUNTRIES = new Set([
+  // Observers
   "336", // Vatican City
+  "275", // Palestine
+
+  // Europe
+  "196", // Cyprus
   "492", // Monaco
-  "520", // Nauru
-  "798", // Tuvalu (synthetic marker - not in TopoJSON)
   "674", // San Marino
   "438", // Liechtenstein
-  "584", // Marshall Islands
-  "659", // Saint Kitts and Nevis
-  "462", // Maldives
-  "470", // Malta
-  "308", // Grenada
-  "670", // Saint Vincent and the Grenadines
-  "052", // Barbados
-  "028", // Antigua and Barbuda
-  "690", // Seychelles
-  "585", // Palau
   "020", // Andorra
-  "662", // Saint Lucia
-  "583", // Micronesia
-  "702", // Singapore
-  "776", // Tonga
-  "212", // Dominica
-  "048", // Bahrain
-  "296", // Kiribati
-  "678", // Sao Tome and Principe
-  "480", // Mauritius
-  "174", // Comoros
   "442", // Luxembourg
-  "882", // Samoa
-  "132", // Cabo Verde
+  "470", // Malta
+
+  // Caribbean / Americas
+  "028", // Antigua and Barbuda
+  "044", // Bahamas
+  "052", // Barbados
+  "212", // Dominica
+  "308", // Grenada
+  "659", // Saint Kitts and Nevis
+  "662", // Saint Lucia
+  "670", // Saint Vincent and the Grenadines
   "780", // Trinidad and Tobago
+
+  // Africa
+  "174", // Comoros
+  "132", // Cabo Verde
+  "678", // Sao Tome and Principe
+  "690", // Seychelles
+  "480", // Mauritius
+  "748", // Eswatini
+
+  // Middle East
+  "048", // Bahrain
+  "414", // Kuwait
   "096", // Brunei
-  "275", // Palestine
+
+  // Asia-Pacific
+  "462", // Maldives
+  "702", // Singapore
+  "626", // Timor-Leste
+
+  // Oceania
+  "520", // Nauru
+  "798", // Tuvalu
+  "296", // Kiribati
+  "584", // Marshall Islands
+  "585", // Palau
+  "583", // Micronesia
+  "776", // Tonga
+  "882", // Samoa
+  "090", // Solomon Islands
+  "242", // Fiji
+  "548", // Vanuatu
 ]);

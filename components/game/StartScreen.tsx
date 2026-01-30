@@ -280,6 +280,77 @@ function GameModeSelect({
   );
 }
 
+function Slider({
+  label,
+  value,
+  onChange,
+  min = 0.1,
+  max = 2.0,
+  step = 0.1,
+  displayMin,
+  displayMax,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  displayMin?: number;
+  displayMax?: number;
+}) {
+  // If display range is specified, map between actual and display values
+  const actualMin = displayMin !== undefined ? min : min;
+  const actualMax = displayMax !== undefined ? max : max;
+  const dispMin = displayMin ?? min;
+  const dispMax = displayMax ?? max;
+
+  // Convert actual value to display value for the slider and label
+  const actualToDisplay = (actual: number) => {
+    if (displayMin === undefined) return actual;
+    return (
+      dispMin +
+      ((actual - actualMin) * (dispMax - dispMin)) / (actualMax - actualMin)
+    );
+  };
+
+  // Convert display value from slider to actual value
+  const displayToActual = (display: number) => {
+    if (displayMin === undefined) return display;
+    return (
+      actualMin +
+      ((display - dispMin) * (actualMax - actualMin)) / (dispMax - dispMin)
+    );
+  };
+
+  const displayValue = actualToDisplay(value);
+  const displayProgress =
+    ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between px-1">
+        <p className="text-white/60 text-xs">{label}</p>
+        <p className="text-white/40 text-xs tabular-nums">
+          {displayValue.toFixed(1)}x
+        </p>
+      </div>
+      <input
+        type="range"
+        min={dispMin}
+        max={dispMax}
+        step={step}
+        value={displayValue}
+        onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
+        className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald hover:bg-white/15 transition-colors"
+        style={{
+          background: `linear-gradient(to right, rgb(16, 185, 129) 0%, rgb(16, 185, 129) ${displayProgress}%, rgba(255, 255, 255, 0.1) ${displayProgress}%, rgba(255, 255, 255, 0.1) 100%)`,
+        }}
+      />
+    </div>
+  );
+}
+
 function TimerLimitSelect({
   value,
   onChange,
@@ -362,11 +433,15 @@ export default function StartScreen({
   const expertMode = useSettingsStore((s) => s.expertMode);
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
+  const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
   const setCountrySet = useSettingsStore((s) => s.setCountrySet);
   const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
   const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
+  const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
+  const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
 
   useEffect(() => {
     setHydrated(true);
@@ -419,7 +494,9 @@ export default function StartScreen({
           !showSettings &&
           (() => {
             const allTotal = GUESSABLE_IDS.size;
-            const normalPercentage = Math.round((bestScores.all / allTotal) * 100);
+            const normalPercentage = Math.round(
+              (bestScores.all / allTotal) * 100,
+            );
             const expertPercentage = Math.round(
               (expertBestScores.all / allTotal) * 100,
             );
@@ -493,23 +570,48 @@ export default function StartScreen({
           })()}
 
         {showSettings ? (
-          <div className="space-y-4 mb-6 text-left">
-            <TimerLimitSelect
-              value={timerLimit}
-              onChange={setTimerLimit}
-              disabled={expertMode}
-              expertMode={expertMode}
-            />
-
+          <div className="space-y-4 text-left">
             <GameModeSelect
               value={countrySet}
               onChange={setCountrySet}
               expertMode={expertMode}
             />
 
+            <div className="space-y-3">
+              <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+                Camera Controls
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Slider
+                  label="Zoom"
+                  value={zoomSpeed}
+                  onChange={setZoomSpeed}
+                  min={0.1}
+                  max={1.0}
+                  displayMin={0.1}
+                  displayMax={2.0}
+                  step={0.1}
+                />
+                <Slider
+                  label="Rotate"
+                  value={rotateSpeed}
+                  onChange={setRotateSpeed}
+                  min={0.1}
+                  max={2.0}
+                  step={0.1}
+                />
+              </div>
+            </div>
+
+            <TimerLimitSelect
+              value={timerLimit}
+              onChange={setTimerLimit}
+              disabled={expertMode}
+              expertMode={expertMode}
+            />
             <div className="space-y-2">
               <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-                Options
+                Game Options
               </p>
               <div className="space-y-2">
                 <Toggle

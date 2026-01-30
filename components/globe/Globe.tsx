@@ -76,6 +76,8 @@ interface GlobeProps {
     position: [number, number, number],
   ) => void;
   onReady?: () => void;
+  zoomSpeed?: number;
+  rotateSpeed?: number;
 }
 
 // ── Fill colour helpers ──────────────────────────────────────────────────────
@@ -202,6 +204,8 @@ function GlobeScene({
   autoRotate,
   onCountryClick,
   onReady,
+  zoomSpeed = 0.53,
+  rotateSpeed = 1.0,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
@@ -533,8 +537,8 @@ function GlobeScene({
         enableDamping
         minDistance={200}
         maxDistance={450}
-        zoomSpeed={0.5}
-        rotateSpeed={0.8}
+        zoomSpeed={zoomSpeed}
+        rotateSpeed={rotateSpeed}
       />
     </>
   );

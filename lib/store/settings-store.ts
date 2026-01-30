@@ -10,6 +10,10 @@ interface SettingsState {
   showHints: boolean; // Show country name on incorrect guesses
   timerLimit: number | null; // Countdown timer limit in seconds (null = disabled)
 
+  // Camera controls
+  zoomSpeed: number; // 0.1 to 1.0 (actual), default 0.53 (displays as 1.0x)
+  rotateSpeed: number; // 0.1 to 2.0, default 1.0
+
   // Saved settings from before expert mode was enabled
   preExpertAllowSkips: boolean;
   preExpertShowHints: boolean;
@@ -21,6 +25,8 @@ interface SettingsState {
   setExpertMode: (expert: boolean) => void;
   setShowHints: (show: boolean) => void;
   setTimerLimit: (limit: number | null) => void;
+  setZoomSpeed: (speed: number) => void;
+  setRotateSpeed: (speed: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -31,6 +37,8 @@ export const useSettingsStore = create<SettingsState>()(
       expertMode: false,
       showHints: true,
       timerLimit: null,
+      zoomSpeed: 0.53,
+      rotateSpeed: 1.0,
 
       preExpertAllowSkips: true,
       preExpertShowHints: true,
@@ -62,6 +70,8 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setShowHints: (showHints) => set({ showHints }),
       setTimerLimit: (timerLimit) => set({ timerLimit }),
+      setZoomSpeed: (zoomSpeed) => set({ zoomSpeed }),
+      setRotateSpeed: (rotateSpeed) => set({ rotateSpeed }),
     }),
     {
       name: "globe-game-settings",
