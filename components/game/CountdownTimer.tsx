@@ -58,8 +58,8 @@ export default function CountdownTimer() {
     };
   }, [phase, handleTimerExpired, setCountdownRemaining, countdownTimerLimit]);
 
-  // Only render if timer is enabled
-  if (countdownTimerLimit === null) {
+  // Only render if timer is enabled and game is active
+  if (countdownTimerLimit === null || phase === "idle" || phase === "gameover") {
     return null;
   }
 
