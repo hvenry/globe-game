@@ -46,20 +46,21 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   const totalCountries = useGameStore((s) => s.totalCountries);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
   const expertMode = useGameStore((s) => s.expertMode);
+  const countrySetId = useGameStore((s) => s.countrySetId);
   const currentCountry = useGameStore((s) => s.currentCountry);
   const lastClickedCountryName = useGameStore((s) => s.lastClickedCountryName);
   const lastResolution = useGameStore((s) => s.lastResolution);
   const gameStartTime = useGameStore((s) => s.gameStartTime);
   const totalPausedTime = useGameStore((s) => s.totalPausedTime);
-  const { bestScore, expertBestScore, recordGame } = useStatsStore();
+  const { bestScores, expertBestScores, recordGame } = useStatsStore();
   const recorded = useRef(false);
-  const previousBestScore = useRef(bestScore);
-  const previousExpertBestScore = useRef(expertBestScore);
+  const previousBestScore = useRef(bestScores[countrySetId]);
+  const previousExpertBestScore = useRef(expertBestScores[countrySetId]);
 
   // Capture the previous best scores before they get updated
   if (!recorded.current) {
-    previousBestScore.current = bestScore;
-    previousExpertBestScore.current = expertBestScore;
+    previousBestScore.current = bestScores[countrySetId];
+    previousExpertBestScore.current = expertBestScores[countrySetId];
   }
 
   const elapsedSeconds =
@@ -77,7 +78,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
       ? Math.round((questionsCorrect / totalCountries) * 100)
       : 0;
 
-  const scorePercentage = Math.round((questionsCorrect / 195) * 100);
+  const scorePercentage = totalCountries > 0
+    ? Math.round((questionsCorrect / totalCountries) * 100)
+    : 0;
   const isNewBest = !expertMode && questionsCorrect > previousBestScore.current;
   const isNewExpertBest = expertMode && questionsCorrect > previousExpertBestScore.current;
 
@@ -93,34 +96,42 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   useEffect(() => {
     if (!recorded.current) {
       recorded.current = true;
-      recordGame(questionsCorrect, expertMode);
+      recordGame(questionsCorrect, countrySetId, expertMode);
     }
-  }, [questionsCorrect, recordGame, expertMode]);
+  }, [questionsCorrect, countrySetId, recordGame, expertMode]);
+
+  const isPerfectScore = scorePercentage === 100;
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
       <div
         className={`animate-fade-in-up backdrop-blur-md rounded-2xl p-8 md:p-12 text-center max-w-sm mx-4 ${
-          expertMode
-            ? "bg-gradient-to-b from-amber-950/80 to-black/80 border border-amber-500/30"
-            : "bg-black/80 border border-white/10"
+          isPerfectScore
+            ? expertMode
+              ? "bg-gradient-to-b from-amber-950/80 to-black/80 border-2 border-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.5)]"
+              : "bg-gradient-to-b from-emerald-950/80 to-black/80 border-2 border-emerald shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+            : expertMode
+              ? "bg-gradient-to-b from-amber-950/80 to-black/80 border border-amber-500/30"
+              : "bg-black/80 border border-white/10"
         }`}
       >
         <h2 className={`text-2xl font-bold mb-1 ${expertMode ? "text-amber-400" : "text-white"}`}>
-          {expertMode ? "Expert Mode" : "Game Over"}
+          {isPerfectScore ? (expertMode ? "Perfect Expert!" : "Perfect Score!") : (expertMode ? "Expert Mode" : "Game Complete")}
         </h2>
 
         {expertMode ? (
           <>
             <div className="mt-6 mb-4">
-              <p className="text-amber-400/60 text-xs uppercase tracking-wider">
-                Countries Found
-              </p>
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-amber-400/60 text-xs uppercase tracking-wider">
+                  Countries Found
+                </p>
+                <p className="text-amber-400/40 text-xs tabular-nums">
+                  {questionsCorrect} / {totalCountries}
+                </p>
+              </div>
               <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-5xl md:text-6xl font-bold tabular-nums mt-1">
                 <AnimatedCounter value={expertPercentage} duration={1200} />%
-              </p>
-              <p className="text-amber-400/40 text-sm mt-2 tabular-nums">
-                {questionsCorrect} / {totalCountries}
               </p>
               {isNewExpertBest && (
                 <Badge className="mt-2 bg-amber-500/20 text-amber-400 border-amber-500/30">

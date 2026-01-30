@@ -53,16 +53,16 @@ export default function GameContainer() {
 
   const handleStart = useCallback(() => {
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, expertMode, timerLimit);
+    startGame(countries, countrySetId, expertMode, timerLimit);
     setIsPaused(false);
-  }, [startGame, filteredCountries, guessableCountries, expertMode, timerLimit]);
+  }, [startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, expertMode, timerLimit);
+    startGame(countries, countrySetId, expertMode, timerLimit);
     setIsPaused(false);
-  }, [resetGame, startGame, filteredCountries, guessableCountries, expertMode, timerLimit]);
+  }, [resetGame, startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit]);
 
   const handleMainMenu = useCallback(() => {
     resetGame();

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { CountryData } from "@/lib/geo/types";
+import type { CountrySetId } from "@/lib/geo/country-sets";
 import { shuffle } from "@/lib/utils";
 import { GAME_CONFIG } from "@/lib/constants";
 import { baseId, getAllFeatures } from "@/lib/geo/countries";
@@ -29,6 +30,7 @@ interface GameState {
   lastClickedCountryName: string | null;
   floatingLabels: FloatingLabel[];
   expertMode: boolean;
+  countrySetId: CountrySetId; // Track which country set is being played
 
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
@@ -42,7 +44,7 @@ interface GameState {
   totalPausedTime: number;
   countryCountdowns: Map<string, number>;
 
-  startGame: (countries: CountryData[], expertMode?: boolean, timerLimit?: number | null) => void;
+  startGame: (countries: CountryData[], countrySetId: CountrySetId, expertMode?: boolean, timerLimit?: number | null) => void;
   makeGuess: (countryId: string) => void;
   addFloatingLabel: (name: string, position: [number, number, number]) => void;
   removeFloatingLabel: (id: string) => void;
@@ -107,6 +109,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastClickedCountryName: null,
   floatingLabels: [],
   expertMode: false,
+  countrySetId: "all",
 
   resolvedCountries: new Map(),
   questionsAnswered: 0,
@@ -120,7 +123,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   totalPausedTime: 0,
   countryCountdowns: new Map(),
 
-  startGame: (countries, expertMode = false, timerLimit = null) => {
+  startGame: (countries, countrySetId, expertMode = false, timerLimit = null) => {
     const shuffled = shuffle(countries);
     const tries = new Map<string, number>();
     const wrongGuesses = new Map<string, Set<string>>();
@@ -146,6 +149,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastClickedCountryName: null,
       floatingLabels: [],
       expertMode,
+      countrySetId,
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
@@ -395,6 +399,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastClickedCountryName: null,
       floatingLabels: [],
       expertMode: false,
+      countrySetId: "all",
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,

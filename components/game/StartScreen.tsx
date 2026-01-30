@@ -86,38 +86,145 @@ function Toggle({
 function GameModeSelect({
   value,
   onChange,
+  expertMode,
 }: {
   value: CountrySetId;
   onChange: (value: CountrySetId) => void;
+  expertMode: boolean;
 }) {
   const availableSets = getAvailableCountrySets();
+  const { bestScores, expertBestScores } = useStatsStore();
 
-  return (
-    <div className="space-y-2">
-      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-        Country Set
-      </p>
-      <div className="grid gap-2">
-        {availableSets.map((set) => (
-          <button
-            key={set.id}
-            onClick={() => onChange(set.id)}
-            className={`p-3 rounded-lg text-left transition-colors cursor-pointer ${
-              value === set.id
-                ? "bg-emerald/20 border border-emerald/50"
-                : "bg-white/5 hover:bg-white/10 border border-transparent"
-            }`}
-          >
+  // Get total countries for each set
+  const getSetTotal = (setId: CountrySetId): number => {
+    const set = availableSets.find(s => s.id === setId);
+    if (!set || !set.countryIds) return 195; // "all" mode
+    return set.countryIds.length;
+  };
+
+  // Only show continents (exclude "all")
+  const continentSets = availableSets.filter(s => s.id !== "all");
+
+  // Handle toggle - clicking selected continent deselects it (goes back to "all")
+  const handleContinentClick = (setId: CountrySetId) => {
+    if (value === setId) {
+      onChange("all");
+    } else {
+      onChange(setId);
+    }
+  };
+
+  const renderSetButton = (set: typeof availableSets[0], isFullWidth = false) => {
+    const normalBestScore = bestScores[set.id] || 0;
+    const expertBestScore = expertBestScores[set.id] || 0;
+    const total = getSetTotal(set.id);
+    const normalPercentage = total > 0 ? Math.round((normalBestScore / total) * 100) : 0;
+    const expertPercentage = total > 0 ? Math.round((expertBestScore / total) * 100) : 0;
+    const hasNormalScore = normalBestScore > 0;
+    const hasExpertScore = expertBestScore > 0;
+    const isSelected = value === set.id;
+    const isPerfectNormal = normalPercentage === 100;
+    const isPerfectExpert = expertPercentage === 100;
+    const isPerfectBoth = isPerfectNormal && isPerfectExpert;
+
+    // Determine border styling based on perfect scores
+    let borderClass = "";
+    if (isPerfectBoth) {
+      borderClass = "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
+    } else if (isPerfectExpert) {
+      borderClass = "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
+    } else if (isPerfectNormal) {
+      borderClass = "border-2 border-emerald shadow-lg shadow-emerald/30";
+    } else if (expertMode) {
+      borderClass = isSelected
+        ? "border-2 border-amber-500/60 shadow-lg shadow-amber-500/20"
+        : "border-2 border-white/5 hover:border-amber-500/30";
+    } else {
+      borderClass = isSelected
+        ? "border-2 border-emerald/60 shadow-lg shadow-emerald/20"
+        : "border-2 border-white/5 hover:border-emerald/30";
+    }
+
+    return (
+      <button
+        key={set.id}
+        onClick={() => handleContinentClick(set.id)}
+        className={`group relative p-3 rounded-xl text-left transition-all duration-300 cursor-pointer transform hover:scale-[1.02] ${borderClass} ${
+          expertMode
+            ? isSelected
+              ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10"
+              : "bg-white/5 hover:bg-white/10"
+            : isSelected
+              ? "bg-gradient-to-br from-emerald/25 to-emerald/10"
+              : "bg-white/5 hover:bg-white/10"
+        }`}
+      >
+        {/* Animated glow effect on hover */}
+        <div className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+          expertMode
+            ? "bg-gradient-to-br from-amber-500/5 to-transparent"
+            : "bg-gradient-to-br from-emerald/5 to-transparent"
+        }`} />
+
+        <div className="relative flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
             <p
-              className={`text-sm font-medium ${
-                value === set.id ? "text-emerald" : "text-white"
+              className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${
+                expertMode
+                  ? isSelected
+                    ? "text-amber-400"
+                    : "text-white group-hover:text-amber-300"
+                  : isSelected
+                    ? "text-emerald"
+                    : "text-white group-hover:text-emerald-300"
               }`}
             >
               {set.name}
             </p>
-            <p className="text-white/40 text-xs mt-0.5">{set.description}</p>
-          </button>
-        ))}
+            <p className="text-white/50 text-[11px] leading-tight">
+              {set.description}
+            </p>
+          </div>
+          {(hasNormalScore || hasExpertScore) && (
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
+              {hasNormalScore && (
+                <div className="flex items-center gap-1">
+                  <div className="w-1 h-1 rounded-full bg-emerald animate-pulse-glow" />
+                  <p className="text-emerald text-xs font-bold tabular-nums">
+                    {normalPercentage}%
+                  </p>
+                </div>
+              )}
+              {hasExpertScore && (
+                <div className="flex items-center gap-1">
+                  <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse-glow" />
+                  <p className="text-amber-400 text-xs font-bold tabular-nums">
+                    {expertPercentage}%
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between px-1">
+        <p className="text-white/50 text-xs uppercase tracking-wider">
+          Country Set
+        </p>
+        {value !== "all" && (
+          <p className="text-white/30 text-[10px] italic">
+            (Click again to deselect)
+          </p>
+        )}
+      </div>
+      {/* Continents - 2x3 Grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {continentSets.map((set) => renderSetButton(set, false))}
       </div>
     </div>
   );
@@ -194,7 +301,7 @@ function TimerLimitSelect({
 export default function StartScreen({ onStart }: StartScreenProps) {
   const [hydrated, setHydrated] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const { gamesPlayed, bestScore, expertGamesPlayed, expertBestScore } =
+  const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
     useStatsStore();
 
   const countrySet = useSettingsStore((s) => s.countrySet);
@@ -240,33 +347,43 @@ export default function StartScreen({ onStart }: StartScreenProps) {
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
-      <div className="animate-fade-in-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center max-w-sm mx-4 w-full">
-        <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-          GLOBE
-        </h1>
-        <p className="text-white/40 text-sm mt-2 mb-6">Test your geography</p>
+      <div className={`animate-fade-in-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center mx-4 w-full ${
+        showSettings ? "max-w-md" : "max-w-sm"
+      }`}>
+        {showSettings ? (
+          <h1 className="text-2xl font-bold text-white tracking-tight mb-6">
+            SETTINGS
+          </h1>
+        ) : (
+          <>
+            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+              GLOBE
+            </h1>
+            <p className="text-white/40 text-sm mt-2 mb-6">Test your geography</p>
+          </>
+        )}
 
         {hydrated &&
-          (gamesPlayed > 0 || expertGamesPlayed > 0) &&
+          (bestScores.all > 0 || expertBestScores.all > 0) &&
           !showSettings && (
             <div className="mb-6 space-y-2">
-              {gamesPlayed > 0 && (
+              {bestScores.all > 0 && (
                 <div className="bg-white/5 rounded-lg p-3">
                   <p className="text-white/40 text-xs uppercase tracking-wider">
-                    Best Score
+                    Best Score (All Countries)
                   </p>
                   <p className="text-emerald text-xl font-bold tabular-nums">
-                    {Math.round((bestScore / 195) * 100)}%
+                    {Math.round((bestScores.all / 195) * 100)}%
                   </p>
                 </div>
               )}
-              {expertGamesPlayed > 0 && (
+              {expertBestScores.all > 0 && (
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
                   <p className="text-amber-400/60 text-xs uppercase tracking-wider">
-                    Expert Best
+                    Expert Best (All Countries)
                   </p>
                   <p className="text-amber-400 text-xl font-bold tabular-nums">
-                    {Math.round((expertBestScore / 195) * 100)}%
+                    {Math.round((expertBestScores.all / 195) * 100)}%
                   </p>
                 </div>
               )}
@@ -282,7 +399,7 @@ export default function StartScreen({ onStart }: StartScreenProps) {
               expertMode={expertMode}
             />
 
-            <GameModeSelect value={countrySet} onChange={setCountrySet} />
+            <GameModeSelect value={countrySet} onChange={setCountrySet} expertMode={expertMode} />
 
             <div className="space-y-2">
               <p className="text-white/50 text-xs uppercase tracking-wider px-1">

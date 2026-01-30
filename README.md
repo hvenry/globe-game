@@ -95,7 +95,14 @@ Core game state and logic:
 
 Persisted user preferences:
 
-- Country set selection (All, Continents, Difficulty levels)
+- Country set selection:
+  - **All Countries** (195 countries)
+  - **Africa** (54 countries)
+  - **Asia** (48 countries)
+  - **Europe** (44 countries)
+  - **North America** (23 countries)
+  - **South America** (12 countries)
+  - **Oceania** (14 countries)
 - Allow skips toggle
 - Show hints toggle
 - Expert mode toggle
@@ -272,7 +279,15 @@ bun run lint
 
 ### Adding New Country Sets
 
-Edit `lib/geo/country-sets.ts` and add a new entry with country ISO codes.
+Edit `lib/geo/country-sets.ts` and add a new entry with country ISO numeric codes.
+
+**Available continent-based sets:**
+- Africa (54 countries)
+- Asia (48 countries)
+- Europe (44 countries)
+- North America (23 countries)
+- South America (12 countries)
+- Oceania (14 countries)
 
 ### Modifying Timer Settings
 

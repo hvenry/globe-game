@@ -65,7 +65,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   "246": "Finland",
   "250": "France",
   "266": "Gabon",
-  "270": "Gambia",
+  "270": "The Gambia",
   "268": "Georgia",
   "276": "Germany",
   "288": "Ghana",
