@@ -25,7 +25,7 @@ export default function ResultFeedback() {
   if (phase !== "feedback" || !currentCountry) return null;
 
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+    <div className="absolute inset-0 z-20 flex items-end justify-center pb-24 md:pb-32 pointer-events-none">
       <div className="animate-fade-in-up text-center">
         {isCorrect ? (
           <>
