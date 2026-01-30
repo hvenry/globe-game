@@ -749,7 +749,7 @@ export default function StartScreen({
           })()}
 
         {showSettings ? (
-          <div className="relative">
+          <div className="relative flex flex-col" style={{ maxHeight: "56vh" }}>
             {/* Scroll progress bar */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 rounded-full overflow-hidden">
               <div
@@ -760,8 +760,11 @@ export default function StartScreen({
 
             {/* Scrollable content */}
             <div
-              className="space-y-4 text-left overflow-y-auto pt-4 pb-2 px-1"
-              style={{ maxHeight: "60vh" }}
+              className="space-y-4 text-left overflow-y-auto pt-4 pb-2 px-1 flex-1 scrollbar-hide"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
               onScroll={handleScroll}
             >
               <GameModeSelect
@@ -840,14 +843,15 @@ export default function StartScreen({
                   />
                 </div>
               </div>
-
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-2 cursor-pointer"
-              >
-                Back
-              </button>
             </div>
+
+            {/* Fixed back button */}
+            <button
+              onClick={() => setShowSettings(false)}
+              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-6 border-t border-white/10 cursor-pointer"
+            >
+              Back
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
