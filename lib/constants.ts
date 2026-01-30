@@ -72,10 +72,10 @@ export const SMALL_COUNTRIES = new Set([
   // Africa
   "174", // Comoros
   "132", // Cabo Verde
+  "270", // The Gambia
   "678", // Sao Tome and Principe
   "690", // Seychelles
   "480", // Mauritius
-  "748", // Eswatini
 
   // Middle East
   "048", // Bahrain
@@ -85,7 +85,7 @@ export const SMALL_COUNTRIES = new Set([
   // Asia-Pacific
   "462", // Maldives
   "702", // Singapore
-  "626", // Timor-Leste
+  "626", // East Timor
 
   // Oceania
   "520", // Nauru

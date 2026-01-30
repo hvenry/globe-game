@@ -47,8 +47,8 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "140", // Central African Republic
       "148", // Chad
       "174", // Comoros
-      "178", // Congo
-      "180", // DR Congo
+      "178", // Republic of the Congo
+      "180", // Democratic Republic of the Congo
       "262", // Djibouti
       "818", // Egypt
       "226", // Equatorial Guinea
@@ -106,6 +106,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "096", // Brunei
       "116", // Cambodia
       "156", // China
+      "626", // East Timor
       "268", // Georgia
       "356", // India
       "360", // Indonesia
@@ -128,6 +129,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "512", // Oman
       "586", // Pakistan
       "608", // Philippines
+      "275", // Palestine
       "634", // Qatar
       "682", // Saudi Arabia
       "702", // Singapore
@@ -136,14 +138,12 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "760", // Syria
       "762", // Tajikistan
       "764", // Thailand
-      "626", // Timor-Leste
       "792", // Turkey
       "795", // Turkmenistan
       "784", // United Arab Emirates
       "860", // Uzbekistan
       "704", // Vietnam
       "887", // Yemen
-      "275", // State of Palestine
     ],
   },
   {
@@ -277,6 +277,6 @@ export function getCountrySet(id: CountrySetId): CountrySetConfig {
 export function getAvailableCountrySets(): CountrySetConfig[] {
   // Return sets that have countries defined (or are "all")
   return COUNTRY_SETS.filter(
-    (set) => set.id === "all" || (set.countryIds && set.countryIds.length > 0)
+    (set) => set.id === "all" || (set.countryIds && set.countryIds.length > 0),
   );
 }
