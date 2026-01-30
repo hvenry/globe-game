@@ -90,6 +90,10 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
   body {
     @apply bg-background text-foreground;
@@ -105,6 +109,25 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes fadeInOutUp {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 
@@ -163,6 +186,10 @@
 
 .animate-fade-in-up {
   animation: fadeInUp 0.3s ease-out;
+}
+
+.animate-fade-in-out-up {
+  animation: fadeInOutUp 2s ease-in-out forwards;
 }
 
 .animate-score-float {

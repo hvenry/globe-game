@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
@@ -490,6 +490,7 @@ export default function StartScreen({
 }: StartScreenProps) {
   const [hydrated, setHydrated] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
     useStatsStore();
 
@@ -524,6 +525,43 @@ export default function StartScreen({
       setMaxTries(1);
     }
   }, [expertMode, timerLimit, maxTries, setTimerLimit, setMaxTries]);
+
+  const handleShare = useCallback(() => {
+    // Prevent multiple clicks while animation is playing
+    if (copied) return;
+
+    const allTotal = GUESSABLE_IDS.size;
+    const normalPercentage = Math.round((bestScores.all / allTotal) * 100);
+    const expertPercentage = Math.round(
+      (expertBestScores.all / allTotal) * 100,
+    );
+
+    const makeBar = (percent: number, size = 10) => {
+      const clamped = Math.max(0, Math.min(100, percent));
+
+      const filled =
+        clamped === 100 ? size : Math.floor((clamped / 100) * size);
+
+      return "█".repeat(filled) + "░".repeat(size - filled);
+    };
+
+    let message = "My high score on https://globe.expert";
+
+    if (expertBestScores.all > 0 && bestScores.all > 0) {
+      message +=
+        `\nExpert  [${makeBar(expertPercentage)}] ${expertPercentage}%` +
+        `\nNormal  [${makeBar(normalPercentage)}] ${normalPercentage}%`;
+    } else if (expertBestScores.all > 0) {
+      message += `\nExpert  [${makeBar(expertPercentage)}] ${expertPercentage}%`;
+    } else {
+      message += `\nNormal  [${makeBar(normalPercentage)}] ${normalPercentage}%`;
+    }
+
+    navigator.clipboard.writeText(message).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [bestScores.all, expertBestScores.all, copied]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -590,50 +628,96 @@ export default function StartScreen({
             }
 
             return (
-              <div
-                className={`relative mb-6 bg-white/5 rounded-xl p-4 overflow-hidden ${borderClass}`}
-              >
-                {/* Animated background shimmer for perfect scores */}
-                {(isPerfectNormal || isPerfectExpert) && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
-                )}
+              <div className="relative mb-6">
+                {/* Share button - badge style overlay in top right */}
+                <button
+                  onClick={handleShare}
+                  className="absolute -top-1.5 -right-1.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 transition-all cursor-pointer group z-20"
+                  style={{ pointerEvents: "auto" }}
+                  title="Share score"
+                >
+                  {copied ? (
+                    <svg
+                      className="w-3 h-3 text-emerald"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-3 h-3 text-white/50 group-hover:text-white/70 transition-colors"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                      />
+                    </svg>
+                  )}
+                  {/* Minimal copied indicator */}
+                  {copied && (
+                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-emerald text-[10px] font-medium whitespace-nowrap animate-fade-in-out-up">
+                      Copied
+                    </span>
+                  )}
+                </button>
 
-                <div className="relative flex items-center justify-between">
-                  <div>
-                    <p className="text-white text-sm tracking-wider">
-                      Best Score
-                    </p>
-                    <p className="text-white/40 text-sm mt-0.5">
-                      {allTotal} Countries
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {bestScores.all > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse-glow" />
-                        <p className="text-emerald text-2xl font-bold tabular-nums">
-                          <AnimatedCounter
-                            value={normalPercentage}
-                            duration={1200}
-                            delayStart={delayAnimation ? 350 : 0}
-                          />
-                          %
-                        </p>
-                      </div>
-                    )}
-                    {expertBestScores.all > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
-                        <p className="text-amber-400 text-2xl font-bold tabular-nums">
-                          <AnimatedCounter
-                            value={expertPercentage}
-                            duration={1200}
-                            delayStart={delayAnimation ? 350 : 0}
-                          />
-                          %
-                        </p>
-                      </div>
-                    )}
+                <div
+                  className={`relative bg-white/5 rounded-xl p-4 overflow-hidden ${borderClass}`}
+                >
+                  {/* Animated background shimmer for perfect scores */}
+                  {(isPerfectNormal || isPerfectExpert) && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
+                  )}
+
+                  <div className="relative flex items-center justify-between">
+                    <div>
+                      <p className="text-white text-sm tracking-wider">
+                        Best Score
+                      </p>
+                      <p className="text-white/40 text-sm mt-0.5">
+                        {allTotal} Countries
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {bestScores.all > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse-glow" />
+                          <p className="text-emerald text-2xl font-bold tabular-nums">
+                            <AnimatedCounter
+                              value={normalPercentage}
+                              duration={1200}
+                              delayStart={delayAnimation ? 350 : 0}
+                            />
+                            %
+                          </p>
+                        </div>
+                      )}
+                      {expertBestScores.all > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
+                          <p className="text-amber-400 text-2xl font-bold tabular-nums">
+                            <AnimatedCounter
+                              value={expertPercentage}
+                              duration={1200}
+                              delayStart={delayAnimation ? 350 : 0}
+                            />
+                            %
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -740,7 +824,9 @@ export default function StartScreen({
               <p className="text-white/30 text-xs text-center">
                 {countrySet === "all"
                   ? "all countries"
-                  : getAvailableCountrySets().find(s => s.id === countrySet)?.name.toLowerCase() || "all countries"}
+                  : getAvailableCountrySets()
+                      .find((s) => s.id === countrySet)
+                      ?.name.toLowerCase() || "all countries"}
               </p>
             </div>
             <button
