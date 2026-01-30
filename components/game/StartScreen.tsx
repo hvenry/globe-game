@@ -647,16 +647,23 @@ export default function StartScreen({
           </div>
         ) : (
           <div className="space-y-3">
-            <Button
-              onClick={onStart}
-              className={`font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer ${
-                expertMode
-                  ? "bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black"
-                  : "bg-emerald hover:bg-emerald/90 text-black"
-              }`}
-            >
-              {expertMode ? "Start Expert Game" : "Start Game"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={onStart}
+                className={`font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer ${
+                  expertMode
+                    ? "bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black"
+                    : "bg-emerald hover:bg-emerald/90 text-black"
+                }`}
+              >
+                {expertMode ? "Start Expert Game" : "Start Game"}
+              </Button>
+              <p className="text-white/30 text-xs text-center">
+                {countrySet === "all"
+                  ? "all countries"
+                  : getAvailableCountrySets().find(s => s.id === countrySet)?.name.toLowerCase() || "all countries"}
+              </p>
+            </div>
             <button
               onClick={() => setShowSettings(true)}
               className="text-white/40 hover:text-white/60 text-sm transition-colors w-full cursor-pointer"
