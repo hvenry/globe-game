@@ -49,7 +49,7 @@ export const SMALL_COUNTRIES = new Set([
   "336", // Vatican City
   "492", // Monaco
   "520", // Nauru
-  "798", // Tuvalu
+  "798", // Tuvalu (synthetic marker - not in TopoJSON)
   "674", // San Marino
   "438", // Liechtenstein
   "584", // Marshall Islands

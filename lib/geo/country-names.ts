@@ -1,6 +1,6 @@
 /**
  * ISO 3166-1 numeric code -> clean display name for all 195 UN sovereign states.
- * Overrides ensure shorter, common-usage names.
+ * Note: Tuvalu (798) is rendered as a synthetic marker as it's not in the Natural Earth 50m dataset.
  */
 export const COUNTRY_NAMES: Record<string, string> = {
   "004": "Afghanistan",
@@ -135,6 +135,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   "578": "Norway",
   "512": "Oman",
   "586": "Pakistan",
+  "275": "State of Palestine",
   "585": "Palau",
   "591": "Panama",
   "598": "Papua New Guinea",

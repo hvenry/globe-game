@@ -8,7 +8,9 @@ Live at [globe.expert](https://globe.expert)
 
 Globe Expert is an interactive geography learning tool that challenges players to identify countries by manipulating a 3D globe to select them.
 
-The game features multiple difficulty modes, time-based challenges, and tracks player statistics across sessions.
+The game features all 195 UN-recognized sovereign states, multiple difficulty modes, time-based challenges, and tracks player statistics across sessions.
+
+**Note:** Tuvalu is rendered as a synthetic marker (green circle) as it's not present in the Natural Earth 50m geographic dataset due to its extremely small size.
 
 ## Tech Stack
 
@@ -212,7 +214,9 @@ Three.js-based 3D rendering:
   - Default: White with low opacity
   - Wrong guesses: Red highlight
   - Resolved countries: Green (perfect), Yellow (imperfect), Red (failed)
-- **SmallCountryMarker:** Clickable 3D spheres for tiny countries
+- **SmallCountryMarkers:** Clickable 3D spheres for tiny countries
+  - Includes Vatican City, Monaco, Nauru, San Marino, and other micro-states
+  - **Tuvalu** is rendered as a synthetic marker (Point geometry at coordinates 179.2°E, 8.5°S) since it's not included in the Natural Earth 50m dataset
 - **Raycasting:** Converts mouse clicks to 3D coordinates for country detection
 - **Auto-rotation:** Enabled on idle/gameover screens
 
@@ -280,7 +284,7 @@ Core game constants are in `GAME_CONFIG` (`lib/constants.ts`):
 
 - `maxTries`: Number of attempts per country
 - `feedbackDuration`: Length of success/fail animation (ms)
-- `totalCountries`: Total countries in full dataset
+- `totalCountries`: Total countries (195 - includes synthetic Tuvalu marker)
 
 ### State Persistence
 

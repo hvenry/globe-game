@@ -8,6 +8,21 @@ const topology = topoData as unknown as Topology;
 
 let _allFeatures: CountryFeature[] | null = null;
 
+// Synthetic feature for Tuvalu (not in Natural Earth 50m dataset)
+// Coordinates: approximately -8.5167° S, 179.1967° E (near Fiji in the Pacific)
+// Rendered as a small green circle marker instead of a polygon
+const TUVALU_FEATURE: CountryFeature = {
+  type: "Feature",
+  id: "798",
+  properties: {
+    name: "Tuvalu",
+  },
+  geometry: {
+    type: "Point",
+    coordinates: [179.1967, -8.5167],
+  },
+};
+
 export function getAllFeatures(): CountryFeature[] {
   if (_allFeatures) return _allFeatures;
 
@@ -37,6 +52,9 @@ export function getAllFeatures(): CountryFeature[] {
         },
       };
     }) as CountryFeature[];
+
+  // Add synthetic Tuvalu feature
+  _allFeatures.push(TUVALU_FEATURE);
 
   return _allFeatures;
 }
