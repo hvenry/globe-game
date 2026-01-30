@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useEffect, useState } from "react";
+import { useMemo, useCallback, useEffect, useState, useRef } from "react";
 import GlobeDynamic from "@/components/globe/GlobeDynamic";
 import CountryPrompt from "./CountryPrompt";
 import TriesIndicator from "./TriesIndicator";
@@ -22,6 +22,7 @@ export default function GameContainer() {
   const [isLoading, setIsLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const lastEscapePress = useRef<number>(0);
 
   const phase = useGameStore((s) => s.phase);
   const wrongGuessIds = useGameStore((s) => s.wrongGuessIds);
@@ -139,6 +140,14 @@ export default function GameContainer() {
       // Escape key toggles pause during gameplay
       if (e.key === "Escape" && (phase === "playing" || phase === "feedback")) {
         e.preventDefault();
+
+        // Debounce: only allow toggle if at least 300ms has passed since last press
+        const now = Date.now();
+        if (now - lastEscapePress.current < 300) {
+          return;
+        }
+        lastEscapePress.current = now;
+
         setIsPaused((p) => {
           const newPaused = !p;
           if (newPaused) {

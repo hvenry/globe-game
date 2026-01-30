@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
@@ -498,6 +498,7 @@ export default function StartScreen({
   const [showSettings, setShowSettings] = useState(false);
   const [copied, setCopied] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const lastEscapePress = useRef<number>(0);
   const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
     useStatsStore();
 
@@ -574,6 +575,14 @@ export default function StartScreen({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && showSettings) {
         e.preventDefault();
+
+        // Debounce: only allow close if at least 300ms has passed since last press
+        const now = Date.now();
+        if (now - lastEscapePress.current < 300) {
+          return;
+        }
+        lastEscapePress.current = now;
+
         setShowSettings(false);
       } else if (e.key === "Enter" && !showSettings) {
         e.preventDefault();
