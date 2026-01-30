@@ -289,6 +289,7 @@ function Slider({
   step = 0.1,
   displayMin,
   displayMax,
+  expertMode = false,
 }: {
   label: string;
   value: number;
@@ -298,6 +299,7 @@ function Slider({
   step?: number;
   displayMin?: number;
   displayMax?: number;
+  expertMode?: boolean;
 }) {
   // If display range is specified, map between actual and display values
   const actualMin = displayMin !== undefined ? min : min;
@@ -327,6 +329,10 @@ function Slider({
   const displayProgress =
     ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
 
+  // Colors for expert vs normal mode
+  const fillColor = expertMode ? "rgb(251, 191, 36)" : "rgb(16, 185, 129)"; // amber-400 vs emerald
+  const accentClass = expertMode ? "accent-amber-400" : "accent-emerald";
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between px-1">
@@ -342,9 +348,9 @@ function Slider({
         step={step}
         value={displayValue}
         onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
-        className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald hover:bg-white/15 transition-colors"
+        className={`w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer ${accentClass} hover:bg-white/15 transition-colors`}
         style={{
-          background: `linear-gradient(to right, rgb(16, 185, 129) 0%, rgb(16, 185, 129) ${displayProgress}%, rgba(255, 255, 255, 0.1) ${displayProgress}%, rgba(255, 255, 255, 0.1) 100%)`,
+          background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, rgba(255, 255, 255, 0.1) ${displayProgress}%, rgba(255, 255, 255, 0.1) 100%)`,
         }}
       />
     </div>
@@ -491,6 +497,7 @@ export default function StartScreen({
   const [hydrated, setHydrated] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
     useStatsStore();
 
@@ -576,6 +583,23 @@ export default function StartScreen({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showSettings, onStart]);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight - target.clientHeight;
+    let progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    // Treat anything above 99% as fully scrolled to account for floating point precision
+    if (progress > 99) progress = 100;
+    setScrollProgress(progress);
+  }, []);
+
+  // Reset scroll progress when settings are toggled
+  useEffect(() => {
+    if (showSettings) {
+      setScrollProgress(0);
+    }
+  }, [showSettings]);
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
@@ -725,88 +749,105 @@ export default function StartScreen({
           })()}
 
         {showSettings ? (
-          <div className="space-y-4 text-left">
-            <GameModeSelect
-              value={countrySet}
-              onChange={setCountrySet}
-              expertMode={expertMode}
-            />
-
-            <div className="space-y-3">
-              <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-                Camera Controls
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <Slider
-                  label="Zoom"
-                  value={zoomSpeed}
-                  onChange={setZoomSpeed}
-                  min={0.1}
-                  max={1.0}
-                  displayMin={0.1}
-                  displayMax={2.0}
-                  step={0.1}
-                />
-                <Slider
-                  label="Rotate"
-                  value={rotateSpeed}
-                  onChange={setRotateSpeed}
-                  min={0.1}
-                  max={2.0}
-                  step={0.1}
-                />
-              </div>
+          <div className="relative">
+            {/* Scroll progress bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-emerald to-amber-400"
+                style={{ width: `${scrollProgress}%` }}
+              />
             </div>
 
-            <TimerLimitSelect
-              value={timerLimit}
-              onChange={setTimerLimit}
-              disabled={expertMode}
-              expertMode={expertMode}
-            />
-
-            <MaxTriesSelect
-              value={maxTries}
-              onChange={setMaxTries}
-              disabled={expertMode}
-              expertMode={expertMode}
-            />
-
-            <div className="space-y-2">
-              <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-                Game Options
-              </p>
-              <div className="space-y-2">
-                <Toggle
-                  enabled={allowSkips}
-                  onChange={setAllowSkips}
-                  label="Allow Skips"
-                  description="Navigate between countries freely"
-                  disabled={expertMode}
-                />
-                <Toggle
-                  enabled={showHints}
-                  onChange={setShowHints}
-                  label="Show Hints"
-                  description="Display country names on incorrect guesses"
-                  disabled={expertMode}
-                />
-                <Toggle
-                  enabled={expertMode}
-                  onChange={setExpertMode}
-                  label="Expert Mode"
-                  description="One wrong click ends the game"
-                  variant="gold"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowSettings(false)}
-              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-2 cursor-pointer"
+            {/* Scrollable content */}
+            <div
+              className="space-y-4 text-left overflow-y-auto pt-4 pb-2 px-1"
+              style={{ maxHeight: "60vh" }}
+              onScroll={handleScroll}
             >
-              Back
-            </button>
+              <GameModeSelect
+                value={countrySet}
+                onChange={setCountrySet}
+                expertMode={expertMode}
+              />
+
+              <div className="space-y-3">
+                <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+                  Camera Controls
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Slider
+                    label="Zoom"
+                    value={zoomSpeed}
+                    onChange={setZoomSpeed}
+                    min={0.1}
+                    max={1.0}
+                    displayMin={0.1}
+                    displayMax={2.0}
+                    step={0.1}
+                    expertMode={expertMode}
+                  />
+                  <Slider
+                    label="Rotate"
+                    value={rotateSpeed}
+                    onChange={setRotateSpeed}
+                    min={0.1}
+                    max={2.0}
+                    step={0.1}
+                    expertMode={expertMode}
+                  />
+                </div>
+              </div>
+
+              <TimerLimitSelect
+                value={timerLimit}
+                onChange={setTimerLimit}
+                disabled={expertMode}
+                expertMode={expertMode}
+              />
+
+              <MaxTriesSelect
+                value={maxTries}
+                onChange={setMaxTries}
+                disabled={expertMode}
+                expertMode={expertMode}
+              />
+
+              <div className="space-y-2">
+                <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+                  Game Options
+                </p>
+                <div className="space-y-2">
+                  <Toggle
+                    enabled={allowSkips}
+                    onChange={setAllowSkips}
+                    label="Allow Skips"
+                    description="Navigate between countries freely"
+                    disabled={expertMode}
+                  />
+                  <Toggle
+                    enabled={showHints}
+                    onChange={setShowHints}
+                    label="Show Hints"
+                    description="Display country names on incorrect guesses"
+                    disabled={expertMode}
+                  />
+                  <Toggle
+                    enabled={expertMode}
+                    onChange={setExpertMode}
+                    label="Expert Mode"
+                    description="One wrong click ends the game"
+                    variant="gold"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-2 cursor-pointer"
+              >
+                Back
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
