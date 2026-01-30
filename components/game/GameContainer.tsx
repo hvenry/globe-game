@@ -12,6 +12,7 @@ import GameOver from "./GameOver";
 import PauseMenu from "./PauseMenu";
 import CountdownTimer from "./CountdownTimer";
 import LoadingScreen from "./LoadingScreen";
+import MenuButton from "./MenuButton";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
@@ -86,6 +87,25 @@ export default function GameContainer() {
   const handleResume = useCallback(() => {
     setIsPaused(false);
   }, []);
+
+  const handleMenuClick = useCallback(() => {
+    // Debounce: only allow toggle if at least 300ms has passed since last press
+    const now = Date.now();
+    if (now - lastEscapePress.current < 300) {
+      return;
+    }
+    lastEscapePress.current = now;
+
+    setIsPaused((p) => {
+      const newPaused = !p;
+      if (newPaused) {
+        pauseTimer();
+      } else {
+        resumeTimer();
+      }
+      return newPaused;
+    });
+  }, [pauseTimer, resumeTimer]);
 
   const handleGlobeReady = useCallback(() => {
     setIsLoading(false);
@@ -201,6 +221,7 @@ export default function GameContainer() {
         <TriesIndicator />
         <ClickFeedback />
         <ResultFeedback />
+        <MenuButton onClick={handleMenuClick} />
 
         {phase === "idle" && <StartScreen onStart={handleStart} delayAnimation={isInitialLoad} />}
         {phase === "gameover" && (
