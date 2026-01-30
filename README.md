@@ -282,6 +282,7 @@ bun run lint
 Edit `lib/geo/country-sets.ts` and add a new entry with country ISO numeric codes.
 
 **Available continent-based sets:**
+
 - Africa (54 countries)
 - Asia (48 countries)
 - Europe (44 countries)
@@ -312,3 +313,29 @@ Settings and stats are automatically persisted to localStorage via Zustand's `pe
 - **Optimized TopoJSON:** 50m resolution for balance of detail and performance
 - **Efficient state updates:** Zustand only re-renders components using changed state slices
 - **Animation throttling:** Timer updates at 100ms intervals, not per-frame
+
+## Troubleshooting Max Scores
+
+```
+// Get the current stats from localStorage
+const stats = JSON.parse(localStorage.getItem('globe-game-stats'));
+
+// Set both normal and expert scores to 195 (total countries)
+stats.state.bestScores.all = 195;
+stats.state.expertBestScores.all = 195;
+
+// Save back to localStorage
+localStorage.setItem('globe-game-stats', JSON.stringify(stats));
+
+// Reload the page to see the changes
+location.reload();
+
+This will give you 100% in both modes (195/195 countries). The UI should show:
+- Gold/amber border with shimmer effect (perfect in both modes)
+- Both the green (normal) and amber (expert) percentage displays showing 100%
+- The share button in the top-right corner as a badge
+
+To reset back to your actual scores, just clear the localStorage:
+localStorage.removeItem('globe-game-stats');
+location.reload();
+```
