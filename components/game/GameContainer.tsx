@@ -11,6 +11,7 @@ import StartScreen from "./StartScreen";
 import GameOver from "./GameOver";
 import PauseMenu from "./PauseMenu";
 import CountdownTimer from "./CountdownTimer";
+import LoadingScreen from "./LoadingScreen";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
@@ -18,6 +19,9 @@ import { getCountrySet } from "@/lib/geo/country-sets";
 
 export default function GameContainer() {
   const [isPaused, setIsPaused] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showContent, setShowContent] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const phase = useGameStore((s) => s.phase);
   const wrongGuessIds = useGameStore((s) => s.wrongGuessIds);
@@ -76,6 +80,18 @@ export default function GameContainer() {
 
   const handleResume = useCallback(() => {
     setIsPaused(false);
+  }, []);
+
+  const handleGlobeReady = useCallback(() => {
+    setIsLoading(false);
+    // Fade in content after a brief moment
+    setTimeout(() => {
+      setShowContent(true);
+      // Mark that initial load is complete after fade-in finishes
+      setTimeout(() => {
+        setIsInitialLoad(false);
+      }, 300);
+    }, 50);
   }, []);
 
   const handleCountryClick = useCallback(
@@ -145,7 +161,9 @@ export default function GameContainer() {
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-black">
-      <div className="absolute inset-0">
+      {isLoading && <LoadingScreen />}
+
+      <div className={`absolute inset-0 transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}>
         <GlobeDynamic
           features={allFeatures}
           wrongGuessIds={wrongGuessIds}
@@ -153,27 +171,30 @@ export default function GameContainer() {
           interactive={phase === "playing" && !isPaused}
           autoRotate={phase === "idle" || phase === "gameover"}
           onCountryClick={handleCountryClick}
+          onReady={handleGlobeReady}
         />
       </div>
 
-      <CountryPrompt />
-      <CountdownTimer />
-      <ScoreBoard />
-      <TriesIndicator />
-      <ClickFeedback />
-      <ResultFeedback />
+      <div className={`transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}>
+        <CountryPrompt />
+        <CountdownTimer />
+        <ScoreBoard />
+        <TriesIndicator />
+        <ClickFeedback />
+        <ResultFeedback />
 
-      {phase === "idle" && <StartScreen onStart={handleStart} />}
-      {phase === "gameover" && (
-        <GameOver onPlayAgain={handlePlayAgain} onMainMenu={handleMainMenu} />
-      )}
-      {isPaused && isGameActive && (
-        <PauseMenu
-          onResume={handleResume}
-          onRestart={handlePlayAgain}
-          onMainMenu={handleForfeit}
-        />
-      )}
+        {phase === "idle" && <StartScreen onStart={handleStart} delayAnimation={isInitialLoad} />}
+        {phase === "gameover" && (
+          <GameOver onPlayAgain={handlePlayAgain} onMainMenu={handleMainMenu} />
+        )}
+        {isPaused && isGameActive && (
+          <PauseMenu
+            onResume={handleResume}
+            onRestart={handlePlayAgain}
+            onMainMenu={handleForfeit}
+          />
+        )}
+      </div>
     </div>
   );
 }

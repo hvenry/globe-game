@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useGameStore } from "@/lib/store/game-store";
-import { useSettingsStore } from "@/lib/store/settings-store";
 import { GAME_CONFIG } from "@/lib/constants";
 
 export default function ResultFeedback() {
@@ -12,7 +11,6 @@ export default function ResultFeedback() {
   const currentCountry = useGameStore((s) => s.currentCountry);
   const lastClickedCountryName = useGameStore((s) => s.lastClickedCountryName);
   const nextCountry = useGameStore((s) => s.nextCountry);
-  const gameMode = useSettingsStore((s) => s.gameMode);
 
   useEffect(() => {
     if (phase !== "feedback") return;

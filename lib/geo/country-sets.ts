@@ -28,7 +28,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
   {
     id: "all",
     name: "All Countries",
-    description: "All 195 countries",
+    description: "All countries",
     countryIds: null,
   },
   {
@@ -106,7 +106,6 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "096", // Brunei
       "116", // Cambodia
       "156", // China
-      "196", // Cyprus
       "268", // Georgia
       "356", // India
       "360", // Indonesia
@@ -160,6 +159,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "070", // Bosnia and Herzegovina
       "100", // Bulgaria
       "191", // Croatia
+      "196", // Cyprus
       "203", // Czech Republic
       "208", // Denmark
       "233", // Estonia

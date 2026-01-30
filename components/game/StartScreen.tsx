@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
@@ -8,10 +8,52 @@ import {
   getAvailableCountrySets,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
+import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import { TIMER_CONFIG } from "@/lib/constants";
 
 interface StartScreenProps {
   onStart: () => void;
+  delayAnimation?: boolean;
+}
+
+function AnimatedCounter({
+  value,
+  duration = 1000,
+  delayStart = 0,
+}: {
+  value: number;
+  duration?: number;
+  delayStart?: number;
+}) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const delayTimeout = setTimeout(() => {
+      const startTime = performance.now();
+      const startValue = 0;
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Ease out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(startValue + (value - startValue) * eased);
+
+        setDisplay(current);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    }, delayStart);
+
+    return () => clearTimeout(delayTimeout);
+  }, [value, duration, delayStart]);
+
+  return <>{display}</>;
 }
 
 function Toggle({
@@ -95,15 +137,15 @@ function GameModeSelect({
   const availableSets = getAvailableCountrySets();
   const { bestScores, expertBestScores } = useStatsStore();
 
-  // Get total countries for each set
+  // Get actual playable count for each set (intersection of set IDs and guessable countries)
   const getSetTotal = (setId: CountrySetId): number => {
-    const set = availableSets.find(s => s.id === setId);
-    if (!set || !set.countryIds) return 195; // "all" mode
-    return set.countryIds.length;
+    const set = availableSets.find((s) => s.id === setId);
+    if (!set || !set.countryIds) return GUESSABLE_IDS.size;
+    return set.countryIds.filter((id) => GUESSABLE_IDS.has(id)).length;
   };
 
   // Only show continents (exclude "all")
-  const continentSets = availableSets.filter(s => s.id !== "all");
+  const continentSets = availableSets.filter((s) => s.id !== "all");
 
   // Handle toggle - clicking selected continent deselects it (goes back to "all")
   const handleContinentClick = (setId: CountrySetId) => {
@@ -114,12 +156,17 @@ function GameModeSelect({
     }
   };
 
-  const renderSetButton = (set: typeof availableSets[0], isFullWidth = false) => {
+  const renderSetButton = (
+    set: (typeof availableSets)[0],
+    isFullWidth = false,
+  ) => {
     const normalBestScore = bestScores[set.id] || 0;
     const expertBestScore = expertBestScores[set.id] || 0;
     const total = getSetTotal(set.id);
-    const normalPercentage = total > 0 ? Math.round((normalBestScore / total) * 100) : 0;
-    const expertPercentage = total > 0 ? Math.round((expertBestScore / total) * 100) : 0;
+    const normalPercentage =
+      total > 0 ? Math.round((normalBestScore / total) * 100) : 0;
+    const expertPercentage =
+      total > 0 ? Math.round((expertBestScore / total) * 100) : 0;
     const hasNormalScore = normalBestScore > 0;
     const hasExpertScore = expertBestScore > 0;
     const isSelected = value === set.id;
@@ -132,7 +179,8 @@ function GameModeSelect({
     if (isPerfectBoth) {
       borderClass = "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
     } else if (isPerfectExpert) {
-      borderClass = "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
+      borderClass =
+        "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
     } else if (isPerfectNormal) {
       borderClass = "border-2 border-emerald shadow-lg shadow-emerald/30";
     } else if (expertMode) {
@@ -160,11 +208,13 @@ function GameModeSelect({
         }`}
       >
         {/* Animated glow effect on hover */}
-        <div className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-          expertMode
-            ? "bg-gradient-to-br from-amber-500/5 to-transparent"
-            : "bg-gradient-to-br from-emerald/5 to-transparent"
-        }`} />
+        <div
+          className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+            expertMode
+              ? "bg-gradient-to-br from-amber-500/5 to-transparent"
+              : "bg-gradient-to-br from-emerald/5 to-transparent"
+          }`}
+        />
 
         <div className="relative flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -182,7 +232,7 @@ function GameModeSelect({
               {set.name}
             </p>
             <p className="text-white/50 text-[11px] leading-tight">
-              {set.description}
+              {total} countries
             </p>
           </div>
           {(hasNormalScore || hasExpertScore) && (
@@ -242,11 +292,11 @@ function TimerLimitSelect({
   expertMode?: boolean;
 }) {
   const options: Array<{ label: string; value: number | null }> = [
-    { label: "None", value: null },
     { label: "5s", value: 5 },
     { label: "10s", value: 10 },
     { label: "30s", value: 30 },
     { label: "1m", value: 60 },
+    { label: "None", value: null },
   ];
 
   return (
@@ -298,7 +348,10 @@ function TimerLimitSelect({
   );
 }
 
-export default function StartScreen({ onStart }: StartScreenProps) {
+export default function StartScreen({
+  onStart,
+  delayAnimation = false,
+}: StartScreenProps) {
   const [hydrated, setHydrated] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
@@ -314,11 +367,6 @@ export default function StartScreen({ onStart }: StartScreenProps) {
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
   const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
-
-  // Store previous settings state when expert mode is toggled on
-  const previousAllowSkips = useRef<boolean>(allowSkips);
-  const previousShowHints = useRef<boolean>(showHints);
-  const previousTimerLimit = useRef<number | null>(timerLimit);
 
   useEffect(() => {
     setHydrated(true);
@@ -347,48 +395,102 @@ export default function StartScreen({ onStart }: StartScreenProps) {
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
-      <div className={`animate-fade-in-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center mx-4 w-full ${
-        showSettings ? "max-w-md" : "max-w-sm"
-      }`}>
+      <div
+        className={`animate-fade-in-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center mx-4 w-full ${
+          showSettings ? "max-w-md" : "max-w-sm"
+        }`}
+      >
         {showSettings ? (
-          <h1 className="text-2xl font-bold text-white tracking-tight mb-6">
-            SETTINGS
-          </h1>
+          <> </>
         ) : (
           <>
             <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-              GLOBE
+              globe. <br />
+              expert
             </h1>
-            <p className="text-white/40 text-sm mt-2 mb-6">Test your geography</p>
+            <p className="text-white/40 text-sm mt-2 mb-6">
+              Test your geography
+            </p>
           </>
         )}
 
         {hydrated &&
           (bestScores.all > 0 || expertBestScores.all > 0) &&
-          !showSettings && (
-            <div className="mb-6 space-y-2">
-              {bestScores.all > 0 && (
-                <div className="bg-white/5 rounded-lg p-3">
-                  <p className="text-white/40 text-xs uppercase tracking-wider">
-                    Best Score (All Countries)
-                  </p>
-                  <p className="text-emerald text-xl font-bold tabular-nums">
-                    {Math.round((bestScores.all / 195) * 100)}%
-                  </p>
+          !showSettings &&
+          (() => {
+            const allTotal = GUESSABLE_IDS.size;
+            const normalPercentage = Math.round((bestScores.all / allTotal) * 100);
+            const expertPercentage = Math.round(
+              (expertBestScores.all / allTotal) * 100,
+            );
+            const isPerfectNormal = normalPercentage === 100;
+            const isPerfectExpert = expertPercentage === 100;
+            const isPerfectBoth = isPerfectNormal && isPerfectExpert;
+
+            let borderClass = "";
+            if (isPerfectBoth) {
+              borderClass =
+                "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
+            } else if (isPerfectExpert) {
+              borderClass =
+                "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
+            } else if (isPerfectNormal) {
+              borderClass =
+                "border-2 border-emerald shadow-lg shadow-emerald/30";
+            } else {
+              borderClass = "border border-white/10";
+            }
+
+            return (
+              <div
+                className={`relative mb-6 bg-white/5 rounded-xl p-4 overflow-hidden ${borderClass}`}
+              >
+                {/* Animated background shimmer for perfect scores */}
+                {(isPerfectNormal || isPerfectExpert) && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
+                )}
+
+                <div className="relative flex items-center justify-between">
+                  <div>
+                    <p className="text-white text-sm tracking-wider">
+                      Best Score
+                    </p>
+                    <p className="text-white/40 text-sm mt-0.5">
+                      {allTotal} Countries
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {bestScores.all > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse-glow" />
+                        <p className="text-emerald text-2xl font-bold tabular-nums">
+                          <AnimatedCounter
+                            value={normalPercentage}
+                            duration={1200}
+                            delayStart={delayAnimation ? 350 : 0}
+                          />
+                          %
+                        </p>
+                      </div>
+                    )}
+                    {expertBestScores.all > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
+                        <p className="text-amber-400 text-2xl font-bold tabular-nums">
+                          <AnimatedCounter
+                            value={expertPercentage}
+                            duration={1200}
+                            delayStart={delayAnimation ? 350 : 0}
+                          />
+                          %
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {expertBestScores.all > 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                  <p className="text-amber-400/60 text-xs uppercase tracking-wider">
-                    Expert Best (All Countries)
-                  </p>
-                  <p className="text-amber-400 text-xl font-bold tabular-nums">
-                    {Math.round((expertBestScores.all / 195) * 100)}%
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
         {showSettings ? (
           <div className="space-y-4 mb-6 text-left">
@@ -399,7 +501,11 @@ export default function StartScreen({ onStart }: StartScreenProps) {
               expertMode={expertMode}
             />
 
-            <GameModeSelect value={countrySet} onChange={setCountrySet} expertMode={expertMode} />
+            <GameModeSelect
+              value={countrySet}
+              onChange={setCountrySet}
+              expertMode={expertMode}
+            />
 
             <div className="space-y-2">
               <p className="text-white/50 text-xs uppercase tracking-wider px-1">
@@ -422,23 +528,7 @@ export default function StartScreen({ onStart }: StartScreenProps) {
                 />
                 <Toggle
                   enabled={expertMode}
-                  onChange={(value) => {
-                    if (value) {
-                      // Save current state before disabling
-                      previousAllowSkips.current = allowSkips;
-                      previousShowHints.current = showHints;
-                      previousTimerLimit.current = timerLimit;
-                      setAllowSkips(false);
-                      setShowHints(false);
-                      setTimerLimit(TIMER_CONFIG.expertModeLimit);
-                    } else {
-                      // Restore previous state
-                      setAllowSkips(previousAllowSkips.current);
-                      setShowHints(previousShowHints.current);
-                      setTimerLimit(previousTimerLimit.current);
-                    }
-                    setExpertMode(value);
-                  }}
+                  onChange={setExpertMode}
                   label="Expert Mode"
                   description="One wrong click ends the game"
                   variant="gold"

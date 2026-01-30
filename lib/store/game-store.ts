@@ -357,7 +357,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ phase: "gameover" });
       return;
     }
-    const country = state.unansweredCountries[state.currentIndex];
+    const idx = Math.min(state.currentIndex, state.unansweredCountries.length - 1);
+    const country = state.unansweredCountries[idx];
     const loaded = loadTriesState(
       country,
       state.countryTries,
@@ -367,6 +368,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     );
     set({
       phase: "playing",
+      currentIndex: idx,
       currentCountry: country,
       triesRemaining: loaded.triesRemaining,
       wrongGuessIds: loaded.wrongGuessIds,

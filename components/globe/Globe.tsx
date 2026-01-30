@@ -44,6 +44,7 @@ interface GlobeProps {
     countryId: string,
     position: [number, number, number],
   ) => void;
+  onReady?: () => void;
 }
 
 // ── Fill colour helpers ──────────────────────────────────────────────────────
@@ -169,12 +170,14 @@ function GlobeScene({
   interactive,
   autoRotate,
   onCountryClick,
+  onReady,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
   const [hoveredCountryBase, setHoveredCountryBase] = useState<string | null>(
     null,
   );
+  const readySignaled = useRef(false);
 
   // ── d3 projection (equirectangular rotated to match Three.js sphere UVs) ──
 
@@ -239,7 +242,14 @@ function GlobeScene({
 
     ctx.globalAlpha = 1;
     texture.needsUpdate = true;
-  }, [canvas, texture, projection, features, getCountryState]);
+
+    // Signal ready after initial render
+    if (!readySignaled.current && onReady) {
+      readySignaled.current = true;
+      // Small delay to ensure everything is rendered
+      setTimeout(() => onReady(), 100);
+    }
+  }, [canvas, texture, projection, features, getCountryState, onReady]);
 
   // ── Pointer → country lookup via d3-geo ───────────────────────────────────
 
