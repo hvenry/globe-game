@@ -152,7 +152,7 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
 
         {expertMode ? (
           <>
-            <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+            <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 relative">
               <p className="text-amber-400/60 text-xs uppercase tracking-wider">
                 Score
               </p>
@@ -160,9 +160,11 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
                 <AnimatedCounter value={expertPercentage} duration={1200} />%
               </p>
               {isNewExpertBest && (
-                <Badge className="mt-2 bg-amber-500/20 text-amber-400 border-amber-500/30">
-                  New Best!
-                </Badge>
+                <div className="absolute -bottom-2.5 -right-2.5">
+                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 backdrop-blur-md">
+                    New Best!
+                  </Badge>
+                </div>
               )}
             </div>
 
@@ -191,33 +193,33 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
           </>
         ) : (
           <>
-            <div className="mt-4 mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-white/30 text-xs uppercase tracking-wider">
-                    Accuracy
-                  </p>
-                  <p className="text-white/60 text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                    <AnimatedCounter value={accuracy} duration={1200} />%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-white/30 text-xs uppercase tracking-wider">
-                    Score
-                  </p>
-                  <p className={`text-3xl md:text-4xl font-bold tabular-nums mt-1 ${
-                    scorePercentage === 100
-                      ? "text-emerald"
-                      : "text-white"
-                  }`}>
-                    <AnimatedCounter value={scorePercentage} duration={1200} />%
-                  </p>
-                  {isNewBest && (
-                    <Badge className="mt-2 bg-emerald/20 text-emerald border-emerald/30">
+            <div className="mt-4 mb-4 grid grid-cols-2 gap-3">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                <p className="text-white/30 text-xs uppercase tracking-wider">
+                  Accuracy
+                </p>
+                <p className="text-white/60 text-3xl md:text-4xl font-bold tabular-nums mt-1">
+                  <AnimatedCounter value={accuracy} duration={1200} />%
+                </p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3 relative">
+                <p className="text-white/30 text-xs uppercase tracking-wider">
+                  Score
+                </p>
+                <p className={`text-3xl md:text-4xl font-bold tabular-nums mt-1 ${
+                  scorePercentage === 100
+                    ? "text-emerald"
+                    : "text-white"
+                }`}>
+                  <AnimatedCounter value={scorePercentage} duration={1200} />%
+                </p>
+                {isNewBest && (
+                  <div className="absolute -bottom-2.5 -right-2.5">
+                    <Badge className="bg-emerald/20 text-emerald border-emerald/30 backdrop-blur-md">
                       New Best!
                     </Badge>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
