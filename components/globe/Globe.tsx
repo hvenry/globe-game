@@ -231,7 +231,8 @@ function GlobeScene({
   }, []);
 
   useEffect(() => {
-    const wasInGame = prevPhaseRef.current === "playing" || prevPhaseRef.current === "feedback";
+    const wasInGame =
+      prevPhaseRef.current === "playing" || prevPhaseRef.current === "feedback";
 
     // Only animate once per game session (idle/gameover → playing)
     if (gamePhase === "playing" && !wasInGame && !hasAnimatedForGame.current) {
@@ -239,7 +240,11 @@ function GlobeScene({
       const center = CONTINENT_CENTERS[gameCountrySetId];
       if (center) {
         // Full position animation to face the continent
-        animTargetRef.current = lngLatToCameraPos(center[0], center[1], GLOBE_CONFIG.cameraZ);
+        animTargetRef.current = lngLatToCameraPos(
+          center[0],
+          center[1],
+          GLOBE_CONFIG.cameraZ,
+        );
       } else {
         // "all" mode — distance-only reset
         animDistanceRef.current = GLOBE_CONFIG.cameraZ;
@@ -343,6 +348,10 @@ function GlobeScene({
     for (const feature of features) {
       const state = getCountryState(feature.id);
       if (state === "default") continue;
+
+      // FIX for synthetic point features (e.g. Tuvalu)
+      // Skip Point geometries - they're rendered as 3D spheres by SmallCountryMarkers
+      if (feature.geometry.type === "Point") continue;
 
       ctx.fillStyle = getFillColor(state);
       ctx.globalAlpha = getFillOpacity(state);
