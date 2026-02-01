@@ -2,6 +2,7 @@
 
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { getFlagPath } from "@/lib/geo/iso-codes";
 
 export default function CountryPrompt() {
   const phase = useGameStore((s) => s.phase);
@@ -20,6 +21,7 @@ export default function CountryPrompt() {
   // During playing phase, we need to add 1 since we're on the next question
   const current = phase === "feedback" ? questionsAnswered : questionsAnswered + 1;
   const showArrows = allowSkips && phase === "playing" && unansweredCountries.length > 1;
+  const flagPath = getFlagPath(currentCountry.id);
 
   return (
     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
@@ -44,9 +46,17 @@ export default function CountryPrompt() {
           ) : (
             <span className="w-[24px]" />
           )}
-          <p className="text-white text-lg md:text-2xl font-semibold">
-            {currentCountry.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <img
+              src={flagPath}
+              alt={`${currentCountry.name} flag`}
+              className="w-8 h-6 md:w-10 md:h-7 object-cover rounded-sm border border-white/10"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <p className="text-white text-lg md:text-2xl font-semibold">
+              {currentCountry.name}
+            </p>
+          </div>
           {showArrows ? (
             <button
               onClick={goNext}
