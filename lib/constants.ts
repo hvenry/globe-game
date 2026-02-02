@@ -38,7 +38,7 @@ export const GLOBE_CONFIG = {
   cameraZ: 350,
   cameraFov: 45,
   autoRotateSpeed: 0.3,
-  dampingFactor: 0.04,
+  dampingFactor: 0.08, // Increased from 0.04 for smoother rotation with more inertia
   smallCountryMarkerRadius: 0.6, // 3D sphere radius
   smallCountryClickRadius: 0.8, // degrees for click detection (matches visual size)
 } as const;
