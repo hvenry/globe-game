@@ -274,7 +274,7 @@ function GameModeSelect({
       </div>
       {/* Continents - 2x3 Grid */}
       <div className="grid grid-cols-2 gap-2">
-        {continentSets.map((set) => renderSetButton(set, false))}
+        {continentSets.map((set) => renderSetButton(set))}
       </div>
     </div>
   );
