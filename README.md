@@ -314,6 +314,33 @@ Settings and stats are automatically persisted to localStorage via Zustand's `pe
 - **Efficient state updates:** Zustand only re-renders components using changed state slices
 - **Animation throttling:** Timer updates at 100ms intervals, not per-frame
 
+## CI/CD & Deployment
+
+This project uses GitHub Actions for automated deployments and semantic versioning.
+
+### Workflow
+
+1. **Feature Development**: Create feature branches (`feature/*`, `fix/*`, etc.)
+2. **Pull Request**: Automated checks + preview deployment on Vercel
+3. **Merge to Main**: Automatic production deployment with semantic versioning
+4. **GitHub Release**: Auto-generated changelog and release notes
+
+### Semantic Versioning
+
+Version bumps are determined by commit message prefixes:
+
+- `feat:` or `feature:` → Minor version bump (0.1.0 → 0.2.0)
+- `fix:` or `bugfix:` → Patch version bump (0.1.0 → 0.1.1)
+- `BREAKING CHANGE:` or `major:` → Major version bump (0.1.0 → 1.0.0)
+
+Example:
+
+```bash
+git commit -m "feat: add multiplayer mode"  # Triggers 0.1.0 → 0.2.0
+```
+
+The current version is displayed at the bottom of the game's settings menu. Version is injected at build time via the `NEXT_PUBLIC_APP_VERSION` environment variable.
+
 ## Troubleshooting Max Scores
 
 ```
