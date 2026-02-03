@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getFlagPath } from "@/lib/geo/iso-codes";
@@ -47,9 +48,11 @@ export default function CountryPrompt() {
             <span className="w-[24px]" />
           )}
           <div className="flex items-center gap-2">
-            <img
+            <Image
               src={flagPath}
               alt={`${currentCountry.name} flag`}
+              width={40}
+              height={28}
               className="w-8 h-6 md:w-10 md:h-7 object-cover rounded-sm border border-white/10"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />

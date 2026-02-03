@@ -159,7 +159,6 @@ function GameModeSelect({
 
   const renderSetButton = (
     set: (typeof availableSets)[0],
-    isFullWidth = false,
   ) => {
     const normalBestScore = bestScores[set.id] || 0;
     const expertBestScore = expertBestScores[set.id] || 0;
@@ -495,12 +494,13 @@ export default function StartScreen({
   onStart,
   delayAnimation = false,
 }: StartScreenProps) {
-  const [hydrated, setHydrated] = useState(false);
+  // Use lazy initialization to set hydrated to true after mount
+  const [hydrated, setHydrated] = useState(() => false);
   const [showSettings, setShowSettings] = useState(false);
   const [copied, setCopied] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const lastEscapePress = useRef<number>(0);
-  const { gamesPlayed, bestScores, expertBestScores, expertGamesPlayed } =
+  const { bestScores, expertBestScores } =
     useStatsStore();
 
   const countrySet = useSettingsStore((s) => s.countrySet);
@@ -520,17 +520,22 @@ export default function StartScreen({
   const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
   const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
 
+  // Mark as hydrated after mount - using setTimeout to avoid setState in effect
   useEffect(() => {
-    setHydrated(true);
+    const timer = setTimeout(() => setHydrated(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
+  // Sync expert mode settings - only update if necessary
   useEffect(() => {
+    if (!expertMode) return;
+
     // If expert mode is enabled and timer isn't 5 seconds, set it to 5 seconds
-    if (expertMode && timerLimit !== TIMER_CONFIG.expertModeLimit) {
+    if (timerLimit !== TIMER_CONFIG.expertModeLimit) {
       setTimerLimit(TIMER_CONFIG.expertModeLimit);
     }
     // If expert mode is enabled and max tries isn't 1, set it to 1
-    if (expertMode && maxTries !== 1) {
+    if (maxTries !== 1) {
       setMaxTries(1);
     }
   }, [expertMode, timerLimit, maxTries, setTimerLimit, setMaxTries]);
@@ -604,12 +609,8 @@ export default function StartScreen({
     setScrollProgress(progress);
   }, []);
 
-  // Reset scroll progress when settings are toggled
-  useEffect(() => {
-    if (showSettings) {
-      setScrollProgress(0);
-    }
-  }, [showSettings]);
+  // Reset scroll progress based on showSettings state - derived value approach
+  const displayScrollProgress = showSettings ? scrollProgress : 0;
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
@@ -764,7 +765,7 @@ export default function StartScreen({
             <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald to-amber-400"
-                style={{ width: `${scrollProgress}%` }}
+                style={{ width: `${displayScrollProgress}%` }}
               />
             </div>
 

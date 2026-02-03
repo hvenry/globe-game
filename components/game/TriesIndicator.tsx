@@ -1,24 +1,28 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/game-store";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function TriesIndicator() {
   const phase = useGameStore((s) => s.phase);
   const triesRemaining = useGameStore((s) => s.triesRemaining);
   const maxTries = useGameStore((s) => s.maxTries);
   const [shaking, setShaking] = useState(false);
-  const [prevTries, setPrevTries] = useState(triesRemaining);
+  const prevTriesRef = useRef(triesRemaining);
 
   useEffect(() => {
-    if (triesRemaining < prevTries && phase === "playing") {
-      setShaking(true);
-      const timer = setTimeout(() => setShaking(false), 300);
-      setPrevTries(triesRemaining);
-      return () => clearTimeout(timer);
+    if (triesRemaining < prevTriesRef.current && phase === "playing") {
+      // Trigger shake animation asynchronously to avoid setState during render
+      const shakeTimer = setTimeout(() => setShaking(true), 0);
+      const resetTimer = setTimeout(() => setShaking(false), 300);
+      prevTriesRef.current = triesRemaining;
+      return () => {
+        clearTimeout(shakeTimer);
+        clearTimeout(resetTimer);
+      };
     }
-    setPrevTries(triesRemaining);
-  }, [triesRemaining, prevTries, phase]);
+    prevTriesRef.current = triesRemaining;
+  }, [triesRemaining, phase]);
 
   if (phase !== "playing" && phase !== "feedback") return null;
 

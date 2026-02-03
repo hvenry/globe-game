@@ -16,6 +16,7 @@ export default function ClickFeedback() {
   const floatingLabels = useGameStore((s) => s.floatingLabels);
   const removeFloatingLabel = useGameStore((s) => s.removeFloatingLabel);
   const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Remove labels after duration
   useEffect(() => {
@@ -45,12 +46,20 @@ export default function ClickFeedback() {
     };
   }, []);
 
+  // Update current time for label animations
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="pointer-events-none fixed inset-0">
       {projectedLabels.map((label) => {
         if (!label.visible) return null;
 
-        const age = Date.now() - label.createdAt;
+        const age = currentTime - label.createdAt;
         const progress = Math.min(1, age / LABEL_DURATION);
         const opacity = Math.max(0, 1 - progress);
 

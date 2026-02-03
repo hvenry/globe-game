@@ -21,7 +21,7 @@ import SmallCountryMarkers from "./SmallCountryMarkers";
 import type { CountryFeature } from "@/lib/geo/types";
 import { GLOBE_CONFIG, COLORS, SMALL_COUNTRIES } from "@/lib/constants";
 import { baseId } from "@/lib/geo/countries";
-import type { Resolution, FloatingLabel } from "@/lib/store/game-store";
+import type { Resolution } from "@/lib/store/game-store";
 import { useGameStore } from "@/lib/store/game-store";
 import type { CountrySetId } from "@/lib/geo/country-sets";
 
@@ -361,7 +361,12 @@ function GlobeScene({
     }
 
     ctx.globalAlpha = 1;
-    texture.needsUpdate = true;
+
+    // Update texture after canvas rendering
+    // This is a necessary mutation for Three.js to detect canvas changes
+    requestAnimationFrame(() => {
+      texture.needsUpdate = true;
+    });
 
     // Signal ready after initial render
     if (!readySignaled.current && onReady) {

@@ -9,7 +9,6 @@ export default function ResultFeedback() {
   const isCorrect = useGameStore((s) => s.isCorrect);
   const lastResolution = useGameStore((s) => s.lastResolution);
   const currentCountry = useGameStore((s) => s.currentCountry);
-  const lastClickedCountryName = useGameStore((s) => s.lastClickedCountryName);
   const nextCountry = useGameStore((s) => s.nextCountry);
 
   useEffect(() => {

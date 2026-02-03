@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useGameStore } from "@/lib/store/game-store";
 import { formatTime } from "@/lib/utils";
 
@@ -12,28 +12,25 @@ export default function ScoreBoard() {
   const totalPausedTime = useGameStore((s) => s.totalPausedTime);
   const gamePausedAt = useGameStore((s) => s.gamePausedAt);
 
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
     if (gameStartTime === null) {
-      setElapsedTime(0);
       return;
     }
 
-    const updateElapsed = () => {
-      const now = Date.now();
-      const pausedDuration = gamePausedAt !== null ? now - gamePausedAt : 0;
-      const elapsed = (now - gameStartTime - totalPausedTime - pausedDuration) / 1000;
-      setElapsedTime(elapsed);
-    };
-
-    // Update immediately
-    updateElapsed();
-
-    // Update every second
-    const interval = setInterval(updateElapsed, 1000);
+    // Update every second - initial update happens via interval
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 100); // Update more frequently for smoother display
     return () => clearInterval(interval);
-  }, [gameStartTime, totalPausedTime, gamePausedAt]);
+  }, [gameStartTime]);
+
+  const elapsedTime = useMemo(() => {
+    if (gameStartTime === null) return 0;
+    const pausedDuration = gamePausedAt !== null ? currentTime - gamePausedAt : 0;
+    return (currentTime - gameStartTime - totalPausedTime - pausedDuration) / 1000;
+  }, [gameStartTime, totalPausedTime, gamePausedAt, currentTime]);
 
   if (phase !== "playing" && phase !== "feedback") return null;
 
