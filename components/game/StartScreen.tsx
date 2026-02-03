@@ -10,6 +10,7 @@ import {
 } from "@/lib/geo/country-sets";
 import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import { TIMER_CONFIG } from "@/lib/constants";
+import { getAppVersion } from "@/lib/version";
 
 interface StartScreenProps {
   onStart: () => void;
@@ -857,10 +858,13 @@ export default function StartScreen({
             {/* Fixed back button */}
             <button
               onClick={() => setShowSettings(false)}
-              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-6 border-t border-white/10 cursor-pointer"
+              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-4 border-t border-white/10 cursor-pointer"
             >
               Back
             </button>
+            <p className="text-white/20 text-xs font-mono text-center">
+              {getAppVersion()}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
