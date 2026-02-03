@@ -25,8 +25,7 @@ import type { Resolution } from "@/lib/store/game-store";
 import { useGameStore } from "@/lib/store/game-store";
 import type { CountrySetId } from "@/lib/geo/country-sets";
 
-// ── Continent camera targets ────────────────────────────────────────────────
-
+// Continent camera targets
 /** Approximate [lng, lat] centers for each continent game mode */
 const CONTINENT_CENTERS: Partial<Record<CountrySetId, [number, number]>> = {
   africa: [20, 5],
@@ -55,8 +54,7 @@ function lngLatToCameraPos(
   );
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
+// Types
 type CountryVisualState =
   | "default"
   | "hover"
@@ -80,8 +78,7 @@ interface GlobeProps {
   rotateSpeed?: number;
 }
 
-// ── Fill colour helpers ──────────────────────────────────────────────────────
-
+// Fill colour helpers
 function getFillColor(state: CountryVisualState): string {
   switch (state) {
     case "hover":
@@ -116,8 +113,7 @@ function getFillOpacity(state: CountryVisualState): number {
   }
 }
 
-// ── Coordinate conversion ────────────────────────────────────────────────────
-
+// Coordinate conversion
 const noopRaycast = () => {};
 
 /**
@@ -134,13 +130,11 @@ function pointToCoords(point: THREE.Vector3, radius: number): [number, number] {
   return [lng, lat];
 }
 
-// ── Canvas texture constants ─────────────────────────────────────────────────
-
+// Canvas texture constants
 const TEX_W = 2048;
 const TEX_H = 1024;
 
-// ── Atmosphere ───────────────────────────────────────────────────────────────
-
+// Atmosphere
 function Atmosphere() {
   return (
     <mesh raycast={noopRaycast}>
@@ -155,8 +149,7 @@ function Atmosphere() {
   );
 }
 
-// ── Label Projector ──────────────────────────────────────────────────────────
-
+// Label Projector
 function LabelProjector() {
   const { camera, size } = useThree();
   const floatingLabels = useGameStore((s) => s.floatingLabels);
@@ -194,8 +187,7 @@ function LabelProjector() {
   return null;
 }
 
-// ── Main scene ───────────────────────────────────────────────────────────────
-
+// Main scene
 function GlobeScene({
   features,
   wrongGuessIds,
@@ -216,8 +208,7 @@ function GlobeScene({
   const validCountryIds = useGameStore((s) => s.validCountryIds);
   const { camera } = useThree();
 
-  // ── Camera animation (continent targeting + zoom reset) ─────────────────
-
+  // Camera animation (continent targeting + zoom reset)
   const gamePhase = useGameStore((s) => s.phase);
   const gameCountrySetId = useGameStore((s) => s.countrySetId);
   const prevPhaseRef = useRef(gamePhase);
@@ -295,8 +286,7 @@ function GlobeScene({
     }
   });
 
-  // ── d3 projection (equirectangular rotated to match Three.js sphere UVs) ──
-
+  // d3 projection (equirectangular rotated to match Three.js sphere UVs) ──
   const projection = useMemo(
     () =>
       geoEquirectangular()
@@ -306,8 +296,7 @@ function GlobeScene({
     [],
   );
 
-  // ── Canvas + Three.js texture (created once) ──────────────────────────────
-
+  // Canvas + Three.js texture (created once)
   const { canvas, texture } = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = TEX_W;
@@ -322,8 +311,7 @@ function GlobeScene({
     return () => texture.dispose();
   }, [texture]);
 
-  // ── Country state resolver ────────────────────────────────────────────────
-
+  // Country state resolver
   const getCountryState = useCallback(
     (featureId: string): CountryVisualState => {
       const base = baseId(featureId);
@@ -336,8 +324,7 @@ function GlobeScene({
     [resolvedCountries, wrongGuessIds, hoveredCountryBase],
   );
 
-  // ── Redraw fill texture whenever visual state changes ─────────────────────
-
+  // Redraw fill texture whenever visual state changes
   useEffect(() => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -376,8 +363,7 @@ function GlobeScene({
     }
   }, [canvas, texture, projection, features, getCountryState, onReady]);
 
-  // ── Pointer → country lookup via d3-geo ───────────────────────────────────
-
+  // Pointer → country lookup via d3-geo
   const findCountryAtPoint = useCallback(
     (point: THREE.Vector3): string | null => {
       const coords = pointToCoords(point, GLOBE_CONFIG.meshRadius);
@@ -475,8 +461,7 @@ function GlobeScene({
     [interactive, onCountryClick, findCountryAtPoint, validCountryIds],
   );
 
-  // ── Border line elements (static, no state dependency) ────────────────────
-
+  // Border line elements (static, no state dependency)
   const borderElements = useMemo(
     () =>
       features.map((feature) => (
@@ -485,8 +470,7 @@ function GlobeScene({
     [features],
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
+  // Render
   return (
     <>
       <Stars />
@@ -558,8 +542,7 @@ function GlobeScene({
   );
 }
 
-// ── Canvas wrapper ───────────────────────────────────────────────────────────
-
+// Canvas wrapper
 export default function Globe(props: GlobeProps) {
   return (
     <Canvas
