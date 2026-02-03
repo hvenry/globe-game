@@ -4,18 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.2.3 or v1.2.3)'
+        description: "Version to release (e.g., 1.2.3 or v1.2.3)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
       release_notes:
-        description: 'Custom release notes (optional - will auto-generate if empty)'
+        description: "Custom release notes (optional - will auto-generate if empty)"
         required: false
         type: string
+
+permissions:
+  contents: write
 
 jobs:
   release:
