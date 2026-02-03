@@ -15,19 +15,14 @@ export default function PauseMenu({
   onMainMenu,
 }: PauseMenuProps) {
   const questionsAnswered = useGameStore((s) => s.questionsAnswered);
-  const questionsCorrect = useGameStore((s) => s.questionsCorrect);
+  const totalPoints = useGameStore((s) => s.totalPoints);
   const totalCountries = useGameStore((s) => s.totalCountries);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
   const expertMode = useGameStore((s) => s.expertMode);
 
-  const accuracy =
-    questionsAnswered > 0
-      ? Math.round((questionsCorrect / questionsAnswered) * 100)
-      : 0;
-
   const scorePercentage =
     totalCountries > 0
-      ? Math.round((questionsCorrect / totalCountries) * 100)
+      ? Math.round((totalPoints / totalCountries) * 100)
       : 0;
 
   let perfectCount = 0;
@@ -80,23 +75,13 @@ export default function PauseMenu({
 
         {!expertMode && (
           <>
-            <div className="mb-4 grid grid-cols-2 gap-3">
-              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                <p className="text-white/30 text-xs uppercase tracking-wider">
-                  Accuracy
-                </p>
-                <p className="text-white/60 text-2xl md:text-3xl font-bold tabular-nums mt-1">
-                  {accuracy}%
-                </p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                <p className="text-white/30 text-xs uppercase tracking-wider">
-                  Score
-                </p>
-                <p className="text-white text-2xl md:text-3xl font-bold tabular-nums mt-1">
-                  {scorePercentage}%
-                </p>
-              </div>
+            <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
+              <p className="text-white/30 text-xs uppercase tracking-wider">
+                Score
+              </p>
+              <p className="text-white text-3xl md:text-4xl font-bold tabular-nums mt-1">
+                {scorePercentage}%
+              </p>
             </div>
 
             <div className="mb-6 bg-white/5 border border-white/10 rounded-lg p-3">

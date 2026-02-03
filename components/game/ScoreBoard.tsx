@@ -7,7 +7,8 @@ import { formatTime } from "@/lib/utils";
 export default function ScoreBoard() {
   const phase = useGameStore((s) => s.phase);
   const questionsAnswered = useGameStore((s) => s.questionsAnswered);
-  const questionsCorrect = useGameStore((s) => s.questionsCorrect);
+  const totalPoints = useGameStore((s) => s.totalPoints);
+  const totalCountries = useGameStore((s) => s.totalCountries);
   const gameStartTime = useGameStore((s) => s.gameStartTime);
   const totalPausedTime = useGameStore((s) => s.totalPausedTime);
   const gamePausedAt = useGameStore((s) => s.gamePausedAt);
@@ -34,21 +35,21 @@ export default function ScoreBoard() {
 
   if (phase !== "playing" && phase !== "feedback") return null;
 
-  const accuracy =
-    questionsAnswered > 0
-      ? Math.round((questionsCorrect / questionsAnswered) * 100)
+  const score =
+    totalCountries > 0
+      ? Math.round((totalPoints / totalCountries) * 100)
       : 0;
 
   return (
     <div className="absolute top-6 right-6 z-10 text-right">
       <p className="text-white/50 text-xs tracking-wider uppercase mb-1">
-        Accuracy
+        Score
       </p>
       <p className="text-white text-2xl md:text-3xl font-bold tabular-nums">
-        {accuracy}%
+        {score}%
       </p>
       <p className="text-white/40 text-xs mt-1 tabular-nums">
-        {questionsCorrect} / {questionsAnswered} correct
+        {questionsAnswered} / {totalCountries}
       </p>
       {gameStartTime !== null && (
         <p className="text-white/30 text-xs mt-2 tabular-nums">

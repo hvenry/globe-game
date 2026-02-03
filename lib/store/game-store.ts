@@ -37,6 +37,7 @@ interface GameState {
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
   questionsCorrect: number;
+  totalPoints: number; // Weighted score based on tries used
 
   // Timer state
   countdownRemaining: number;
@@ -119,6 +120,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   resolvedCountries: new Map(),
   questionsAnswered: 0,
   questionsCorrect: 0,
+  totalPoints: 0,
 
   // Timer state
   countdownRemaining: 0,
@@ -160,6 +162,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      totalPoints: 0,
       countdownRemaining: timerLimit ?? 0,
       countdownTimerLimit: timerLimit,
       gameStartTime: Date.now(),
@@ -276,6 +279,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       const newResolved = new Map(state.resolvedCountries);
       newResolved.set(state.currentCountry.id, resolution);
 
+      // Calculate points based on tries remaining
+      // Perfect answer (first try) = 1.0 point, decreases with each wrong guess
+      const points = state.triesRemaining / state.maxTries;
+
       // Remove country from unanswered list
       const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
       const newTries = new Map(state.countryTries);
@@ -294,6 +301,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         resolvedCountries: newResolved,
         questionsAnswered: state.questionsAnswered + 1,
         questionsCorrect: state.questionsCorrect + 1,
+        totalPoints: state.totalPoints + points,
         unansweredCountries: newUnanswered,
         currentIndex: newIndex,
         countryTries: newTries,
@@ -421,6 +429,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      totalPoints: 0,
       countdownRemaining: 0,
       countdownTimerLimit: null,
       gameStartTime: null,
