@@ -15,11 +15,11 @@ export default function CountryPrompt() {
   const goPrev = useGameStore((s) => s.goPrev);
   const allowSkips = useSettingsStore((s) => s.allowSkips);
 
-  if ((phase !== "playing" && phase !== "feedback") || !currentCountry)
+  if ((phase !== "playing" && phase !== "feedback" && phase !== "mustclick") || !currentCountry)
     return null;
 
   // During feedback phase, questionsAnswered has already been incremented
-  // During playing phase, we need to add 1 since we're on the next question
+  // During playing/mustclick phase, we need to add 1 since we're on the next question
   const current = phase === "feedback" ? questionsAnswered : questionsAnswered + 1;
   const showArrows = allowSkips && phase === "playing" && unansweredCountries.length > 1;
   const flagPath = getFlagPath(currentCountry.id);
@@ -30,8 +30,8 @@ export default function CountryPrompt() {
         key={currentCountry.id}
         className="animate-fade-in-up bg-black/60 backdrop-blur-sm border border-white/10 rounded-xl px-6 py-3 text-center"
       >
-        <p className="text-white/50 text-xs mb-1 tracking-wider uppercase">
-          Find this country
+        <p className={`text-xs mb-1 tracking-wider uppercase ${phase === "mustclick" ? "text-red-400" : "text-white/50"}`}>
+          {phase === "mustclick" ? "Click the country to continue" : "Find this country"}
         </p>
         <div className="flex items-center gap-3">
           {showArrows ? (

@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useGameStore } from "@/lib/store/game-store";
+import { formatScore } from "@/lib/utils";
 
 interface PauseMenuProps {
   onResume: () => void;
@@ -17,13 +18,20 @@ export default function PauseMenu({
   const questionsAnswered = useGameStore((s) => s.questionsAnswered);
   const totalPoints = useGameStore((s) => s.totalPoints);
   const totalCountries = useGameStore((s) => s.totalCountries);
+  const triesRemaining = useGameStore((s) => s.triesRemaining);
+  const maxTries = useGameStore((s) => s.maxTries);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
   const expertMode = useGameStore((s) => s.expertMode);
 
-  const scorePercentage =
-    totalCountries > 0
-      ? Math.round((totalPoints / totalCountries) * 100)
-      : 0;
+  // Calculate score: running average capped at last feedback score
+  // so it never jumps UP when a new question starts with full tries
+  const scoreRaw = questionsAnswered === 0
+    ? 0
+    : Math.min(
+        totalPoints / questionsAnswered,
+        (totalPoints + triesRemaining / maxTries) / (questionsAnswered + 1)
+      );
+  const scoreDisplay = formatScore(scoreRaw);
 
   let perfectCount = 0;
   let imperfectCount = 0;
@@ -80,7 +88,7 @@ export default function PauseMenu({
                 Score
               </p>
               <p className="text-white text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                {scorePercentage}%
+                {scoreDisplay}%
               </p>
             </div>
 

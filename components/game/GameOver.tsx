@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useGameStore } from "@/lib/store/game-store";
 import { useStatsStore } from "@/lib/store/stats-store";
-import { formatTime } from "@/lib/utils";
+import { formatTime, formatScore } from "@/lib/utils";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -23,7 +23,6 @@ function AnimatedCounter({
 
   useEffect(() => {
     const startTime = performance.now();
-    const startValue = 0;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -31,9 +30,7 @@ function AnimatedCounter({
 
       // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(startValue + (value - startValue) * eased);
-
-      setDisplay(current);
+      setDisplay(Math.round(value * eased));
 
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -47,7 +44,6 @@ function AnimatedCounter({
 }
 
 export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
-  const questionsAnswered = useGameStore((s) => s.questionsAnswered);
   const questionsCorrect = useGameStore((s) => s.questionsCorrect);
   const totalPoints = useGameStore((s) => s.totalPoints);
   const totalCountries = useGameStore((s) => s.totalCountries);
@@ -80,10 +76,11 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
       ? Math.round((questionsCorrect / totalCountries) * 100)
       : 0;
 
-  const scorePercentage =
-    totalCountries > 0
-      ? Math.round((totalPoints / totalCountries) * 100)
-      : 0;
+  // GameOver shows final score: totalPoints / totalCountries
+  // This accounts for all unanswered countries (they count as 0 points)
+  const scoreRaw = totalCountries > 0 ? totalPoints / totalCountries : 0;
+  const scorePercentage = Number(formatScore(scoreRaw));
+
   const isNewBest = !expertMode && totalPoints > previousBestScore.current;
   const isNewExpertBest =
     expertMode && questionsCorrect > previousExpertBestScore.current;
@@ -101,11 +98,15 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
     if (!recorded.current) {
       recorded.current = true;
       // For normal mode, use totalPoints; for expert mode, use questionsCorrect
-      recordGame(expertMode ? questionsCorrect : totalPoints, countrySetId, expertMode);
+      recordGame(
+        expertMode ? questionsCorrect : totalPoints,
+        countrySetId,
+        expertMode,
+      );
     }
   }, [questionsCorrect, totalPoints, countrySetId, recordGame, expertMode]);
 
-  const isPerfectScore = scorePercentage === 100;
+  const isPerfectScore = scoreRaw >= 1;
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
@@ -127,7 +128,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
             >
               Perfect Score!
             </h2>
-            <p className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}>
+            <p
+              className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}
+            >
               {questionsCorrect} / {totalCountries}
             </p>
           </>
@@ -140,7 +143,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
           </>
         ) : (
           <>
-            <h2 className="text-2xl font-bold mb-1 text-white">Game Overview</h2>
+            <h2 className="text-2xl font-bold mb-1 text-white">
+              Game Overview
+            </h2>
             <p className="text-xs text-white/40 tabular-nums">
               {questionsCorrect} / {totalCountries}
             </p>
@@ -194,11 +199,11 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               <p className="text-white/30 text-xs uppercase tracking-wider">
                 Score
               </p>
-              <p className={`text-4xl md:text-5xl font-bold tabular-nums mt-1 ${
-                scorePercentage === 100
-                  ? "text-emerald"
-                  : "text-white"
-              }`}>
+              <p
+                className={`text-4xl md:text-5xl font-bold tabular-nums mt-1 ${
+                  isPerfectScore ? "text-emerald" : "text-white"
+                }`}
+              >
                 <AnimatedCounter value={scorePercentage} duration={1200} />%
               </p>
               {isNewBest && (

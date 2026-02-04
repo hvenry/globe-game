@@ -32,3 +32,14 @@ export function formatCountdown(seconds: number): string {
   }
   return seconds.toFixed(1);
 }
+
+/**
+ * Format a score ratio (0-1) as a whole-number percentage string (without the % sign).
+ * Uses floor instead of round so scores like 99.8% display as 99, not 100.
+ * 100 is only returned when the raw score is exactly 1.0 (all perfect).
+ */
+export function formatScore(raw: number): string {
+  if (raw <= 0) return "0";
+  if (raw >= 1) return "100";
+  return Math.floor(raw * 100).toString();
+}

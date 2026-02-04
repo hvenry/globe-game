@@ -9,7 +9,7 @@ interface MenuButtonProps {
 export default function MenuButton({ onClick }: MenuButtonProps) {
   const phase = useGameStore((s) => s.phase);
 
-  if (phase !== "playing" && phase !== "feedback") return null;
+  if (phase !== "playing" && phase !== "feedback" && phase !== "mustclick") return null;
 
   return (
     <button

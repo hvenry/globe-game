@@ -24,7 +24,7 @@ export default function TriesIndicator() {
     prevTriesRef.current = triesRemaining;
   }, [triesRemaining, phase]);
 
-  if (phase !== "playing" && phase !== "feedback") return null;
+  if (phase !== "playing" && phase !== "feedback" && phase !== "mustclick") return null;
 
   return (
     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">

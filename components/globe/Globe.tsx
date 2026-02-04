@@ -61,7 +61,8 @@ type CountryVisualState =
   | "wrongGuess"
   | "perfect"
   | "imperfect"
-  | "failed";
+  | "failed"
+  | "mustclick";
 
 interface GlobeProps {
   features: CountryFeature[];
@@ -208,8 +209,18 @@ function GlobeScene({
   const validCountryIds = useGameStore((s) => s.validCountryIds);
   const { camera } = useThree();
 
+  // Pulsing animation state for mustclick phase
+  const [pulseTime, setPulseTime] = useState(0);
+
+  useFrame((state) => {
+    if (gamePhase === "mustclick") {
+      setPulseTime(state.clock.elapsedTime);
+    }
+  });
+
   // Camera animation (continent targeting + zoom reset)
   const gamePhase = useGameStore((s) => s.phase);
+  const currentCountry = useGameStore((s) => s.currentCountry);
   const gameCountrySetId = useGameStore((s) => s.countrySetId);
   const prevPhaseRef = useRef(gamePhase);
   const animTargetRef = useRef<THREE.Vector3 | null>(null);
@@ -223,7 +234,9 @@ function GlobeScene({
 
   useEffect(() => {
     const wasInGame =
-      prevPhaseRef.current === "playing" || prevPhaseRef.current === "feedback";
+      prevPhaseRef.current === "playing" ||
+      prevPhaseRef.current === "feedback" ||
+      prevPhaseRef.current === "mustclick";
 
     // Only animate once per game session (idle/gameover → playing)
     if (gamePhase === "playing" && !wasInGame && !hasAnimatedForGame.current) {
@@ -315,16 +328,20 @@ function GlobeScene({
   const getCountryState = useCallback(
     (featureId: string): CountryVisualState => {
       const base = baseId(featureId);
+      // Check if in mustclick phase and this is the current country
+      if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
+        return "mustclick";
+      }
       const resolution = resolvedCountries.get(base);
       if (resolution) return resolution;
       if (wrongGuessIds.has(base)) return "wrongGuess";
       if (hoveredCountryBase === base) return "hover";
       return "default";
     },
-    [resolvedCountries, wrongGuessIds, hoveredCountryBase],
+    [resolvedCountries, wrongGuessIds, hoveredCountryBase, gamePhase, currentCountry],
   );
 
-  // Redraw fill texture whenever visual state changes
+  // Redraw fill texture whenever visual state changes or pulse animation updates
   useEffect(() => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -340,8 +357,17 @@ function GlobeScene({
       // Skip Point geometries - they're rendered as 3D spheres by SmallCountryMarkers
       if (feature.geometry.type === "Point") continue;
 
-      ctx.fillStyle = getFillColor(state);
-      ctx.globalAlpha = getFillOpacity(state);
+      // Special handling for mustclick state with pulsing animation
+      if (state === "mustclick") {
+        // Pulse between red and white
+        const pulse = (Math.sin(pulseTime * 4) + 1) / 2; // 0 to 1
+        ctx.fillStyle = pulse > 0.5 ? COLORS.countryFailed : "#ffffff";
+        ctx.globalAlpha = 0.8;
+      } else {
+        ctx.fillStyle = getFillColor(state);
+        ctx.globalAlpha = getFillOpacity(state);
+      }
+
       ctx.beginPath();
       pathGen(feature as unknown as GeoJSON.Feature);
       ctx.fill();
@@ -361,7 +387,7 @@ function GlobeScene({
       // Small delay to ensure everything is rendered
       setTimeout(() => onReady(), 100);
     }
-  }, [canvas, texture, projection, features, getCountryState, onReady]);
+  }, [canvas, texture, projection, features, getCountryState, onReady, pulseTime]);
 
   // Pointer → country lookup via d3-geo
   const findCountryAtPoint = useCallback(
@@ -504,6 +530,9 @@ function GlobeScene({
         resolvedCountries={resolvedCountries}
         wrongGuessIds={wrongGuessIds}
         hoveredCountryBase={hoveredCountryBase}
+        gamePhase={gamePhase}
+        currentCountry={currentCountry}
+        pulseTime={pulseTime}
       />
 
       {/* Invisible event-catcher sphere */}
