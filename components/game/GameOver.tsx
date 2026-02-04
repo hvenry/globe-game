@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useGameStore } from "@/lib/store/game-store";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { formatTime, formatScore } from "@/lib/utils";
+import ScoreCard, { countResolutions } from "./ResolutionBreakdown";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -56,20 +57,17 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   const gameStartTime = useGameStore((s) => s.gameStartTime);
   const totalPausedTime = useGameStore((s) => s.totalPausedTime);
   const { bestScores, expertBestScores, recordGame } = useStatsStore();
+
+  // Capture snapshot values once on mount so they don't change during render
+  const [snapshot] = useState(() => ({
+    previousBestScore: bestScores[countrySetId],
+    previousExpertBestScore: expertBestScores[countrySetId],
+    elapsedSeconds:
+      gameStartTime !== null
+        ? (Date.now() - gameStartTime - totalPausedTime) / 1000
+        : 0,
+  }));
   const recorded = useRef(false);
-  const previousBestScore = useRef(bestScores[countrySetId]);
-  const previousExpertBestScore = useRef(expertBestScores[countrySetId]);
-
-  // Capture the previous best scores before they get updated
-  if (!recorded.current) {
-    previousBestScore.current = bestScores[countrySetId];
-    previousExpertBestScore.current = expertBestScores[countrySetId];
-  }
-
-  const elapsedSeconds =
-    gameStartTime !== null
-      ? (Date.now() - gameStartTime - totalPausedTime) / 1000
-      : 0;
 
   const expertPercentage =
     totalCountries > 0
@@ -81,23 +79,15 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   const scoreRaw = totalCountries > 0 ? totalPoints / totalCountries : 0;
   const scorePercentage = Number(formatScore(scoreRaw));
 
-  const isNewBest = !expertMode && totalPoints > previousBestScore.current;
+  const isNewBest = !expertMode && totalPoints > snapshot.previousBestScore;
   const isNewExpertBest =
-    expertMode && questionsCorrect > previousExpertBestScore.current;
+    expertMode && questionsCorrect > snapshot.previousExpertBestScore;
 
-  let perfectCount = 0;
-  let imperfectCount = 0;
-  let failedCount = 0;
-  resolvedCountries.forEach((res) => {
-    if (res === "perfect") perfectCount++;
-    else if (res === "imperfect") imperfectCount++;
-    else failedCount++;
-  });
+  const { perfect: perfectCount, imperfect: imperfectCount, failed: failedCount } = countResolutions(resolvedCountries);
 
   useEffect(() => {
     if (!recorded.current) {
       recorded.current = true;
-      // For normal mode, use totalPoints; for expert mode, use questionsCorrect
       recordGame(
         expertMode ? questionsCorrect : totalPoints,
         countrySetId,
@@ -122,34 +112,17 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
         }`}
       >
         {isPerfectScore ? (
-          <>
-            <h2
-              className={`text-2xl font-bold mb-1 ${expertMode ? "text-amber-400" : "text-white"}`}
-            >
-              Perfect Score!
-            </h2>
-            <p
-              className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}
-            >
-              {questionsCorrect} / {totalCountries}
-            </p>
-          </>
+          <h2
+            className={`text-2xl font-bold mb-1 ${expertMode ? "text-amber-400" : "text-white"}`}
+          >
+            Perfect Score!
+          </h2>
         ) : expertMode ? (
-          <>
-            <h2 className="text-2xl font-bold mb-1 text-error">Game Over</h2>
-            <p className="text-xs text-amber-400/40 tabular-nums">
-              {questionsCorrect} / {totalCountries}
-            </p>
-          </>
+          <h2 className="text-2xl font-bold mb-1 text-error">Game Over</h2>
         ) : (
-          <>
-            <h2 className="text-2xl font-bold mb-1 text-white">
-              Game Overview
-            </h2>
-            <p className="text-xs text-white/40 tabular-nums">
-              {questionsCorrect} / {totalCountries}
-            </p>
-          </>
+          <h2 className="text-2xl font-bold mb-1 text-white">
+            Game Overview
+          </h2>
         )}
 
         {expertMode ? (
@@ -194,56 +167,20 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
               )}
           </>
         ) : (
-          <>
-            <div className="mt-4 mb-4 bg-white/5 border border-white/10 rounded-lg p-3 relative">
-              <p className="text-white/30 text-xs uppercase tracking-wider">
-                Score
-              </p>
-              <p
-                className={`text-4xl md:text-5xl font-bold tabular-nums mt-1 ${
-                  isPerfectScore ? "text-emerald" : "text-white"
-                }`}
-              >
-                <AnimatedCounter value={scorePercentage} duration={1200} />%
-              </p>
-              {isNewBest && (
-                <div className="absolute -bottom-2.5 -right-2.5">
-                  <Badge className="bg-emerald/20 text-emerald border-emerald/30 backdrop-blur-md">
-                    New Best!
-                  </Badge>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-emerald text-[10px] uppercase tracking-wider">
-                    Perfect
-                  </p>
-                  <p className="text-emerald text-lg font-bold tabular-nums">
-                    {perfectCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
-                    Imperfect
-                  </p>
-                  <p className="text-yellow-400 text-lg font-bold tabular-nums">
-                    {imperfectCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-error text-[10px] uppercase tracking-wider">
-                    Failed
-                  </p>
-                  <p className="text-error text-lg font-bold tabular-nums">
-                    {failedCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
+          <div className="mt-4 mb-4">
+            <ScoreCard
+              scoreContent={
+                <span className={isPerfectScore ? "text-emerald" : ""}>
+                  <AnimatedCounter value={scorePercentage} duration={1200} />%
+                </span>
+              }
+              previousBestLabel={`${formatScore(snapshot.previousBestScore / totalCountries)}%`}
+              perfect={perfectCount}
+              imperfect={imperfectCount}
+              failed={failedCount}
+              isNewBest={isNewBest}
+            />
+          </div>
         )}
 
         {gameStartTime !== null && (
@@ -266,7 +203,7 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
                 expertMode ? "text-amber-400" : "text-white"
               }`}
             >
-              {formatTime(elapsedSeconds)}
+              {formatTime(snapshot.elapsedSeconds)}
             </p>
           </div>
         )}

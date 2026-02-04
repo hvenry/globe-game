@@ -256,7 +256,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Special case: mustclick phase - user must click the correct country to proceed
     if (state.phase === "mustclick") {
       if (isCorrect) {
-        // User clicked the correct country, now proceed to next
+        // User clicked the correct country — resolve and move to next directly
         const newResolved = new Map(state.resolvedCountries);
         newResolved.set(state.currentCountry.id, "failed");
 
@@ -271,8 +271,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
 
         set({
-          phase: "feedback",
-          isCorrect: false,
           resolvedCountries: newResolved,
           questionsAnswered: state.questionsAnswered + 1,
           unansweredCountries: newUnanswered,
@@ -281,6 +279,9 @@ export const useGameStore = create<GameState>((set, get) => ({
           countryWrongGuesses: newWrong,
           countryCountdowns: newCountdowns,
         });
+
+        // Immediately advance to next country (or gameover)
+        get().nextCountry();
       }
       // Ignore clicks on wrong countries during mustclick phase
       return;
@@ -369,7 +370,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       newWrongIds.add(guessBase);
 
       if (newTries === 0) {
-        // Non-expert mode: User must click the correct country to learn and proceed
+        // Non-expert mode: enter mustclick immediately (feedback overlay shown simultaneously)
         set({
           phase: "mustclick",
           isCorrect: false,
@@ -479,7 +480,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Normal mode: user must click the correct country to proceed
+    // Normal mode: enter mustclick immediately (feedback overlay shown simultaneously)
     set({
       phase: "mustclick",
       isCorrect: false,

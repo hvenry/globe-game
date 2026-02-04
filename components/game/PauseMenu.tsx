@@ -2,7 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { useGameStore } from "@/lib/store/game-store";
+import { useStatsStore } from "@/lib/store/stats-store";
 import { formatScore } from "@/lib/utils";
+import ScoreCard, { countResolutions } from "./ResolutionBreakdown";
 
 interface PauseMenuProps {
   onResume: () => void;
@@ -22,6 +24,8 @@ export default function PauseMenu({
   const maxTries = useGameStore((s) => s.maxTries);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
   const expertMode = useGameStore((s) => s.expertMode);
+  const countrySetId = useGameStore((s) => s.countrySetId);
+  const { bestScores } = useStatsStore();
 
   // Calculate score: running average capped at last feedback score
   // so it never jumps UP when a new question starts with full tries
@@ -33,16 +37,15 @@ export default function PauseMenu({
       );
   const scoreDisplay = formatScore(scoreRaw);
 
-  let perfectCount = 0;
-  let imperfectCount = 0;
-  let failedCount = 0;
-  resolvedCountries.forEach((res) => {
-    if (res === "perfect") perfectCount++;
-    else if (res === "imperfect") imperfectCount++;
-    else failedCount++;
-  });
+  const { perfect: perfectCount, imperfect: imperfectCount, failed: failedCount } = countResolutions(resolvedCountries);
 
   const progress = Math.round((questionsAnswered / totalCountries) * 100);
+
+  // Previous best score as percentage
+  const previousBestRaw = bestScores[countrySetId] || 0;
+  const previousBestPct = totalCountries > 0
+    ? formatScore(previousBestRaw / totalCountries)
+    : "0";
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/05 backdrop-blur-lg">
@@ -82,45 +85,16 @@ export default function PauseMenu({
         </div>
 
         {!expertMode && (
-          <>
-            <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">
-              <p className="text-white/30 text-xs uppercase tracking-wider">
-                Score
-              </p>
-              <p className="text-white text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                {scoreDisplay}%
-              </p>
-            </div>
-
-            <div className="mb-6 bg-white/5 border border-white/10 rounded-lg p-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-emerald text-[10px] uppercase tracking-wider">
-                    Perfect
-                  </p>
-                  <p className="text-emerald text-lg font-bold tabular-nums">
-                    {perfectCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-yellow-400 text-[10px] uppercase tracking-wider">
-                    Imperfect
-                  </p>
-                  <p className="text-yellow-400 text-lg font-bold tabular-nums">
-                    {imperfectCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-error text-[10px] uppercase tracking-wider">
-                    Failed
-                  </p>
-                  <p className="text-error text-lg font-bold tabular-nums">
-                    {failedCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
+          <div className="mb-6">
+            <ScoreCard
+              scoreContent={<>{scoreDisplay}%</>}
+              scoreLabel="Current Score"
+              previousBestLabel={`${previousBestPct}%`}
+              perfect={perfectCount}
+              imperfect={imperfectCount}
+              failed={failedCount}
+            />
+          </div>
         )}
 
         <div className="space-y-3">
