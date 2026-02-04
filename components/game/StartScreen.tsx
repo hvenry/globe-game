@@ -162,14 +162,14 @@ function GameModeSelect({
     const expertBestScore = expertBestScores[set.id] || 0;
     const total = getSetTotal(set.id);
     const normalPercentage =
-      total > 0 ? Math.round((normalBestScore / total) * 100) : 0;
+      total > 0 ? Math.floor((normalBestScore / total) * 100) : 0;
     const expertPercentage =
-      total > 0 ? Math.round((expertBestScore / total) * 100) : 0;
+      total > 0 ? Math.floor((expertBestScore / total) * 100) : 0;
     const hasNormalScore = normalBestScore > 0;
     const hasExpertScore = expertBestScore > 0;
     const isSelected = value === set.id;
-    const isPerfectNormal = normalPercentage === 100;
-    const isPerfectExpert = expertPercentage === 100;
+    const isPerfectNormal = total > 0 && normalBestScore >= total;
+    const isPerfectExpert = total > 0 && expertBestScore >= total;
     const isPerfectBoth = isPerfectNormal && isPerfectExpert;
 
     // Determine border styling based on perfect scores
@@ -542,8 +542,8 @@ export default function StartScreen({
     if (copied) return;
 
     const allTotal = GUESSABLE_IDS.size;
-    const normalPercentage = Math.round((bestScores.all / allTotal) * 100);
-    const expertPercentage = Math.round(
+    const normalPercentage = Math.floor((bestScores.all / allTotal) * 100);
+    const expertPercentage = Math.floor(
       (expertBestScores.all / allTotal) * 100,
     );
 
@@ -635,14 +635,14 @@ export default function StartScreen({
           !showSettings &&
           (() => {
             const allTotal = GUESSABLE_IDS.size;
-            const normalPercentage = Math.round(
+            const normalPercentage = Math.floor(
               (bestScores.all / allTotal) * 100,
             );
-            const expertPercentage = Math.round(
+            const expertPercentage = Math.floor(
               (expertBestScores.all / allTotal) * 100,
             );
-            const isPerfectNormal = normalPercentage === 100;
-            const isPerfectExpert = expertPercentage === 100;
+            const isPerfectNormal = bestScores.all >= allTotal;
+            const isPerfectExpert = expertBestScores.all >= allTotal;
             const isPerfectBoth = isPerfectNormal && isPerfectExpert;
 
             let borderClass = "";
