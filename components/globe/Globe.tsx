@@ -12,6 +12,7 @@ import {
   geoEquirectangular,
   geoCentroid,
   geoDistance,
+  geoArea,
 } from "d3-geo";
 import GlobeSphere from "./GlobeSphere";
 import GlobeGrid from "./GlobeGrid";
@@ -364,7 +365,25 @@ function GlobeScene({
     );
     if (!feature) return null;
     try {
-      const centroid = geoCentroid(feature as unknown as GeoJSON.Feature);
+      // For MultiPolygon features (e.g. France with French Guiana), use the
+      // centroid of the largest polygon so the radar appears on the mainland.
+      let centroidTarget: GeoJSON.Feature = feature as unknown as GeoJSON.Feature;
+      if (feature.geometry.type === "MultiPolygon") {
+        let largestArea = -1;
+        for (const coords of feature.geometry.coordinates) {
+          const poly: GeoJSON.Feature = {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "Polygon", coordinates: coords },
+          };
+          const area = geoArea(poly);
+          if (area > largestArea) {
+            largestArea = area;
+            centroidTarget = poly;
+          }
+        }
+      }
+      const centroid = geoCentroid(centroidTarget);
       if (!centroid || !isFinite(centroid[0]) || !isFinite(centroid[1]))
         return null;
       return coordsToPosition(
