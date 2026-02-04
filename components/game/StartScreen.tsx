@@ -157,9 +157,7 @@ function GameModeSelect({
     }
   };
 
-  const renderSetButton = (
-    set: (typeof availableSets)[0],
-  ) => {
+  const renderSetButton = (set: (typeof availableSets)[0]) => {
     const normalBestScore = bestScores[set.id] || 0;
     const expertBestScore = expertBestScores[set.id] || 0;
     const total = getSetTotal(set.id);
@@ -436,8 +434,8 @@ function TimerLimitSelect({
   const options: Array<{ label: string; value: number | null }> = [
     { label: "5s", value: 5 },
     { label: "10s", value: 10 },
+    { label: "15s", value: 15 },
     { label: "30s", value: 30 },
-    { label: "1m", value: 60 },
     { label: "None", value: null },
   ];
 
@@ -500,8 +498,7 @@ export default function StartScreen({
   const [copied, setCopied] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const lastEscapePress = useRef<number>(0);
-  const { bestScores, expertBestScores } =
-    useStatsStore();
+  const { bestScores, expertBestScores } = useStatsStore();
 
   const countrySet = useSettingsStore((s) => s.countrySet);
   const allowSkips = useSettingsStore((s) => s.allowSkips);
@@ -859,7 +856,7 @@ export default function StartScreen({
             {/* Fixed back button */}
             <button
               onClick={() => setShowSettings(false)}
-              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center pt-4 border-t border-white/10 cursor-pointer"
+              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center p-2 border-t border-white/10 cursor-pointer"
             >
               Back
             </button>
