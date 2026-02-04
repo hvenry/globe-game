@@ -19,7 +19,7 @@ export const COLORS = {
 
 export const GAME_CONFIG = {
   maxTries: 3,
-  feedbackDuration: 1500,
+  feedbackDuration: 800,
 } as const;
 
 export const TIMER_CONFIG = {
