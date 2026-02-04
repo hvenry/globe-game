@@ -18,6 +18,7 @@ import GlobeGrid from "./GlobeGrid";
 import Stars from "./Stars";
 import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
+import PulseRing from "./PulseRing";
 import type { CountryFeature } from "@/lib/geo/types";
 import { GLOBE_CONFIG, COLORS, SMALL_COUNTRIES } from "@/lib/constants";
 import { baseId } from "@/lib/geo/countries";
@@ -129,6 +130,20 @@ function pointToCoords(point: THREE.Vector3, radius: number): [number, number] {
   if (lng > 180) lng -= 360;
   if (lng < -180) lng += 360;
   return [lng, lat];
+}
+
+// Convert [lng, lat] to 3D position on sphere
+function coordsToPosition(
+  lng: number,
+  lat: number,
+  radius: number,
+): [number, number, number] {
+  const phi = ((90 - lat) * Math.PI) / 180;
+  const theta = ((90 - lng) * Math.PI) / 180;
+  const x = radius * Math.sin(phi) * Math.cos(theta);
+  const y = radius * Math.cos(phi);
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+  return [x, y, z];
 }
 
 // Canvas texture constants
@@ -341,6 +356,27 @@ function GlobeScene({
     [resolvedCountries, wrongGuessIds, hoveredCountryBase, gamePhase, currentCountry],
   );
 
+  // Compute centroid position for pulse ring during mustclick phase
+  const pulseRingPosition = useMemo(() => {
+    if (gamePhase !== "mustclick" || !currentCountry) return null;
+    const feature = features.find(
+      (f) => baseId(f.id) === currentCountry.id,
+    );
+    if (!feature) return null;
+    try {
+      const centroid = geoCentroid(feature as unknown as GeoJSON.Feature);
+      if (!centroid || !isFinite(centroid[0]) || !isFinite(centroid[1]))
+        return null;
+      return coordsToPosition(
+        centroid[0],
+        centroid[1],
+        GLOBE_CONFIG.meshRadius + 0.5,
+      );
+    } catch {
+      return null;
+    }
+  }, [gamePhase, currentCountry, features]);
+
   // Redraw fill texture whenever visual state changes or pulse animation updates
   useEffect(() => {
     const ctx = canvas.getContext("2d");
@@ -534,6 +570,9 @@ function GlobeScene({
         currentCountry={currentCountry}
         pulseTime={pulseTime}
       />
+
+      {/* Radar pulse ring for mustclick phase */}
+      {pulseRingPosition && <PulseRing position={pulseRingPosition} />}
 
       {/* Invisible event-catcher sphere */}
       <mesh
