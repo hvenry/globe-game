@@ -23,7 +23,7 @@ export const GAME_CONFIG = {
 } as const;
 
 export const TIMER_CONFIG = {
-  availableLimits: [null, 5, 10, 30, 60] as const,
+  availableLimits: [null, 5, 10, 15, 30] as const,
   defaultLimit: null as number | null,
   expertModeLimit: 5, // Expert mode is locked to 5 seconds
   updateInterval: 100, // ms
