@@ -248,6 +248,19 @@
   animation: flash-red 0.8s ease-in-out forwards;
 }
 
+@keyframes scroll-text {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll-text {
+  animation: scroll-text var(--scroll-duration, 5s) linear infinite;
+}
+
 /* Hide scrollbar */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

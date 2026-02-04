@@ -28,6 +28,7 @@ interface GameState {
   isCorrect: boolean | null;
   lastResolution: Resolution | null;
   lastClickedCountryName: string | null;
+  lastClickedCountryId: string | null;
   floatingLabels: FloatingLabel[];
   expertMode: boolean;
   countrySetId: CountrySetId; // Track which country set is being played
@@ -111,6 +112,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   isCorrect: null,
   lastResolution: null,
   lastClickedCountryName: null,
+  lastClickedCountryId: null,
   floatingLabels: [],
   expertMode: false,
   countrySetId: "all",
@@ -154,6 +156,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isCorrect: null,
       lastResolution: null,
       lastClickedCountryName: null,
+      lastClickedCountryId: null,
       floatingLabels: [],
       expertMode,
       countrySetId,
@@ -210,6 +213,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       countdownRemaining: loaded.countdownRemaining,
       isCorrect: null,
       lastClickedCountryName: null,
+      lastClickedCountryId: null,
       floatingLabels: [],
     });
   },
@@ -238,6 +242,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       countdownRemaining: loaded.countdownRemaining,
       isCorrect: null,
       lastClickedCountryName: null,
+      lastClickedCountryId: null,
       floatingLabels: [],
     });
   },
@@ -334,6 +339,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         isCorrect: true,
         lastResolution: resolution,
         lastClickedCountryName: null,
+        lastClickedCountryId: null,
         resolvedCountries: newResolved,
         questionsAnswered: state.questionsAnswered + 1,
         questionsCorrect: state.questionsCorrect + 1,
@@ -359,6 +365,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           wrongGuessIds: newWrongIds,
           lastResolution: "failed",
           lastClickedCountryName: guessedCountryName,
+          lastClickedCountryId: guessBase,
           resolvedCountries: newResolved,
           questionsAnswered: state.questionsAnswered + 1,
         });
@@ -378,12 +385,14 @@ export const useGameStore = create<GameState>((set, get) => ({
           wrongGuessIds: newWrongIds,
           lastResolution: "failed",
           lastClickedCountryName: guessedCountryName,
+          lastClickedCountryId: guessBase,
         });
       } else {
         set({
           triesRemaining: newTries,
           wrongGuessIds: newWrongIds,
           lastClickedCountryName: guessedCountryName,
+          lastClickedCountryId: guessBase,
         });
       }
     }
@@ -415,6 +424,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isCorrect: null,
       lastResolution: null,
       lastClickedCountryName: null,
+      lastClickedCountryId: null,
       floatingLabels: [],
     });
   },
@@ -438,6 +448,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isCorrect: null,
       lastResolution: null,
       lastClickedCountryName: null,
+      lastClickedCountryId: null,
       floatingLabels: [],
       expertMode: false,
       countrySetId: "all",
@@ -474,6 +485,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         countdownRemaining: 0,
         lastResolution: "failed",
         lastClickedCountryName: "Time's up!",
+        lastClickedCountryId: null,
         resolvedCountries: newResolved,
         questionsAnswered: state.questionsAnswered + 1,
       });
