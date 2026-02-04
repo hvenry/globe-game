@@ -3,15 +3,19 @@
 import { useMemo } from "react";
 import { geoCentroid } from "d3-geo";
 import type { CountryFeature } from "@/lib/geo/types";
+import type { CountryData } from "@/lib/geo/types";
 import { GLOBE_CONFIG, COLORS, SMALL_COUNTRIES } from "@/lib/constants";
 import { baseId } from "@/lib/geo/countries";
-import type { Resolution } from "@/lib/store/game-store";
+import type { Resolution, GamePhase } from "@/lib/store/game-store";
 
 interface SmallCountryMarkersProps {
   features: CountryFeature[];
   resolvedCountries: Map<string, Resolution>;
   wrongGuessIds: Set<string>;
   hoveredCountryBase: string | null;
+  gamePhase: GamePhase;
+  currentCountry: CountryData | null;
+  pulseTime: number;
 }
 
 const noopRaycast = () => {};
@@ -34,8 +38,18 @@ function getMarkerColor(
   base: string,
   resolvedCountries: Map<string, Resolution>,
   wrongGuessIds: Set<string>,
-  hoveredCountryBase: string | null
+  hoveredCountryBase: string | null,
+  gamePhase: GamePhase,
+  currentCountry: CountryData | null,
+  pulseTime: number
 ): string {
+  // Check if in mustclick phase and this is the current country
+  if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
+    // Pulse between red and white
+    const pulse = (Math.sin(pulseTime * 4) + 1) / 2; // 0 to 1
+    return pulse > 0.5 ? COLORS.countryFailed : "#ffffff";
+  }
+
   const resolution = resolvedCountries.get(base);
   if (resolution === "perfect") return COLORS.countryPerfect;
   if (resolution === "imperfect") return COLORS.countryImperfect;
@@ -49,8 +63,15 @@ function getMarkerOpacity(
   base: string,
   resolvedCountries: Map<string, Resolution>,
   wrongGuessIds: Set<string>,
-  hoveredCountryBase: string | null
+  hoveredCountryBase: string | null,
+  gamePhase: GamePhase,
+  currentCountry: CountryData | null
 ): number {
+  // Mustclick phase - high opacity for pulsing effect
+  if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
+    return 0.9;
+  }
+
   const resolution = resolvedCountries.get(base);
   if (resolution) return 0.85;
   if (wrongGuessIds.has(base)) return 0.6;
@@ -63,6 +84,9 @@ export default function SmallCountryMarkers({
   resolvedCountries,
   wrongGuessIds,
   hoveredCountryBase,
+  gamePhase,
+  currentCountry,
+  pulseTime,
 }: SmallCountryMarkersProps) {
   const markers = useMemo(() => {
     const result: Array<{
@@ -102,13 +126,18 @@ export default function SmallCountryMarkers({
           marker.base,
           resolvedCountries,
           wrongGuessIds,
-          hoveredCountryBase
+          hoveredCountryBase,
+          gamePhase,
+          currentCountry,
+          pulseTime
         );
         const opacity = getMarkerOpacity(
           marker.base,
           resolvedCountries,
           wrongGuessIds,
-          hoveredCountryBase
+          hoveredCountryBase,
+          gamePhase,
+          currentCountry
         );
 
         return (

@@ -5,7 +5,7 @@ import { shuffle } from "@/lib/utils";
 import { GAME_CONFIG } from "@/lib/constants";
 import { baseId, getAllFeatures } from "@/lib/geo/countries";
 
-export type GamePhase = "idle" | "playing" | "feedback" | "gameover";
+export type GamePhase = "idle" | "playing" | "feedback" | "gameover" | "mustclick";
 export type Resolution = "perfect" | "imperfect" | "failed";
 
 export interface FloatingLabel {
@@ -37,6 +37,7 @@ interface GameState {
   resolvedCountries: Map<string, Resolution>;
   questionsAnswered: number;
   questionsCorrect: number;
+  totalPoints: number; // Weighted score based on tries used
 
   // Timer state
   countdownRemaining: number;
@@ -119,6 +120,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   resolvedCountries: new Map(),
   questionsAnswered: 0,
   questionsCorrect: 0,
+  totalPoints: 0,
 
   // Timer state
   countdownRemaining: 0,
@@ -160,6 +162,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      totalPoints: 0,
       countdownRemaining: timerLimit ?? 0,
       countdownTimerLimit: timerLimit,
       gameStartTime: Date.now(),
@@ -241,7 +244,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   makeGuess: (countryId) => {
     const state = get();
-    if (state.phase !== "playing" || !state.currentCountry) return;
+    if (!state.currentCountry) return;
 
     const guessBase = baseId(countryId);
 
@@ -249,6 +252,41 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!state.validCountryIds.has(guessBase)) return;
 
     const isCorrect = guessBase === state.currentCountry.id;
+
+    // Special case: mustclick phase - user must click the correct country to proceed
+    if (state.phase === "mustclick") {
+      if (isCorrect) {
+        // User clicked the correct country, now proceed to next
+        const newResolved = new Map(state.resolvedCountries);
+        newResolved.set(state.currentCountry.id, "failed");
+
+        // Remove country from unanswered list
+        const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
+        const newTries = new Map(state.countryTries);
+        newTries.delete(state.currentCountry.id);
+        const newWrong = new Map(state.countryWrongGuesses);
+        newWrong.delete(state.currentCountry.id);
+        const newCountdowns = new Map(state.countryCountdowns);
+        newCountdowns.delete(state.currentCountry.id);
+        const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
+
+        set({
+          phase: "feedback",
+          isCorrect: false,
+          resolvedCountries: newResolved,
+          questionsAnswered: state.questionsAnswered + 1,
+          unansweredCountries: newUnanswered,
+          currentIndex: newIndex,
+          countryTries: newTries,
+          countryWrongGuesses: newWrong,
+          countryCountdowns: newCountdowns,
+        });
+      }
+      // Ignore clicks on wrong countries during mustclick phase
+      return;
+    }
+
+    if (state.phase !== "playing") return;
 
     // Check if this country has already been resolved (correctly guessed in a previous question)
     if (state.resolvedCountries.has(guessBase)) {
@@ -276,6 +314,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       const newResolved = new Map(state.resolvedCountries);
       newResolved.set(state.currentCountry.id, resolution);
 
+      // Calculate points based on tries remaining
+      // Perfect answer (first try) = 1.0 point, decreases with each wrong guess
+      const points = state.triesRemaining / state.maxTries;
+
       // Remove country from unanswered list
       const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
       const newTries = new Map(state.countryTries);
@@ -294,6 +336,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         resolvedCountries: newResolved,
         questionsAnswered: state.questionsAnswered + 1,
         questionsCorrect: state.questionsCorrect + 1,
+        totalPoints: state.totalPoints + points,
         unansweredCountries: newUnanswered,
         currentIndex: newIndex,
         countryTries: newTries,
@@ -326,33 +369,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       newWrongIds.add(guessBase);
 
       if (newTries === 0) {
-        const newResolved = new Map(state.resolvedCountries);
-        newResolved.set(state.currentCountry.id, "failed");
-
-        // Remove country from unanswered list
-        const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
-        const newTriesMap = new Map(state.countryTries);
-        newTriesMap.delete(state.currentCountry.id);
-        const newWrong = new Map(state.countryWrongGuesses);
-        newWrong.delete(state.currentCountry.id);
-        const newCountdowns = new Map(state.countryCountdowns);
-        newCountdowns.delete(state.currentCountry.id);
-        const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
-
+        // Non-expert mode: User must click the correct country to learn and proceed
         set({
-          phase: "feedback",
+          phase: "mustclick",
           isCorrect: false,
           triesRemaining: 0,
           wrongGuessIds: newWrongIds,
           lastResolution: "failed",
           lastClickedCountryName: guessedCountryName,
-          resolvedCountries: newResolved,
-          questionsAnswered: state.questionsAnswered + 1,
-          unansweredCountries: newUnanswered,
-          currentIndex: newIndex,
-          countryTries: newTriesMap,
-          countryWrongGuesses: newWrong,
-          countryCountdowns: newCountdowns,
         });
       } else {
         set({
@@ -421,6 +445,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       resolvedCountries: new Map(),
       questionsAnswered: 0,
       questionsCorrect: 0,
+      totalPoints: 0,
       countdownRemaining: 0,
       countdownTimerLimit: null,
       gameStartTime: null,
@@ -437,11 +462,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     if (state.phase !== "playing" || !state.currentCountry) return;
 
-    const newResolved = new Map(state.resolvedCountries);
-    newResolved.set(state.currentCountry.id, "failed");
-
     // Expert mode: time expired = game over
     if (state.expertMode) {
+      const newResolved = new Map(state.resolvedCountries);
+      newResolved.set(state.currentCountry.id, "failed");
       set({
         phase: "gameover",
         isCorrect: false,
@@ -455,30 +479,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Normal mode: remove country from unanswered list and continue
-    const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
-    const newTries = new Map(state.countryTries);
-    newTries.delete(state.currentCountry.id);
-    const newWrong = new Map(state.countryWrongGuesses);
-    newWrong.delete(state.currentCountry.id);
-    const newCountdowns = new Map(state.countryCountdowns);
-    newCountdowns.delete(state.currentCountry.id);
-    const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
-
+    // Normal mode: user must click the correct country to proceed
     set({
-      phase: "feedback",
+      phase: "mustclick",
       isCorrect: false,
       triesRemaining: 0,
       countdownRemaining: 0,
       lastResolution: "failed",
       lastClickedCountryName: "Time's up!",
-      resolvedCountries: newResolved,
-      questionsAnswered: state.questionsAnswered + 1,
-      unansweredCountries: newUnanswered,
-      currentIndex: newIndex,
-      countryTries: newTries,
-      countryWrongGuesses: newWrong,
-      countryCountdowns: newCountdowns,
     });
   },
 

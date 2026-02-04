@@ -121,7 +121,7 @@ export default function GameContainer() {
 
   const handleCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
-      if (phase !== "playing" || isPaused) return;
+      if ((phase !== "playing" && phase !== "mustclick") || isPaused) return;
 
       const currentCountry = useGameStore.getState().currentCountry;
       const base = baseId(countryId);
@@ -158,7 +158,7 @@ export default function GameContainer() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape key toggles pause during gameplay
-      if (e.key === "Escape" && (phase === "playing" || phase === "feedback")) {
+      if (e.key === "Escape" && (phase === "playing" || phase === "feedback" || phase === "mustclick")) {
         e.preventDefault();
 
         // Debounce: only allow toggle if at least 300ms has passed since last press
@@ -194,7 +194,7 @@ export default function GameContainer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [phase, isPaused, goNext, goPrev, allowSkips, pauseTimer, resumeTimer]);
 
-  const isGameActive = phase === "playing" || phase === "feedback";
+  const isGameActive = phase === "playing" || phase === "feedback" || phase === "mustclick";
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-black">
@@ -205,7 +205,7 @@ export default function GameContainer() {
           features={allFeatures}
           wrongGuessIds={wrongGuessIds}
           resolvedCountries={resolvedCountries}
-          interactive={phase === "playing" && !isPaused}
+          interactive={(phase === "playing" || phase === "mustclick") && !isPaused}
           autoRotate={phase === "idle" || phase === "gameover"}
           onCountryClick={handleCountryClick}
           onReady={handleGlobeReady}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useGameStore } from "@/lib/store/game-store";
 import { useStatsStore } from "@/lib/store/stats-store";
-import { formatTime } from "@/lib/utils";
+import { formatTime, formatScore } from "@/lib/utils";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -23,7 +23,6 @@ function AnimatedCounter({
 
   useEffect(() => {
     const startTime = performance.now();
-    const startValue = 0;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -31,9 +30,7 @@ function AnimatedCounter({
 
       // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(startValue + (value - startValue) * eased);
-
-      setDisplay(current);
+      setDisplay(Math.round(value * eased));
 
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -47,8 +44,8 @@ function AnimatedCounter({
 }
 
 export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
-  const questionsAnswered = useGameStore((s) => s.questionsAnswered);
   const questionsCorrect = useGameStore((s) => s.questionsCorrect);
+  const totalPoints = useGameStore((s) => s.totalPoints);
   const totalCountries = useGameStore((s) => s.totalCountries);
   const resolvedCountries = useGameStore((s) => s.resolvedCountries);
   const expertMode = useGameStore((s) => s.expertMode);
@@ -74,21 +71,17 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
       ? (Date.now() - gameStartTime - totalPausedTime) / 1000
       : 0;
 
-  const accuracy =
-    questionsAnswered > 0
-      ? Math.round((questionsCorrect / questionsAnswered) * 100)
-      : 0;
-
   const expertPercentage =
     totalCountries > 0
       ? Math.round((questionsCorrect / totalCountries) * 100)
       : 0;
 
-  const scorePercentage =
-    totalCountries > 0
-      ? Math.round((questionsCorrect / totalCountries) * 100)
-      : 0;
-  const isNewBest = !expertMode && questionsCorrect > previousBestScore.current;
+  // GameOver shows final score: totalPoints / totalCountries
+  // This accounts for all unanswered countries (they count as 0 points)
+  const scoreRaw = totalCountries > 0 ? totalPoints / totalCountries : 0;
+  const scorePercentage = Number(formatScore(scoreRaw));
+
+  const isNewBest = !expertMode && totalPoints > previousBestScore.current;
   const isNewExpertBest =
     expertMode && questionsCorrect > previousExpertBestScore.current;
 
@@ -104,11 +97,16 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
   useEffect(() => {
     if (!recorded.current) {
       recorded.current = true;
-      recordGame(questionsCorrect, countrySetId, expertMode);
+      // For normal mode, use totalPoints; for expert mode, use questionsCorrect
+      recordGame(
+        expertMode ? questionsCorrect : totalPoints,
+        countrySetId,
+        expertMode,
+      );
     }
-  }, [questionsCorrect, countrySetId, recordGame, expertMode]);
+  }, [questionsCorrect, totalPoints, countrySetId, recordGame, expertMode]);
 
-  const isPerfectScore = scorePercentage === 100;
+  const isPerfectScore = scoreRaw >= 1;
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
@@ -130,7 +128,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
             >
               Perfect Score!
             </h2>
-            <p className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}>
+            <p
+              className={`text-xs ${expertMode ? "text-amber-400/40" : "text-white/40"} tabular-nums`}
+            >
               {questionsCorrect} / {totalCountries}
             </p>
           </>
@@ -143,7 +143,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
           </>
         ) : (
           <>
-            <h2 className="text-2xl font-bold mb-1 text-white">Game Overview</h2>
+            <h2 className="text-2xl font-bold mb-1 text-white">
+              Game Overview
+            </h2>
             <p className="text-xs text-white/40 tabular-nums">
               {questionsCorrect} / {totalCountries}
             </p>
@@ -193,34 +195,24 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
           </>
         ) : (
           <>
-            <div className="mt-4 mb-4 grid grid-cols-2 gap-3">
-              <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                <p className="text-white/30 text-xs uppercase tracking-wider">
-                  Accuracy
-                </p>
-                <p className="text-white/60 text-3xl md:text-4xl font-bold tabular-nums mt-1">
-                  <AnimatedCounter value={accuracy} duration={1200} />%
-                </p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-lg p-3 relative">
-                <p className="text-white/30 text-xs uppercase tracking-wider">
-                  Score
-                </p>
-                <p className={`text-3xl md:text-4xl font-bold tabular-nums mt-1 ${
-                  scorePercentage === 100
-                    ? "text-emerald"
-                    : "text-white"
-                }`}>
-                  <AnimatedCounter value={scorePercentage} duration={1200} />%
-                </p>
-                {isNewBest && (
-                  <div className="absolute -bottom-2.5 -right-2.5">
-                    <Badge className="bg-emerald/20 text-emerald border-emerald/30 backdrop-blur-md">
-                      New Best!
-                    </Badge>
-                  </div>
-                )}
-              </div>
+            <div className="mt-4 mb-4 bg-white/5 border border-white/10 rounded-lg p-3 relative">
+              <p className="text-white/30 text-xs uppercase tracking-wider">
+                Score
+              </p>
+              <p
+                className={`text-4xl md:text-5xl font-bold tabular-nums mt-1 ${
+                  isPerfectScore ? "text-emerald" : "text-white"
+                }`}
+              >
+                <AnimatedCounter value={scorePercentage} duration={1200} />%
+              </p>
+              {isNewBest && (
+                <div className="absolute -bottom-2.5 -right-2.5">
+                  <Badge className="bg-emerald/20 text-emerald border-emerald/30 backdrop-blur-md">
+                    New Best!
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <div className="mb-4 bg-white/5 border border-white/10 rounded-lg p-3">

@@ -6,13 +6,13 @@ interface StatsState {
   gamesPlayed: number;
   totalAnswered: number;
   totalCorrect: number;
-  bestScores: Record<CountrySetId, number>; // Best score per continent (normal mode)
-  expertBestScores: Record<CountrySetId, number>; // Best score per continent (expert mode)
+  bestScores: Record<CountrySetId, number>; // Best score per continent (normal mode) - stores total points
+  expertBestScores: Record<CountrySetId, number>; // Best score per continent (expert mode) - stores country count
   bestStreak: number;
   expertGamesPlayed: number;
 
   recordGame: (
-    correct: number,
+    score: number, // For normal mode: total points; for expert mode: correct count
     countrySetId: CountrySetId,
     expertMode?: boolean
   ) => void;
@@ -45,13 +45,13 @@ export const useStatsStore = create<StatsState>()(
       bestStreak: 0,
       expertGamesPlayed: 0,
 
-      recordGame: (correct, countrySetId, expertMode = false) => {
+      recordGame: (score, countrySetId, expertMode = false) => {
         const state = get();
         if (expertMode) {
           const newExpertBestScores = { ...state.expertBestScores };
           newExpertBestScores[countrySetId] = Math.max(
             newExpertBestScores[countrySetId] || 0,
-            correct
+            score
           );
           set({
             expertGamesPlayed: state.expertGamesPlayed + 1,
@@ -61,7 +61,7 @@ export const useStatsStore = create<StatsState>()(
           const newBestScores = { ...state.bestScores };
           newBestScores[countrySetId] = Math.max(
             newBestScores[countrySetId] || 0,
-            correct
+            score
           );
           set({
             gamesPlayed: state.gamesPlayed + 1,
