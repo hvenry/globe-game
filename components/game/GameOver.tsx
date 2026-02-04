@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useGameStore } from "@/lib/store/game-store";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { formatTime, formatScore } from "@/lib/utils";
@@ -127,20 +126,29 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
 
         {expertMode ? (
           <>
-            <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 relative">
-              <p className="text-amber-400/60 text-xs uppercase tracking-wider">
-                Score
-              </p>
-              <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-4xl md:text-5xl font-bold tabular-nums mt-1">
-                <AnimatedCounter value={expertPercentage} duration={1200} />%
-              </p>
-              {isNewExpertBest && (
-                <div className="absolute -bottom-2.5 -right-2.5">
-                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 backdrop-blur-md">
-                    New Best!
-                  </Badge>
+            <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
+                    Best
+                  </p>
+                  <p className="text-amber-400/30 text-lg font-bold tabular-nums">
+                    {formatScore(snapshot.previousExpertBestScore / totalCountries)}%
+                  </p>
                 </div>
-              )}
+                <div className="text-right">
+                  <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
+                    {isNewExpertBest ? (
+                      <span className="text-amber-400">New Best!</span>
+                    ) : (
+                      "Score"
+                    )}
+                  </p>
+                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-3xl md:text-4xl font-bold tabular-nums">
+                    <AnimatedCounter value={expertPercentage} duration={1200} />%
+                  </p>
+                </div>
+              </div>
             </div>
 
             {lastResolution === "failed" &&
