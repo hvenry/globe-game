@@ -229,7 +229,7 @@ function GlobeScene({
   const [pulseTime, setPulseTime] = useState(0);
 
   useFrame((state) => {
-    if (gamePhase === "mustclick") {
+    if (showMustclickEffects) {
       setPulseTime(state.clock.elapsedTime);
     }
   });
@@ -238,6 +238,13 @@ function GlobeScene({
   const gamePhase = useGameStore((s) => s.phase);
   const currentCountry = useGameStore((s) => s.currentCountry);
   const gameCountrySetId = useGameStore((s) => s.countrySetId);
+  const expertMode = useGameStore((s) => s.expertMode);
+  const lastResolution = useGameStore((s) => s.lastResolution);
+
+  // Show mustclick effects during mustclick phase OR during expert gameover with failed guess
+  const showMustclickEffects =
+    gamePhase === "mustclick" ||
+    (gamePhase === "gameover" && expertMode && lastResolution === "failed");
   const prevPhaseRef = useRef(gamePhase);
   const animTargetRef = useRef<THREE.Vector3 | null>(null);
   const animDistanceRef = useRef<number | null>(null);
@@ -344,8 +351,8 @@ function GlobeScene({
   const getCountryState = useCallback(
     (featureId: string): CountryVisualState => {
       const base = baseId(featureId);
-      // Check if in mustclick phase and this is the current country
-      if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
+      // Check if showing mustclick effects and this is the current country
+      if (showMustclickEffects && currentCountry && base === currentCountry.id) {
         return "mustclick";
       }
       const resolution = resolvedCountries.get(base);
@@ -354,12 +361,12 @@ function GlobeScene({
       if (hoveredCountryBase === base) return "hover";
       return "default";
     },
-    [resolvedCountries, wrongGuessIds, hoveredCountryBase, gamePhase, currentCountry],
+    [resolvedCountries, wrongGuessIds, hoveredCountryBase, showMustclickEffects, currentCountry],
   );
 
-  // Compute centroid position for pulse ring during mustclick phase
+  // Compute centroid position for pulse ring during mustclick phase or expert gameover
   const pulseRingPosition = useMemo(() => {
-    if (gamePhase !== "mustclick" || !currentCountry) return null;
+    if (!showMustclickEffects || !currentCountry) return null;
     const feature = features.find(
       (f) => baseId(f.id) === currentCountry.id,
     );
@@ -394,7 +401,7 @@ function GlobeScene({
     } catch {
       return null;
     }
-  }, [gamePhase, currentCountry, features]);
+  }, [showMustclickEffects, currentCountry, features]);
 
   // Redraw fill texture whenever visual state changes or pulse animation updates
   useEffect(() => {
