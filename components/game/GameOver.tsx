@@ -8,7 +8,6 @@ import Image from "next/image";
 import { formatTime, formatScore } from "@/lib/utils";
 import { getFlagPath } from "@/lib/geo/iso-codes";
 import ScoreCard, { countResolutions } from "./ResolutionBreakdown";
-import ScrollingText from "./ScrollingText";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -160,52 +159,47 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
 
             {lastResolution === "failed" &&
               currentCountry &&
-              lastClickedCountryName && (
-                <div className="border-t border-amber-500/10 pt-2 mt-2">
-                  <div className="flex justify-between gap-3">
-                    <div className="min-w-0 flex-1 text-left">
-                      <p className="text-red-400/50 text-[10px] uppercase tracking-wider mb-1">
-                        Guessed
+              lastClickedCountryName &&
+              lastClickedCountryId && (
+                <div className="border-t border-amber-500/10 pt-2 mt-2 space-y-2 text-center">
+                  <div>
+                    <p className="text-red-400/50 text-xs uppercase tracking-wider mb-0.5">
+                      Guessed
+                    </p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Image
+                        src={getFlagPath(lastClickedCountryId)}
+                        alt=""
+                        width={16}
+                        height={12}
+                        className="w-4 h-3 object-cover rounded-xs shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                      <p className="text-red-400/80 text-sm font-medium">
+                        {lastClickedCountryName}
                       </p>
-                      <div className="flex items-center gap-1.5">
-                        {lastClickedCountryId && (
-                          <Image
-                            src={getFlagPath(lastClickedCountryId)}
-                            alt=""
-                            width={20}
-                            height={14}
-                            className="w-4 h-3 object-cover rounded-xs border border-red-400/20 shrink-0"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        )}
-                        <ScrollingText
-                          text={lastClickedCountryName}
-                          className="text-red-400/80 text-xs font-medium min-w-0 flex-1"
-                        />
-                      </div>
                     </div>
-                    <div className="min-w-0 flex-1 text-right">
-                      <p className="text-emerald-400/50 text-[10px] uppercase tracking-wider mb-1">
-                        Answer
+                  </div>
+                  <div>
+                    <p className="text-emerald-400/50 text-xs uppercase tracking-wider mb-0.5">
+                      Answer
+                    </p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Image
+                        src={getFlagPath(currentCountry.id)}
+                        alt=""
+                        width={16}
+                        height={12}
+                        className="w-4 h-3 object-cover rounded-xs shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                      <p className="text-emerald-400 text-sm font-medium">
+                        {currentCountry.name}
                       </p>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <ScrollingText
-                          text={currentCountry.name}
-                          className="text-emerald-400/80 text-xs font-medium min-w-0 flex-1"
-                        />
-                        <Image
-                          src={getFlagPath(currentCountry.id)}
-                          alt=""
-                          width={20}
-                          height={14}
-                          className="w-4 h-3 object-cover rounded-xs border border-emerald-400/20 shrink-0"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
