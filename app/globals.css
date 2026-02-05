@@ -265,6 +265,20 @@
   animation: flash-red 0.8s ease-in-out forwards;
 }
 
+@keyframes flash-brackets {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-flash-brackets {
+  animation: flash-brackets 2s step-end infinite;
+}
+
 /* Hide scrollbar */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
