@@ -189,6 +189,15 @@
   }
 }
 
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.3s ease-out;
 }
@@ -215,6 +224,14 @@
 
 .animate-shimmer {
   animation: shimmer 3s ease-in-out infinite;
+}
+
+.animate-shimmer-emerald {
+  animation: shimmer-sweep 3s ease-in-out infinite;
+}
+
+.animate-shimmer-gold {
+  animation: shimmer-sweep 4s ease-in-out infinite;
 }
 
 @keyframes fade-blur-in {

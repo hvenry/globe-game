@@ -172,16 +172,9 @@ function GameModeSelect({
     const isPerfectExpert = total > 0 && expertBestScore >= total;
     const isPerfectBoth = isPerfectNormal && isPerfectExpert;
 
-    // Determine border styling based on perfect scores
+    // Determine border styling (no special borders for perfect scores)
     let borderClass = "";
-    if (isPerfectBoth) {
-      borderClass = "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
-    } else if (isPerfectExpert) {
-      borderClass =
-        "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
-    } else if (isPerfectNormal) {
-      borderClass = "border-2 border-emerald shadow-lg shadow-emerald/30";
-    } else if (expertMode) {
+    if (expertMode) {
       borderClass = isSelected
         ? "border-2 border-amber-500/60 shadow-lg shadow-amber-500/20"
         : "border-2 border-white/5 hover:border-amber-500/30";
@@ -189,6 +182,16 @@ function GameModeSelect({
       borderClass = isSelected
         ? "border-2 border-emerald/60 shadow-lg shadow-emerald/20"
         : "border-2 border-white/5 hover:border-emerald/30";
+    }
+
+    // Determine shimmer for perfect scores
+    let shimmerClass = "";
+    if (isPerfectBoth) {
+      shimmerClass = "bg-gradient-to-r from-transparent via-amber-400/20 to-transparent animate-shimmer-gold";
+    } else if (isPerfectExpert) {
+      shimmerClass = "bg-gradient-to-r from-transparent via-amber-400/15 to-transparent animate-shimmer-gold";
+    } else if (isPerfectNormal) {
+      shimmerClass = "bg-gradient-to-r from-transparent via-emerald/15 to-transparent animate-shimmer-emerald";
     }
 
     return (
@@ -213,6 +216,13 @@ function GameModeSelect({
               : "bg-gradient-to-br from-emerald/5 to-transparent"
           }`}
         />
+
+        {/* Shimmer for perfect scores */}
+        {shimmerClass && (
+          <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+            <div className={`absolute inset-y-0 w-1/2 ${shimmerClass}`} />
+          </div>
+        )}
 
         <div className="relative flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -645,18 +655,15 @@ export default function StartScreen({
             const isPerfectExpert = expertBestScores.all >= allTotal;
             const isPerfectBoth = isPerfectNormal && isPerfectExpert;
 
-            let borderClass = "";
+            const borderClass = "border border-white/10";
+
+            let mainShimmerClass = "";
             if (isPerfectBoth) {
-              borderClass =
-                "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
+              mainShimmerClass = "bg-gradient-to-r from-transparent via-amber-400/20 to-transparent animate-shimmer-gold";
             } else if (isPerfectExpert) {
-              borderClass =
-                "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
+              mainShimmerClass = "bg-gradient-to-r from-transparent via-amber-400/15 to-transparent animate-shimmer-gold";
             } else if (isPerfectNormal) {
-              borderClass =
-                "border-2 border-emerald shadow-lg shadow-emerald/30";
-            } else {
-              borderClass = "border border-white/10";
+              mainShimmerClass = "bg-gradient-to-r from-transparent via-emerald/15 to-transparent animate-shimmer-emerald";
             }
 
             return (
@@ -709,8 +716,8 @@ export default function StartScreen({
                   className={`relative bg-white/5 rounded-xl p-4 overflow-hidden ${borderClass}`}
                 >
                   {/* Animated background shimmer for perfect scores */}
-                  {(isPerfectNormal || isPerfectExpert) && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
+                  {mainShimmerClass && (
+                    <div className={`absolute inset-y-0 w-1/2 ${mainShimmerClass}`} />
                   )}
 
                   <div className="relative flex items-center justify-between">
