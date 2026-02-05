@@ -231,11 +231,11 @@ function MainMenu({
             onClick={() => onOpenSettings(true)}
             className="group relative cursor-pointer text-white/60 hover:text-white transition-colors hover:scale-105 px-4"
           >
-            <span className="absolute left-0 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
+            <span className="absolute left-1 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
               &lt;
             </span>
             <span className="group-hover:underline">{countrySetName}</span>
-            <span className="absolute right-0 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
+            <span className="absolute right-1 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
               &gt;
             </span>
           </button>
@@ -433,11 +433,10 @@ function SettingsView({
   const [showHighlight, setShowHighlight] = useState(highlightCountrySet);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fade out the highlight after 2 seconds
+  // Fade out the highlight after 1.5 seconds
   useEffect(() => {
     if (highlightCountrySet) {
-      setShowHighlight(true);
-      const timer = setTimeout(() => setShowHighlight(false), 2000);
+      const timer = setTimeout(() => setShowHighlight(false), 1500);
       return () => clearTimeout(timer);
     }
   }, [highlightCountrySet]);
@@ -533,7 +532,7 @@ function SettingsView({
         <div className="relative">
           {/* Background highlight glow */}
           <div
-            className={`absolute inset-0 -m-2 rounded-2xl bg-emerald/15 blur-md transition-opacity duration-500 ${
+            className={`absolute inset-0 -m-2 bg-emerald/20 blur-lg transition-opacity duration-900 ${
               showHighlight ? "opacity-100" : "opacity-0"
             }`}
           />
