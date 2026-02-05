@@ -4,18 +4,30 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
-import {
-  getAvailableCountrySets,
-  type CountrySetId,
-} from "@/lib/geo/country-sets";
+import { getAvailableCountrySets } from "@/lib/geo/country-sets";
 import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import { TIMER_CONFIG } from "@/lib/constants";
 import { getAppVersion } from "@/lib/version";
+import {
+  Toggle,
+  Slider,
+  MaxTriesSelect,
+  TimerLimitSelect,
+  CountrySetSelect,
+} from "./settings/SettingsControls";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface StartScreenProps {
   onStart: () => void;
   delayAnimation?: boolean;
 }
+
+// ============================================================================
+// Utility Components
+// ============================================================================
 
 function AnimatedCounter({
   value,
@@ -36,13 +48,9 @@ function AnimatedCounter({
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-
-        // Ease out cubic
         const eased = 1 - Math.pow(1 - progress, 3);
         const current = Math.round(startValue + (value - startValue) * eased);
-
         setDisplay(current);
-
         if (progress < 1) {
           requestAnimationFrame(animate);
         }
@@ -57,502 +65,101 @@ function AnimatedCounter({
   return <>{display}</>;
 }
 
-function Toggle({
-  enabled,
-  onChange,
-  label,
-  description,
-  variant = "default",
-  disabled = false,
-}: {
-  enabled: boolean;
-  onChange: (value: boolean) => void;
-  label: string;
-  description?: string;
-  variant?: "default" | "gold";
-  disabled?: boolean;
-}) {
-  const isGold = variant === "gold";
-
+// Chevron icon for scroll indicator
+function ChevronDown({ className }: { className?: string }) {
   return (
-    <button
-      onClick={() => !disabled && onChange(!enabled)}
-      className={`flex items-center justify-between w-full p-3 rounded-lg transition-all duration-200 ${
-        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-      } ${
-        isGold
-          ? enabled
-            ? "bg-amber-500/15 border border-amber-500/50"
-            : "bg-white/5 hover:bg-white/10 border border-amber-500/20"
-          : disabled
-            ? "bg-white/5 border border-transparent"
-            : "bg-white/5 hover:bg-white/10 border border-transparent"
-      }`}
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <div className="text-left">
-        <p
-          className={`text-sm font-medium ${
-            isGold && enabled ? "text-amber-400" : "text-white"
-          }`}
-        >
-          {label}
-        </p>
-        {description && (
-          <p
-            className={`text-xs mt-0.5 ${
-              isGold && enabled ? "text-amber-400/60" : "text-white/40"
-            }`}
-          >
-            {description}
-          </p>
-        )}
-      </div>
-      <div
-        className={`w-10 h-6 rounded-full transition-all duration-200 relative ${
-          enabled
-            ? isGold
-              ? "bg-gradient-to-r from-amber-500 to-yellow-400"
-              : "bg-emerald"
-            : "bg-white/20"
-        }`}
-      >
-        <div
-          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-            enabled ? "translate-x-5" : "translate-x-1"
-          } ${isGold && enabled ? "shadow-lg" : ""}`}
-        />
-      </div>
-    </button>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }
 
-function GameModeSelect({
-  value,
-  onChange,
-  expertMode,
-}: {
-  value: CountrySetId;
-  onChange: (value: CountrySetId) => void;
+// Settings gear icon
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+// Back arrow icon
+function BackIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </svg>
+  );
+}
+
+// ============================================================================
+// Main Menu View
+// ============================================================================
+
+interface MainMenuProps {
+  onStart: () => void;
+  onOpenSettings: (highlightCountrySet?: boolean) => void;
+  delayAnimation: boolean;
   expertMode: boolean;
-}) {
-  const availableSets = getAvailableCountrySets();
-  const { bestScores, expertBestScores } = useStatsStore();
-
-  // Get actual playable count for each set (intersection of set IDs and guessable countries)
-  const getSetTotal = (setId: CountrySetId): number => {
-    const set = availableSets.find((s) => s.id === setId);
-    if (!set || !set.countryIds) return GUESSABLE_IDS.size;
-    return set.countryIds.filter((id) => GUESSABLE_IDS.has(id)).length;
-  };
-
-  // Only show continents (exclude "all")
-  const continentSets = availableSets.filter((s) => s.id !== "all");
-
-  // Handle toggle - clicking selected continent deselects it (goes back to "all")
-  const handleContinentClick = (setId: CountrySetId) => {
-    if (value === setId) {
-      onChange("all");
-    } else {
-      onChange(setId);
-    }
-  };
-
-  const renderSetButton = (set: (typeof availableSets)[0]) => {
-    const normalBestScore = bestScores[set.id] || 0;
-    const expertBestScore = expertBestScores[set.id] || 0;
-    const total = getSetTotal(set.id);
-    const normalPercentage =
-      total > 0 ? Math.round((normalBestScore / total) * 100) : 0;
-    const expertPercentage =
-      total > 0 ? Math.round((expertBestScore / total) * 100) : 0;
-    const hasNormalScore = normalBestScore > 0;
-    const hasExpertScore = expertBestScore > 0;
-    const isSelected = value === set.id;
-    const isPerfectNormal = normalPercentage === 100;
-    const isPerfectExpert = expertPercentage === 100;
-    const isPerfectBoth = isPerfectNormal && isPerfectExpert;
-
-    // Determine border styling based on perfect scores
-    let borderClass = "";
-    if (isPerfectBoth) {
-      borderClass = "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
-    } else if (isPerfectExpert) {
-      borderClass =
-        "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
-    } else if (isPerfectNormal) {
-      borderClass = "border-2 border-emerald shadow-lg shadow-emerald/30";
-    } else if (expertMode) {
-      borderClass = isSelected
-        ? "border-2 border-amber-500/60 shadow-lg shadow-amber-500/20"
-        : "border-2 border-white/5 hover:border-amber-500/30";
-    } else {
-      borderClass = isSelected
-        ? "border-2 border-emerald/60 shadow-lg shadow-emerald/20"
-        : "border-2 border-white/5 hover:border-emerald/30";
-    }
-
-    return (
-      <button
-        key={set.id}
-        onClick={() => handleContinentClick(set.id)}
-        className={`group relative p-3 rounded-xl text-left transition-all duration-300 cursor-pointer transform hover:scale-[1.02] ${borderClass} ${
-          expertMode
-            ? isSelected
-              ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10"
-              : "bg-white/5 hover:bg-white/10"
-            : isSelected
-              ? "bg-gradient-to-br from-emerald/25 to-emerald/10"
-              : "bg-white/5 hover:bg-white/10"
-        }`}
-      >
-        {/* Animated glow effect on hover */}
-        <div
-          className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-            expertMode
-              ? "bg-gradient-to-br from-amber-500/5 to-transparent"
-              : "bg-gradient-to-br from-emerald/5 to-transparent"
-          }`}
-        />
-
-        <div className="relative flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <p
-              className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${
-                expertMode
-                  ? isSelected
-                    ? "text-amber-400"
-                    : "text-white group-hover:text-amber-300"
-                  : isSelected
-                    ? "text-emerald"
-                    : "text-white group-hover:text-emerald-300"
-              }`}
-            >
-              {set.name}
-            </p>
-            <p className="text-white/50 text-[11px] leading-tight">
-              {total} countries
-            </p>
-          </div>
-          {(hasNormalScore || hasExpertScore) && (
-            <div className="flex flex-col items-end gap-0.5 shrink-0">
-              {hasNormalScore && (
-                <div className="flex items-center gap-1">
-                  <div className="w-1 h-1 rounded-full bg-emerald animate-pulse-glow" />
-                  <p className="text-emerald text-xs font-bold tabular-nums">
-                    {normalPercentage}%
-                  </p>
-                </div>
-              )}
-              {hasExpertScore && (
-                <div className="flex items-center gap-1">
-                  <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse-glow" />
-                  <p className="text-amber-400 text-xs font-bold tabular-nums">
-                    {expertPercentage}%
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </button>
-    );
-  };
-
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-white/50 text-xs uppercase tracking-wider">
-          Country Set
-        </p>
-        {value !== "all" && (
-          <p className="text-white/30 text-[10px] italic">
-            (Click again to deselect)
-          </p>
-        )}
-      </div>
-      {/* Continents - 2x3 Grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {continentSets.map((set) => renderSetButton(set))}
-      </div>
-    </div>
-  );
+  countrySet: string;
 }
 
-function Slider({
-  label,
-  value,
-  onChange,
-  min = 0.1,
-  max = 2.0,
-  step = 0.1,
-  displayMin,
-  displayMax,
-  expertMode = false,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  displayMin?: number;
-  displayMax?: number;
-  expertMode?: boolean;
-}) {
-  // If display range is specified, map between actual and display values
-  const actualMin = displayMin !== undefined ? min : min;
-  const actualMax = displayMax !== undefined ? max : max;
-  const dispMin = displayMin ?? min;
-  const dispMax = displayMax ?? max;
-
-  // Convert actual value to display value for the slider and label
-  const actualToDisplay = (actual: number) => {
-    if (displayMin === undefined) return actual;
-    return (
-      dispMin +
-      ((actual - actualMin) * (dispMax - dispMin)) / (actualMax - actualMin)
-    );
-  };
-
-  // Convert display value from slider to actual value
-  const displayToActual = (display: number) => {
-    if (displayMin === undefined) return display;
-    return (
-      actualMin +
-      ((display - dispMin) * (actualMax - actualMin)) / (dispMax - dispMin)
-    );
-  };
-
-  const displayValue = actualToDisplay(value);
-  const displayProgress =
-    ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
-
-  // Colors for expert vs normal mode
-  const fillColor = expertMode ? "rgb(251, 191, 36)" : "rgb(16, 185, 129)"; // amber-400 vs emerald
-  const accentClass = expertMode ? "accent-amber-400" : "accent-emerald";
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-white/60 text-xs">{label}</p>
-        <p className="text-white/40 text-xs tabular-nums">
-          {displayValue.toFixed(1)}x
-        </p>
-      </div>
-      <input
-        type="range"
-        min={dispMin}
-        max={dispMax}
-        step={step}
-        value={displayValue}
-        onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
-        className={`w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer ${accentClass} hover:bg-white/15 transition-colors`}
-        style={{
-          background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, rgba(255, 255, 255, 0.1) ${displayProgress}%, rgba(255, 255, 255, 0.1) 100%)`,
-        }}
-      />
-    </div>
-  );
-}
-
-function MaxTriesSelect({
-  value,
-  onChange,
-  disabled = false,
-  expertMode = false,
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  disabled?: boolean;
-  expertMode?: boolean;
-}) {
-  const options = [1, 2, 3, 4, 5];
-
-  return (
-    <div className="space-y-2">
-      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-        Max Tries
-      </p>
-      <div className="grid grid-cols-5 gap-2">
-        {options.map((tries) => {
-          const isSelected = value === tries;
-          const is1Try = tries === 1;
-          const useExpertStyling = expertMode && is1Try;
-
-          return (
-            <button
-              key={tries}
-              onClick={() => !disabled && onChange(tries)}
-              disabled={disabled}
-              className={`p-2 rounded-lg text-center transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
-                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                useExpertStyling
-                  ? isSelected
-                    ? "bg-amber-500/15 border border-amber-500/50"
-                    : "bg-white/5 border border-amber-500/20"
-                  : isSelected
-                    ? "bg-emerald/20 border border-emerald/50"
-                    : "bg-white/5 hover:bg-white/10 border border-transparent"
-              }`}
-            >
-              <div className="flex gap-0.5">
-                {Array.from({ length: tries }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      useExpertStyling
-                        ? isSelected
-                          ? "bg-amber-400"
-                          : "bg-white/40"
-                        : isSelected
-                          ? "bg-emerald"
-                          : "bg-white/40"
-                    }`}
-                  />
-                ))}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function TimerLimitSelect({
-  value,
-  onChange,
-  disabled = false,
-  expertMode = false,
-}: {
-  value: number | null;
-  onChange: (value: number | null) => void;
-  disabled?: boolean;
-  expertMode?: boolean;
-}) {
-  const options: Array<{ label: string; value: number | null }> = [
-    { label: "5s", value: 5 },
-    { label: "10s", value: 10 },
-    { label: "15s", value: 15 },
-    { label: "30s", value: 30 },
-    { label: "None", value: null },
-  ];
-
-  return (
-    <div className="space-y-2">
-      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-        Time Restriction
-      </p>
-      <div className="grid grid-cols-5 gap-2">
-        {options.map((option) => {
-          const isSelected = value === option.value;
-          const is5Second = option.value === 5;
-          const useExpertStyling = expertMode && is5Second;
-
-          return (
-            <button
-              key={option.label}
-              onClick={() => !disabled && onChange(option.value)}
-              disabled={disabled}
-              className={`p-2 rounded-lg text-center transition-all duration-200 ${
-                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                useExpertStyling
-                  ? isSelected
-                    ? "bg-amber-500/15 border border-amber-500/50"
-                    : "bg-white/5 border border-amber-500/20"
-                  : isSelected
-                    ? "bg-emerald/20 border border-emerald/50"
-                    : "bg-white/5 hover:bg-white/10 border border-transparent"
-              }`}
-            >
-              <p
-                className={`text-xs font-medium ${
-                  useExpertStyling
-                    ? isSelected
-                      ? "text-amber-400"
-                      : "text-white"
-                    : isSelected
-                      ? "text-emerald"
-                      : "text-white"
-                }`}
-              >
-                {option.label}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export default function StartScreen({
+function MainMenu({
   onStart,
-  delayAnimation = false,
-}: StartScreenProps) {
-  // Use lazy initialization to set hydrated to true after mount
-  const [hydrated, setHydrated] = useState(() => false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const lastEscapePress = useRef<number>(0);
+  onOpenSettings,
+  delayAnimation,
+  expertMode,
+  countrySet,
+}: MainMenuProps) {
   const { bestScores, expertBestScores } = useStatsStore();
-
-  const countrySet = useSettingsStore((s) => s.countrySet);
-  const allowSkips = useSettingsStore((s) => s.allowSkips);
-  const expertMode = useSettingsStore((s) => s.expertMode);
-  const showHints = useSettingsStore((s) => s.showHints);
-  const timerLimit = useSettingsStore((s) => s.timerLimit);
-  const maxTries = useSettingsStore((s) => s.maxTries);
-  const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
-  const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
-  const setCountrySet = useSettingsStore((s) => s.setCountrySet);
-  const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
+  const [copied, setCopied] = useState(false);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
-  const setShowHints = useSettingsStore((s) => s.setShowHints);
-  const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
-  const setMaxTries = useSettingsStore((s) => s.setMaxTries);
-  const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
-  const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
-
-  // Mark as hydrated after mount - using setTimeout to avoid setState in effect
-  useEffect(() => {
-    const timer = setTimeout(() => setHydrated(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Sync expert mode settings - only update if necessary
-  useEffect(() => {
-    if (!expertMode) return;
-
-    // If expert mode is enabled and timer isn't 5 seconds, set it to 5 seconds
-    if (timerLimit !== TIMER_CONFIG.expertModeLimit) {
-      setTimerLimit(TIMER_CONFIG.expertModeLimit);
-    }
-    // If expert mode is enabled and max tries isn't 1, set it to 1
-    if (maxTries !== 1) {
-      setMaxTries(1);
-    }
-  }, [expertMode, timerLimit, maxTries, setTimerLimit, setMaxTries]);
 
   const handleShare = useCallback(() => {
-    // Prevent multiple clicks while animation is playing
     if (copied) return;
 
     const allTotal = GUESSABLE_IDS.size;
-    const normalPercentage = Math.round((bestScores.all / allTotal) * 100);
-    const expertPercentage = Math.round(
+    const normalPercentage = Math.floor((bestScores.all / allTotal) * 100);
+    const expertPercentage = Math.floor(
       (expertBestScores.all / allTotal) * 100,
     );
 
     const makeBar = (percent: number, size = 10) => {
       const clamped = Math.max(0, Math.min(100, percent));
-
       const filled =
         clamped === 100 ? size : Math.floor((clamped / 100) * size);
-
       return "█".repeat(filled) + "░".repeat(size - filled);
     };
 
@@ -574,18 +181,506 @@ export default function StartScreen({
     });
   }, [bestScores.all, expertBestScores.all, copied]);
 
+  const allTotal = GUESSABLE_IDS.size;
+  const hasScores = bestScores.all > 0 || expertBestScores.all > 0;
+
+  // Get current country set name
+  const countrySetName =
+    countrySet === "all"
+      ? "All Countries"
+      : getAvailableCountrySets().find((s) => s.id === countrySet)?.name ||
+        "All Countries";
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+          globe. <br />
+          expert
+        </h1>
+        <p className="text-white/40 text-sm mt-2">Test your geography</p>
+      </div>
+
+      {/* Best Scores Card */}
+      {hasScores && (
+        <BestScoresCard
+          bestScores={bestScores}
+          expertBestScores={expertBestScores}
+          allTotal={allTotal}
+          delayAnimation={delayAnimation}
+          onShare={handleShare}
+          copied={copied}
+        />
+      )}
+
+      {/* Current Mode Badge */}
+      <div className="flex justify-center">
+        <div
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${
+            expertMode
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              : "bg-emerald/10 border-emerald/30 text-emerald"
+          }`}
+        >
+          <button
+            onClick={() => setExpertMode(!expertMode)}
+            className="group flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${expertMode ? "bg-amber-400" : "bg-emerald"} animate-pulse-glow group-hover:scale-125 transition-transform`}
+            />
+            <span className="group-hover:underline">
+              {expertMode ? "Expert Mode" : "Normal Mode"}
+            </span>
+          </button>
+          <span className="text-white/40">·</span>
+          <button
+            onClick={() => onOpenSettings(true)}
+            className="group relative cursor-pointer text-white/60 hover:text-white transition-colors hover:scale-105 px-4"
+          >
+            <span className="absolute left-1 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
+              &lt;
+            </span>
+            <span className="group-hover:underline">{countrySetName}</span>
+            <span className="absolute right-1 top-0 text-white/60 animate-flash-brackets opacity-0 group-hover:opacity-100">
+              &gt;
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Button
+            onClick={onStart}
+            className={`relative font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer bg-emerald hover:bg-emerald/90 text-black overflow-hidden transition-shadow duration-300 ${
+              expertMode
+                ? "hover:shadow-[0_0_20px_rgba(251,191,36,0.5)]"
+                : "hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+            }`}
+          >
+            <span
+              className={`absolute inset-0 bg-gradient-to-r from-amber-500 to-yellow-400 transition-opacity duration-500 ${
+                expertMode ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <span className="relative z-10">
+              {expertMode ? "Start Expert Game" : "Start Game"}
+            </span>
+          </Button>
+        </div>
+
+        {/* Settings Button - Made more prominent */}
+        <button
+          onClick={() => onOpenSettings(false)}
+          className={`group flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl transition-all duration-200 cursor-pointer border ${
+            expertMode
+              ? "border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5"
+              : "border-emerald/20 hover:border-emerald/40 hover:bg-emerald/5"
+          }`}
+        >
+          <SettingsIcon
+            className={`transition-colors ${
+              expertMode
+                ? "text-amber-400/60 group-hover:text-amber-400"
+                : "text-emerald/60 group-hover:text-emerald"
+            }`}
+          />
+          <span
+            className={`text-sm font-medium transition-colors ${
+              expertMode
+                ? "text-amber-400/60 group-hover:text-amber-400"
+                : "text-emerald/60 group-hover:text-emerald"
+            }`}
+          >
+            Game Settings
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Best Scores Card
+// ============================================================================
+
+interface BestScoresCardProps {
+  bestScores: { all: number };
+  expertBestScores: { all: number };
+  allTotal: number;
+  delayAnimation: boolean;
+  onShare: () => void;
+  copied: boolean;
+}
+
+function BestScoresCard({
+  bestScores,
+  expertBestScores,
+  allTotal,
+  delayAnimation,
+  onShare,
+  copied,
+}: BestScoresCardProps) {
+  const normalPercentage = Math.floor((bestScores.all / allTotal) * 100);
+  const expertPercentage = Math.floor((expertBestScores.all / allTotal) * 100);
+  const isPerfectNormal = bestScores.all >= allTotal;
+  const isPerfectExpert = expertBestScores.all >= allTotal;
+  const isPerfectBoth = isPerfectNormal && isPerfectExpert;
+
+  let mainShimmerClass = "";
+  if (isPerfectBoth) {
+    mainShimmerClass =
+      "bg-gradient-to-r from-transparent via-amber-400/20 to-transparent animate-shimmer-gold";
+  } else if (isPerfectExpert) {
+    mainShimmerClass =
+      "bg-gradient-to-r from-transparent via-amber-400/15 to-transparent animate-shimmer-gold";
+  } else if (isPerfectNormal) {
+    mainShimmerClass =
+      "bg-gradient-to-r from-transparent via-emerald/15 to-transparent animate-shimmer-emerald";
+  }
+
+  return (
+    <div className="relative">
+      {/* Share button */}
+      <button
+        onClick={onShare}
+        className="absolute -top-1.5 -right-1.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 transition-all cursor-pointer group z-20"
+        title="Share score"
+      >
+        {copied ? (
+          <svg
+            className="w-3 h-3 text-emerald"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        ) : (
+          <svg
+            className="w-3 h-3 text-white/50 group-hover:text-white/70 transition-colors"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+            />
+          </svg>
+        )}
+        {copied && (
+          <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-emerald text-[10px] font-medium whitespace-nowrap animate-fade-in-out-up">
+            Copied
+          </span>
+        )}
+      </button>
+
+      <div className="relative bg-white/5 rounded-xl p-4 overflow-hidden border border-white/10">
+        {mainShimmerClass && (
+          <div className={`absolute inset-y-0 w-1/2 ${mainShimmerClass}`} />
+        )}
+
+        <div className="relative flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm tracking-wider">Best Score</p>
+            <p className="text-white/40 text-sm mt-0.5">{allTotal} Countries</p>
+          </div>
+          <div className="flex items-center gap-4">
+            {bestScores.all > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse-glow" />
+                <p className="text-emerald text-2xl font-bold tabular-nums">
+                  <AnimatedCounter
+                    value={normalPercentage}
+                    duration={1200}
+                    delayStart={delayAnimation ? 350 : 0}
+                  />
+                  %
+                </p>
+              </div>
+            )}
+            {expertBestScores.all > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
+                <p className="text-amber-400 text-2xl font-bold tabular-nums">
+                  <AnimatedCounter
+                    value={expertPercentage}
+                    duration={1200}
+                    delayStart={delayAnimation ? 350 : 0}
+                  />
+                  %
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Settings View
+// ============================================================================
+
+interface SettingsViewProps {
+  onBack: () => void;
+  expertMode: boolean;
+  highlightCountrySet?: boolean;
+}
+
+function SettingsView({
+  onBack,
+  expertMode,
+  highlightCountrySet = false,
+}: SettingsViewProps) {
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [canScroll, setCanScroll] = useState(false);
+  const [showHighlight, setShowHighlight] = useState(highlightCountrySet);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fade out the highlight after 1.5 seconds
+  useEffect(() => {
+    if (highlightCountrySet) {
+      const timer = setTimeout(() => setShowHighlight(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightCountrySet]);
+
+  const countrySet = useSettingsStore((s) => s.countrySet);
+  const allowSkips = useSettingsStore((s) => s.allowSkips);
+  const showHints = useSettingsStore((s) => s.showHints);
+  const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const maxTries = useSettingsStore((s) => s.maxTries);
+  const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
+  const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
+  const setCountrySet = useSettingsStore((s) => s.setCountrySet);
+  const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
+  const setExpertMode = useSettingsStore((s) => s.setExpertMode);
+  const setShowHints = useSettingsStore((s) => s.setShowHints);
+  const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
+  const setMaxTries = useSettingsStore((s) => s.setMaxTries);
+  const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
+  const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight - target.clientHeight;
+    let progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    if (progress > 99) progress = 100;
+    setScrollProgress(progress);
+  }, []);
+
+  // Check if content is scrollable on mount and resize
+  useEffect(() => {
+    const checkScrollable = () => {
+      if (scrollContainerRef.current) {
+        const { scrollHeight, clientHeight } = scrollContainerRef.current;
+        setCanScroll(scrollHeight > clientHeight);
+      }
+    };
+
+    checkScrollable();
+    window.addEventListener("resize", checkScrollable);
+    return () => window.removeEventListener("resize", checkScrollable);
+  }, []);
+
+  return (
+    <div className="relative flex flex-col" style={{ maxHeight: "50vh" }}>
+      {/* Scroll indicator - absolutely positioned bottom right */}
+      {canScroll && scrollProgress < 95 && (
+        <div className="absolute bottom-8 right-0 z-10 animate-bounce pointer-events-none">
+          <div className="flex flex-col items-center text-white/40">
+            <ChevronDown className="w-4 h-4 -mb-1.5" />
+            <ChevronDown className="w-4 h-4 opacity-50" />
+          </div>
+        </div>
+      )}
+
+      {/* Header with back button */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className={`flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg transition-colors cursor-pointer ${
+            expertMode
+              ? "text-amber-400/70 hover:text-amber-400 hover:bg-amber-500/10"
+              : "text-emerald/70 hover:text-emerald hover:bg-emerald/10"
+          }`}
+        >
+          <BackIcon />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+        <h2 className="text-white/80 text-sm font-medium tracking-wide uppercase">
+          Settings
+        </h2>
+        <div className="w-16" /> {/* Spacer for centering */}
+      </div>
+
+      {/* Scroll progress indicator */}
+      <div className="relative h-1 bg-white/10 mt-3 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-emerald to-amber-400"
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
+
+      {/* Scrollable content */}
+      <div
+        ref={scrollContainerRef}
+        className="space-y-4 text-left overflow-y-auto pt-3 pb-4 px-1 flex-1 scrollbar-hide"
+        style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}
+        onScroll={handleScroll}
+      >
+        <div className="relative">
+          {/* Background highlight glow */}
+          <div
+            className={`absolute inset-0 -m-2 bg-emerald/20 blur-lg transition-opacity duration-900 ${
+              showHighlight ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          <CountrySetSelect
+            value={countrySet}
+            onChange={setCountrySet}
+            expertMode={expertMode}
+          />
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+            Camera Controls
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Slider
+              label="Zoom"
+              value={zoomSpeed}
+              onChange={setZoomSpeed}
+              min={0.1}
+              max={1.0}
+              displayMin={0.1}
+              displayMax={2.0}
+              step={0.1}
+              expertMode={expertMode}
+            />
+            <Slider
+              label="Rotate"
+              value={rotateSpeed}
+              onChange={setRotateSpeed}
+              min={0.1}
+              max={2.0}
+              step={0.1}
+              expertMode={expertMode}
+            />
+          </div>
+        </div>
+
+        <TimerLimitSelect
+          value={timerLimit}
+          onChange={setTimerLimit}
+          disabled={expertMode}
+          expertMode={expertMode}
+        />
+
+        <MaxTriesSelect
+          value={maxTries}
+          onChange={setMaxTries}
+          disabled={expertMode}
+          expertMode={expertMode}
+        />
+
+        <div className="space-y-2">
+          <p className="text-white/50 text-xs uppercase tracking-wider px-1">
+            Game Options
+          </p>
+          <div className="space-y-2">
+            <Toggle
+              enabled={allowSkips}
+              onChange={setAllowSkips}
+              label="Allow Skips"
+              description="Navigate between countries freely"
+              disabled={expertMode}
+            />
+            <Toggle
+              enabled={showHints}
+              onChange={setShowHints}
+              label="Show Hints"
+              description="Display country names on incorrect guesses"
+              disabled={expertMode}
+            />
+            <Toggle
+              enabled={expertMode}
+              onChange={setExpertMode}
+              label="Expert Mode"
+              description="One wrong click ends the game"
+              variant="gold"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-white/10">
+        <p className="pt-4 text-white/20 text-xs font-mono text-center">
+          {getAppVersion()}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main StartScreen Component
+// ============================================================================
+
+export default function StartScreen({
+  onStart,
+  delayAnimation = false,
+}: StartScreenProps) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [highlightCountrySet, setHighlightCountrySet] = useState(false);
+  const lastEscapePress = useRef<number>(0);
+
+  const countrySet = useSettingsStore((s) => s.countrySet);
+  const expertMode = useSettingsStore((s) => s.expertMode);
+  const timerLimit = useSettingsStore((s) => s.timerLimit);
+  const maxTries = useSettingsStore((s) => s.maxTries);
+  const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
+  const setMaxTries = useSettingsStore((s) => s.setMaxTries);
+
+  // Sync expert mode settings
+  useEffect(() => {
+    if (!expertMode) return;
+
+    if (timerLimit !== TIMER_CONFIG.expertModeLimit) {
+      setTimerLimit(TIMER_CONFIG.expertModeLimit);
+    }
+    if (maxTries !== 1) {
+      setMaxTries(1);
+    }
+  }, [expertMode, timerLimit, maxTries, setTimerLimit, setMaxTries]);
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && showSettings) {
         e.preventDefault();
-
-        // Debounce: only allow close if at least 300ms has passed since last press
         const now = Date.now();
-        if (now - lastEscapePress.current < 300) {
-          return;
-        }
+        if (now - lastEscapePress.current < 300) return;
         lastEscapePress.current = now;
-
         setShowSettings(false);
       } else if (e.key === "Enter" && !showSettings) {
         e.preventDefault();
@@ -596,302 +691,33 @@ export default function StartScreen({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showSettings, onStart]);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const scrollTop = target.scrollTop;
-    const scrollHeight = target.scrollHeight - target.clientHeight;
-    let progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
-    // Treat anything above 99% as fully scrolled to account for floating point precision
-    if (progress > 99) progress = 100;
-    setScrollProgress(progress);
-  }, []);
-
-  // Reset scroll progress based on showSettings state - derived value approach
-  const displayScrollProgress = showSettings ? scrollProgress : 0;
-
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
       <div
-        className={`animate-fade-in-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center mx-4 w-full ${
-          showSettings ? "max-w-md" : "max-w-sm"
-        }`}
+        className={`bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-10 text-center mx-4 w-full ${showSettings ? "max-w-md" : "max-w-sm"}`}
       >
         {showSettings ? (
-          <> </>
+          <SettingsView
+            key="settings"
+            onBack={() => {
+              setShowSettings(false);
+              setHighlightCountrySet(false);
+            }}
+            expertMode={expertMode}
+            highlightCountrySet={highlightCountrySet}
+          />
         ) : (
-          <>
-            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
-              globe. <br />
-              expert
-            </h1>
-            <p className="text-white/40 text-sm mt-2 mb-6">
-              Test your geography
-            </p>
-          </>
-        )}
-
-        {hydrated &&
-          (bestScores.all > 0 || expertBestScores.all > 0) &&
-          !showSettings &&
-          (() => {
-            const allTotal = GUESSABLE_IDS.size;
-            const normalPercentage = Math.round(
-              (bestScores.all / allTotal) * 100,
-            );
-            const expertPercentage = Math.round(
-              (expertBestScores.all / allTotal) * 100,
-            );
-            const isPerfectNormal = normalPercentage === 100;
-            const isPerfectExpert = expertPercentage === 100;
-            const isPerfectBoth = isPerfectNormal && isPerfectExpert;
-
-            let borderClass = "";
-            if (isPerfectBoth) {
-              borderClass =
-                "border-2 border-amber-400 shadow-lg shadow-amber-400/30";
-            } else if (isPerfectExpert) {
-              borderClass =
-                "border-2 border-amber-400/60 shadow-lg shadow-amber-400/20";
-            } else if (isPerfectNormal) {
-              borderClass =
-                "border-2 border-emerald shadow-lg shadow-emerald/30";
-            } else {
-              borderClass = "border border-white/10";
-            }
-
-            return (
-              <div className="relative mb-6">
-                {/* Share button - badge style overlay in top right */}
-                <button
-                  onClick={handleShare}
-                  className="absolute -top-1.5 -right-1.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 transition-all cursor-pointer group z-20"
-                  style={{ pointerEvents: "auto" }}
-                  title="Share score"
-                >
-                  {copied ? (
-                    <svg
-                      className="w-3 h-3 text-emerald"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-3 h-3 text-white/50 group-hover:text-white/70 transition-colors"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                      />
-                    </svg>
-                  )}
-                  {/* Minimal copied indicator */}
-                  {copied && (
-                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-emerald text-[10px] font-medium whitespace-nowrap animate-fade-in-out-up">
-                      Copied
-                    </span>
-                  )}
-                </button>
-
-                <div
-                  className={`relative bg-white/5 rounded-xl p-4 overflow-hidden ${borderClass}`}
-                >
-                  {/* Animated background shimmer for perfect scores */}
-                  {(isPerfectNormal || isPerfectExpert) && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
-                  )}
-
-                  <div className="relative flex items-center justify-between">
-                    <div>
-                      <p className="text-white text-sm tracking-wider">
-                        Best Score
-                      </p>
-                      <p className="text-white/40 text-sm mt-0.5">
-                        {allTotal} Countries
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {bestScores.all > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse-glow" />
-                          <p className="text-emerald text-2xl font-bold tabular-nums">
-                            <AnimatedCounter
-                              value={normalPercentage}
-                              duration={1200}
-                              delayStart={delayAnimation ? 350 : 0}
-                            />
-                            %
-                          </p>
-                        </div>
-                      )}
-                      {expertBestScores.all > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
-                          <p className="text-amber-400 text-2xl font-bold tabular-nums">
-                            <AnimatedCounter
-                              value={expertPercentage}
-                              duration={1200}
-                              delayStart={delayAnimation ? 350 : 0}
-                            />
-                            %
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-        {showSettings ? (
-          <div className="relative flex flex-col" style={{ maxHeight: "42vh" }}>
-            {/* Scroll progress bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-emerald to-amber-400"
-                style={{ width: `${displayScrollProgress}%` }}
-              />
-            </div>
-
-            {/* Scrollable content */}
-            <div
-              className="space-y-4 text-left overflow-y-auto pt-4 pb-2 px-1 flex-1 scrollbar-hide"
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
-              onScroll={handleScroll}
-            >
-              <GameModeSelect
-                value={countrySet}
-                onChange={setCountrySet}
-                expertMode={expertMode}
-              />
-
-              <div className="space-y-3">
-                <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-                  Camera Controls
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Slider
-                    label="Zoom"
-                    value={zoomSpeed}
-                    onChange={setZoomSpeed}
-                    min={0.1}
-                    max={1.0}
-                    displayMin={0.1}
-                    displayMax={2.0}
-                    step={0.1}
-                    expertMode={expertMode}
-                  />
-                  <Slider
-                    label="Rotate"
-                    value={rotateSpeed}
-                    onChange={setRotateSpeed}
-                    min={0.1}
-                    max={2.0}
-                    step={0.1}
-                    expertMode={expertMode}
-                  />
-                </div>
-              </div>
-
-              <TimerLimitSelect
-                value={timerLimit}
-                onChange={setTimerLimit}
-                disabled={expertMode}
-                expertMode={expertMode}
-              />
-
-              <MaxTriesSelect
-                value={maxTries}
-                onChange={setMaxTries}
-                disabled={expertMode}
-                expertMode={expertMode}
-              />
-
-              <div className="space-y-2">
-                <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-                  Game Options
-                </p>
-                <div className="space-y-2">
-                  <Toggle
-                    enabled={allowSkips}
-                    onChange={setAllowSkips}
-                    label="Allow Skips"
-                    description="Navigate between countries freely"
-                    disabled={expertMode}
-                  />
-                  <Toggle
-                    enabled={showHints}
-                    onChange={setShowHints}
-                    label="Show Hints"
-                    description="Display country names on incorrect guesses"
-                    disabled={expertMode}
-                  />
-                  <Toggle
-                    enabled={expertMode}
-                    onChange={setExpertMode}
-                    label="Expert Mode"
-                    description="One wrong click ends the game"
-                    variant="gold"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Fixed back button */}
-            <button
-              onClick={() => setShowSettings(false)}
-              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full text-center p-2 border-t border-white/10 cursor-pointer"
-            >
-              Back
-            </button>
-            <p className="text-white/20 text-xs font-mono text-center">
-              {getAppVersion()}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Button
-                onClick={onStart}
-                className={`font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer ${
-                  expertMode
-                    ? "bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black"
-                    : "bg-emerald hover:bg-emerald/90 text-black"
-                }`}
-              >
-                {expertMode ? "Start Expert Game" : "Start Game"}
-              </Button>
-              <p className="text-white/30 text-xs text-center">
-                {countrySet === "all"
-                  ? "all countries"
-                  : getAvailableCountrySets()
-                      .find((s) => s.id === countrySet)
-                      ?.name.toLowerCase() || "all countries"}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="text-white/40 hover:text-white/60 text-sm transition-colors w-full cursor-pointer"
-            >
-              Settings
-            </button>
-          </div>
+          <MainMenu
+            key="menu"
+            onStart={onStart}
+            onOpenSettings={(highlight) => {
+              setShowSettings(true);
+              setHighlightCountrySet(highlight ?? false);
+            }}
+            delayAnimation={delayAnimation}
+            expertMode={expertMode}
+            countrySet={countrySet}
+          />
         )}
       </div>
     </div>
