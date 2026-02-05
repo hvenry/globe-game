@@ -145,6 +145,7 @@ function MainMenu({
 }: MainMenuProps) {
   const { bestScores, expertBestScores } = useStatsStore();
   const [copied, setCopied] = useState(false);
+  const setExpertMode = useSettingsStore((s) => s.setExpertMode);
 
   const handleShare = useCallback(() => {
     if (copied) return;
@@ -222,10 +223,17 @@ function MainMenu({
               : "bg-emerald/10 border-emerald/30 text-emerald"
           }`}
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${expertMode ? "bg-amber-400" : "bg-emerald"} animate-pulse-glow`}
-          />
-          {expertMode ? "Expert Mode" : "Normal Mode"}
+          <button
+            onClick={() => setExpertMode(!expertMode)}
+            className="group flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${expertMode ? "bg-amber-400" : "bg-emerald"} animate-pulse-glow group-hover:scale-125 transition-transform`}
+            />
+            <span className="group-hover:underline">
+              {expertMode ? "Expert Mode" : "Normal Mode"}
+            </span>
+          </button>
           <span className="text-white/40">·</span>
           <button
             onClick={() => onOpenSettings(true)}
@@ -244,16 +252,25 @@ function MainMenu({
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        <Button
-          onClick={onStart}
-          className={`font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer ${
-            expertMode
-              ? "bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black"
-              : "bg-emerald hover:bg-emerald/90 text-black"
-          }`}
-        >
-          {expertMode ? "Start Expert Game" : "Start Game"}
-        </Button>
+        <div className="relative">
+          <Button
+            onClick={onStart}
+            className={`relative font-semibold px-8 py-3 text-lg rounded-xl w-full cursor-pointer bg-emerald hover:bg-emerald/90 text-black overflow-hidden transition-shadow duration-300 ${
+              expertMode
+                ? "hover:shadow-[0_0_20px_rgba(251,191,36,0.5)]"
+                : "hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+            }`}
+          >
+            <span
+              className={`absolute inset-0 bg-gradient-to-r from-amber-500 to-yellow-400 transition-opacity duration-500 ${
+                expertMode ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <span className="relative z-10">
+              {expertMode ? "Start Expert Game" : "Start Game"}
+            </span>
+          </Button>
+        </div>
 
         {/* Settings Button - Made more prominent */}
         <button
