@@ -8,6 +8,8 @@ import Image from "next/image";
 import { formatTime, formatScore } from "@/lib/utils";
 import { getFlagPath } from "@/lib/geo/iso-codes";
 import ScoreCard, { countResolutions } from "./ResolutionBreakdown";
+import { getCountrySet } from "@/lib/geo/country-sets";
+import { Timer } from "lucide-react";
 
 interface GameOverProps {
   onPlayAgain: () => void;
@@ -91,6 +93,9 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
     failed: failedCount,
   } = countResolutions(resolvedCountries);
 
+  const countrySet = getCountrySet(countrySetId);
+  const progress = Math.round((questionsCorrect / totalCountries) * 100);
+
   useEffect(() => {
     if (!recorded.current) {
       recorded.current = true;
@@ -130,83 +135,148 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
         )}
 
         {expertMode ? (
-          <div className="mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-            <div className="flex items-center justify-between">
-              <div className="text-left">
-                <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
-                  Best
-                </p>
-                <p className="text-amber-400/30 text-lg font-bold tabular-nums">
-                  {formatScore(
-                    snapshot.previousExpertBestScore / totalCountries,
-                  )}
-                  %
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
-                  {isNewExpertBest ? (
-                    <span className="text-amber-400">New Best!</span>
-                  ) : (
-                    "Score"
-                  )}
-                </p>
-                <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-3xl md:text-4xl font-bold tabular-nums">
-                  <AnimatedCounter value={expertPercentage} duration={1200} />%
-                </p>
-              </div>
+          <div className="mt-4 mb-4 space-y-3">
+            {/* Game Mode Badge */}
+            <div className="flex items-center justify-center gap-2 py-2 px-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <p className="text-amber-400/80 text-xs uppercase tracking-widest font-semibold">
+                Expert Mode: {countrySet.name}
+              </p>
             </div>
 
+            {/* Failed Country Info - Only shown when game ends on a failed question */}
             {lastResolution === "failed" &&
               currentCountry &&
               lastClickedCountryName &&
               lastClickedCountryId && (
-                <div className="border-t border-amber-500/10 pt-2 mt-2 space-y-2 text-center">
-                  <div>
-                    <p className="text-red-400/50 text-xs uppercase tracking-wider mb-0.5">
-                      Guessed
-                    </p>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Image
-                        src={getFlagPath(lastClickedCountryId)}
-                        alt=""
-                        width={16}
-                        height={12}
-                        className="w-4 h-3 object-cover rounded-xs shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                      <p className="text-red-400/80 text-sm font-medium">
-                        {lastClickedCountryName}
+                <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3">
+                  <div className="flex flex-wrap items-start justify-center gap-x-4 gap-y-2">
+                    <div className="flex-shrink-0 text-center">
+                      <p className="text-red-400/50 text-xs uppercase tracking-wider mb-0.5">
+                        Guessed
                       </p>
+                      <div className="flex items-center gap-1.5">
+                        <Image
+                          src={getFlagPath(lastClickedCountryId)}
+                          alt=""
+                          width={16}
+                          height={12}
+                          className="w-4 h-3 object-cover rounded-xs shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                        <p className="text-red-400/80 text-sm font-medium">
+                          {lastClickedCountryName}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-emerald-400/50 text-xs uppercase tracking-wider mb-0.5">
-                      Answer
-                    </p>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Image
-                        src={getFlagPath(currentCountry.id)}
-                        alt=""
-                        width={16}
-                        height={12}
-                        className="w-4 h-3 object-cover rounded-xs shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                      <p className="text-emerald-400 text-sm font-medium">
-                        {currentCountry.name}
+                    <div className="flex-shrink-0 text-center">
+                      <p className="text-emerald-400/50 text-xs uppercase tracking-wider mb-0.5">
+                        Answer
                       </p>
+                      <div className="flex items-center gap-1.5">
+                        <Image
+                          src={getFlagPath(currentCountry.id)}
+                          alt=""
+                          width={16}
+                          height={12}
+                          className="w-4 h-3 object-cover rounded-xs shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                        <p className="text-emerald-400 text-sm font-medium">
+                          {currentCountry.name}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
+            {/* Progress Section */}
+            <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-amber-400 text-2xl font-bold tabular-nums tracking-tight">
+                  {questionsCorrect}
+                  <span className="text-amber-400/40 mx-1.5">/</span>
+                  {totalCountries}
+                </p>
+                {gameStartTime !== null && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 rounded-md border border-amber-500/20">
+                    <Timer className="w-3 h-3 text-amber-400/70" />
+                    <p className="text-amber-400/70 text-sm font-medium tabular-nums">
+                      {formatTime(snapshot.elapsedSeconds)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="w-full rounded-full h-2 bg-amber-500/20 overflow-hidden">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500 shadow-[0_0_8px_rgba(251,191,36,0.4)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Score Section */}
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
+                    Best
+                  </p>
+                  <p className="text-amber-400/30 text-lg font-bold tabular-nums">
+                    {formatScore(
+                      snapshot.previousExpertBestScore / totalCountries,
+                    )}
+                    %
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-amber-400/25 text-[10px] uppercase tracking-wider">
+                    {isNewExpertBest ? (
+                      <span className="text-amber-400">New Best!</span>
+                    ) : (
+                      "Score"
+                    )}
+                  </p>
+                  <p className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 text-3xl md:text-4xl font-bold tabular-nums">
+                    <AnimatedCounter value={expertPercentage} duration={1200} />
+                    %
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="mt-4 mb-4">
+          <div className="mt-4 mb-4 space-y-3">
+            {/* Progress Section */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-white text-2xl font-bold tabular-nums tracking-tight">
+                  {questionsCorrect}
+                  <span className="text-white/40 mx-1.5">/</span>
+                  {totalCountries}
+                </p>
+                {gameStartTime !== null && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-md border border-white/10">
+                    <Timer className="w-3 h-3 text-white/60" />
+                    <p className="text-white/60 text-sm font-medium tabular-nums">
+                      {formatTime(snapshot.elapsedSeconds)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="w-full rounded-full h-2 bg-white/10 overflow-hidden">
+                <div
+                  className="h-2 rounded-full bg-emerald transition-all duration-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Score Card */}
             <ScoreCard
               scoreContent={
                 <span className={isPerfectScore ? "text-emerald" : ""}>
@@ -222,21 +292,6 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
           </div>
         )}
 
-        {gameStartTime !== null &&
-          (expertMode ? (
-            <p className="text-amber-400/30 text-xs tabular-nums mb-4">
-              Time: {formatTime(snapshot.elapsedSeconds)}
-            </p>
-          ) : (
-            <div className="my-4 rounded-lg p-3 bg-white/5 border border-white/10">
-              <p className="text-white/40 text-xs uppercase tracking-wider">
-                Total Time
-              </p>
-              <p className="text-white text-2xl font-bold tabular-nums mt-1">
-                {formatTime(snapshot.elapsedSeconds)}
-              </p>
-            </div>
-          ))}
 
         <div className="space-y-3">
           <Button
