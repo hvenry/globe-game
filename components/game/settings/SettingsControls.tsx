@@ -33,30 +33,30 @@ export function Toggle({
   return (
     <button
       onClick={() => !disabled && onChange(!enabled)}
-      className={`flex items-center justify-between w-full p-3 rounded-lg transition-all duration-200 ${
+      className={`flex w-full items-center justify-between rounded-control border p-3 transition-all duration-200 ${
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
       } ${
         isGold
           ? enabled
-            ? "bg-amber-500/15 border border-amber-500/50"
-            : "bg-white/5 hover:bg-white/10 border border-amber-500/20"
+            ? "border-expert/50 bg-expert-soft"
+            : "border-hairline bg-well hover:border-expert/30"
           : disabled
-            ? "bg-white/5 border border-transparent"
-            : "bg-white/5 hover:bg-white/10 border border-transparent"
+            ? "border-transparent bg-well"
+            : "border-hairline bg-well hover:border-hairline-strong"
       }`}
     >
       <div className="text-left">
         <p
           className={`text-sm font-medium ${
-            isGold && enabled ? "text-amber-400" : "text-white"
+            isGold && enabled ? "text-expert-ink" : "text-hi"
           }`}
         >
           {label}
         </p>
         {description && (
           <p
-            className={`text-xs mt-0.5 ${
-              isGold && enabled ? "text-amber-400/60" : "text-white/40"
+            className={`mt-0.5 text-xs ${
+              isGold && enabled ? "text-expert-ink/60" : "text-low"
             }`}
           >
             {description}
@@ -64,18 +64,14 @@ export function Toggle({
         )}
       </div>
       <div
-        className={`w-10 h-6 rounded-full transition-all duration-200 relative ${
-          enabled
-            ? isGold
-              ? "bg-gradient-to-r from-amber-500 to-yellow-400"
-              : "bg-emerald"
-            : "bg-white/20"
+        className={`relative h-5 w-9 rounded-full transition-all duration-200 ${
+          enabled ? (isGold ? "bg-expert" : "bg-signal") : "bg-hairline-strong"
         }`}
       >
         <div
-          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+          className={`absolute top-1 h-3 w-3 rounded-full bg-ground transition-transform ${
             enabled ? "translate-x-5" : "translate-x-1"
-          } ${isGold && enabled ? "shadow-lg" : ""}`}
+          }`}
         />
       </div>
     </button>
@@ -109,8 +105,8 @@ export function Slider({
   displayMax,
   expertMode = false,
 }: SliderProps) {
-  const actualMin = displayMin !== undefined ? min : min;
-  const actualMax = displayMax !== undefined ? max : max;
+  const actualMin = min;
+  const actualMax = max;
   const dispMin = displayMin ?? min;
   const dispMax = displayMax ?? max;
 
@@ -134,16 +130,16 @@ export function Slider({
   const displayProgress =
     ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
 
-  const fillColor = expertMode ? "rgb(251, 191, 36)" : "rgb(16, 185, 129)";
-  const accentClass = expertMode ? "accent-amber-400" : "accent-emerald";
+  const fillColor = expertMode
+    ? "var(--color-expert)"
+    : "var(--color-signal)";
+  const accentClass = expertMode ? "accent-expert" : "accent-signal";
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between px-1">
-        <p className="text-white/60 text-xs">{label}</p>
-        <p className="text-white/40 text-xs tabular-nums">
-          {displayValue.toFixed(1)}x
-        </p>
+        <p className="text-xs text-mid">{label}</p>
+        <p className="readout text-xs text-low">{displayValue.toFixed(1)}x</p>
       </div>
       <input
         type="range"
@@ -152,12 +148,50 @@ export function Slider({
         step={step}
         value={displayValue}
         onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
-        className={`w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer ${accentClass} hover:bg-white/15 transition-colors`}
+        className={`h-1.5 w-full cursor-pointer appearance-none rounded-full bg-hairline ${accentClass} transition-colors`}
         style={{
-          background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, rgba(255, 255, 255, 0.1) ${displayProgress}%, rgba(255, 255, 255, 0.1) 100%)`,
+          background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, var(--color-hairline) ${displayProgress}%, var(--color-hairline) 100%)`,
         }}
       />
     </div>
+  );
+}
+
+// ============================================================================
+// Shared option-grid button
+// ============================================================================
+
+function OptionButton({
+  selected,
+  expertStyled,
+  disabled,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  expertStyled: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={() => !disabled && onClick()}
+      disabled={disabled}
+      className={`flex min-h-8 items-center justify-center rounded-control border p-2 text-center transition-all duration-200 ${
+        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+      } ${
+        expertStyled
+          ? selected
+            ? "border-expert/50 bg-expert-soft"
+            : "border-expert/20 bg-well"
+          : selected
+            ? "border-signal/50 bg-signal-soft"
+            : "border-hairline bg-well hover:border-hairline-strong"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -181,50 +215,36 @@ export function MaxTriesSelect({
   const options = [1, 2, 3, 4, 5];
 
   return (
-    <div className="space-y-2">
-      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-        Max Tries
-      </p>
+    <div className="space-y-3">
+      <p className="hud-rule hud-label">Max tries</p>
       <div className="grid grid-cols-5 gap-2">
         {options.map((tries) => {
           const isSelected = value === tries;
-          const is1Try = tries === 1;
-          const useExpertStyling = expertMode && is1Try;
+          const useExpertStyling = expertMode && tries === 1;
 
           return (
-            <button
+            <OptionButton
               key={tries}
-              onClick={() => !disabled && onChange(tries)}
+              selected={isSelected}
+              expertStyled={useExpertStyling}
               disabled={disabled}
-              className={`p-2 rounded-lg text-center transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
-                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                useExpertStyling
-                  ? isSelected
-                    ? "bg-amber-500/15 border border-amber-500/50"
-                    : "bg-white/5 border border-amber-500/20"
-                  : isSelected
-                    ? "bg-emerald/20 border border-emerald/50"
-                    : "bg-white/5 hover:bg-white/10 border border-transparent"
-              }`}
+              onClick={() => onChange(tries)}
             >
               <div className="flex gap-0.5">
                 {Array.from({ length: tries }).map((_, i) => (
                   <div
                     key={i}
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      useExpertStyling
-                        ? isSelected
-                          ? "bg-amber-400"
-                          : "bg-white/40"
-                        : isSelected
-                          ? "bg-emerald"
-                          : "bg-white/40"
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isSelected
+                        ? useExpertStyling
+                          ? "bg-expert"
+                          : "bg-signal"
+                        : "bg-low"
                     }`}
                   />
                 ))}
               </div>
-            </button>
+            </OptionButton>
           );
         })}
       </div>
@@ -258,47 +278,33 @@ export function TimerLimitSelect({
   ];
 
   return (
-    <div className="space-y-2">
-      <p className="text-white/50 text-xs uppercase tracking-wider px-1">
-        Time Restriction
-      </p>
+    <div className="space-y-3">
+      <p className="hud-rule hud-label">Time limit</p>
       <div className="grid grid-cols-5 gap-2">
         {options.map((option) => {
           const isSelected = value === option.value;
-          const is5Second = option.value === 5;
-          const useExpertStyling = expertMode && is5Second;
+          const useExpertStyling = expertMode && option.value === 5;
 
           return (
-            <button
+            <OptionButton
               key={option.label}
-              onClick={() => !disabled && onChange(option.value)}
+              selected={isSelected}
+              expertStyled={useExpertStyling}
               disabled={disabled}
-              className={`p-2 rounded-lg text-center transition-all duration-200 ${
-                disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-              } ${
-                useExpertStyling
-                  ? isSelected
-                    ? "bg-amber-500/15 border border-amber-500/50"
-                    : "bg-white/5 border border-amber-500/20"
-                  : isSelected
-                    ? "bg-emerald/20 border border-emerald/50"
-                    : "bg-white/5 hover:bg-white/10 border border-transparent"
-              }`}
+              onClick={() => onChange(option.value)}
             >
               <p
-                className={`text-xs font-medium ${
-                  useExpertStyling
-                    ? isSelected
-                      ? "text-amber-400"
-                      : "text-white"
-                    : isSelected
-                      ? "text-emerald"
-                      : "text-white"
+                className={`readout text-xs font-medium ${
+                  isSelected
+                    ? useExpertStyling
+                      ? "text-expert-ink"
+                      : "text-signal"
+                    : "text-mid"
                 }`}
               >
                 {option.label}
               </p>
-            </button>
+            </OptionButton>
           );
         })}
       </div>
@@ -307,7 +313,7 @@ export function TimerLimitSelect({
 }
 
 // ============================================================================
-// CountrySetSelect Component (formerly GameModeSelect)
+// CountrySetSelect Component
 // ============================================================================
 
 interface CountrySetSelectProps {
@@ -322,7 +328,8 @@ export function CountrySetSelect({
   expertMode,
 }: CountrySetSelectProps) {
   const availableSets = getAvailableCountrySets();
-  const { bestScores, expertBestScores } = useStatsStore();
+  const bestScores = useStatsStore((s) => s.bestScores);
+  const expertBestScores = useStatsStore((s) => s.expertBestScores);
 
   const getSetTotal = (setId: CountrySetId): number => {
     const set = availableSets.find((s) => s.id === setId);
@@ -333,11 +340,7 @@ export function CountrySetSelect({
   const continentSets = availableSets.filter((s) => s.id !== "all");
 
   const handleContinentClick = (setId: CountrySetId) => {
-    if (value === setId) {
-      onChange("all");
-    } else {
-      onChange(setId);
-    }
+    onChange(value === setId ? "all" : setId);
   };
 
   const renderSetButton = (set: (typeof availableSets)[0]) => {
@@ -353,92 +356,73 @@ export function CountrySetSelect({
     const isSelected = value === set.id;
     const isPerfectNormal = total > 0 && normalBestScore >= total;
     const isPerfectExpert = total > 0 && expertBestScore >= total;
-    const isPerfectBoth = isPerfectNormal && isPerfectExpert;
 
-    let borderClass = "";
-    if (expertMode) {
-      borderClass = isSelected
-        ? "border-2 border-amber-500/60 shadow-lg shadow-amber-500/20"
-        : "border-2 border-white/5 hover:border-amber-500/30";
-    } else {
-      borderClass = isSelected
-        ? "border-2 border-emerald/60 shadow-lg shadow-emerald/20"
-        : "border-2 border-white/5 hover:border-emerald/30";
-    }
+    const borderClass = expertMode
+      ? isSelected
+        ? "border-expert/60"
+        : "border-hairline hover:border-expert/30"
+      : isSelected
+        ? "border-signal/60"
+        : "border-hairline hover:border-signal/30";
 
     let shimmerClass = "";
-    if (isPerfectBoth) {
+    if (isPerfectExpert) {
       shimmerClass =
-        "bg-gradient-to-r from-transparent via-amber-400/20 to-transparent animate-shimmer-gold";
-    } else if (isPerfectExpert) {
-      shimmerClass =
-        "bg-gradient-to-r from-transparent via-amber-400/15 to-transparent animate-shimmer-gold";
+        "bg-gradient-to-r from-transparent via-expert/15 to-transparent animate-shimmer-gold";
     } else if (isPerfectNormal) {
       shimmerClass =
-        "bg-gradient-to-r from-transparent via-emerald/15 to-transparent animate-shimmer-emerald";
+        "bg-gradient-to-r from-transparent via-signal/15 to-transparent animate-shimmer-signal";
     }
 
     return (
       <button
         key={set.id}
         onClick={() => handleContinentClick(set.id)}
-        className={`group relative p-3 rounded-xl text-left transition-all duration-300 cursor-pointer transform hover:scale-[1.02] ${borderClass} ${
-          expertMode
-            ? isSelected
-              ? "bg-[#1a1a1a] bg-gradient-to-br from-amber-500/20 to-amber-600/10"
-              : "bg-[#0a0a0a] hover:bg-[#111]"
-            : isSelected
-              ? "bg-[#1a1a1a] bg-gradient-to-br from-emerald/25 to-emerald/10"
-              : "bg-[#0a0a0a] hover:bg-[#111]"
+        className={`group relative rounded-control border p-3 text-left transition-all duration-200 cursor-pointer ${borderClass} ${
+          isSelected
+            ? expertMode
+              ? "bg-expert-soft"
+              : "bg-signal-soft"
+            : "bg-well hover:bg-panel"
         }`}
       >
-        <div
-          className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-            expertMode
-              ? "bg-gradient-to-br from-amber-500/5 to-transparent"
-              : "bg-gradient-to-br from-emerald/5 to-transparent"
-          }`}
-        />
-
         {shimmerClass && (
-          <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-control">
             <div className={`absolute inset-y-0 w-1/2 ${shimmerClass}`} />
           </div>
         )}
 
-        <div className="relative flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
+        {/* Two narrow columns on mobile leave no room for a score beside the
+            name, so it drops below the count and lays out as a row instead */}
+        <div className="relative flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-2">
+          <div className="min-w-0 flex-1">
             <p
-              className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${
-                expertMode
-                  ? isSelected
-                    ? "text-amber-400"
-                    : "text-white group-hover:text-amber-300"
-                  : isSelected
-                    ? "text-emerald"
-                    : "text-white group-hover:text-emerald-300"
+              className={`mb-0.5 text-sm font-medium transition-colors duration-200 ${
+                isSelected
+                  ? expertMode
+                    ? "text-expert-ink"
+                    : "text-signal"
+                  : "text-hi"
               }`}
             >
               {set.name}
             </p>
-            <p className="text-white/50 text-[11px] leading-tight">
-              {total} countries
-            </p>
+            <p className="readout text-label text-faint">{total} countries</p>
           </div>
           {(hasNormalScore || hasExpertScore) && (
-            <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <div className="flex shrink-0 flex-row items-center gap-2.5 md:flex-col md:items-end md:gap-0.5">
               {hasNormalScore && (
                 <div className="flex items-center gap-1">
-                  <div className="w-1 h-1 rounded-full bg-emerald animate-pulse-glow" />
-                  <p className="text-emerald text-xs font-bold tabular-nums">
+                  <div className="h-1 w-1 rounded-full bg-signal animate-pulse-glow" />
+                  <p className="readout text-xs font-medium text-signal">
                     {normalPercentage}%
                   </p>
                 </div>
               )}
               {hasExpertScore && (
                 <div className="flex items-center gap-1">
-                  <div className="w-1 h-1 rounded-full bg-amber-400 animate-pulse-glow" />
-                  <p className="text-amber-400 text-xs font-bold tabular-nums">
+                  <div className="h-1 w-1 rounded-full bg-expert animate-pulse-glow" />
+                  <p className="readout text-xs font-medium text-expert-ink">
                     {expertPercentage}%
                   </p>
                 </div>
@@ -451,17 +435,8 @@ export function CountrySetSelect({
   };
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-white/50 text-xs uppercase tracking-wider">
-          Country Set
-        </p>
-        {value !== "all" && (
-          <p className="text-white/30 text-[10px] italic">
-            (Click again to deselect)
-          </p>
-        )}
-      </div>
+    <div className="space-y-3">
+      <p className="hud-rule hud-label">Country set</p>
       <div className="grid grid-cols-2 gap-2">
         {continentSets.map((set) => renderSetButton(set))}
       </div>

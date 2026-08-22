@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CountrySetId } from "@/lib/geo/country-sets";
+import { TIMER_CONFIG, type ThemeMode } from "@/lib/constants";
 
 interface SettingsState {
+  // Appearance
+  theme: ThemeMode;
+
   // Game mode settings
   countrySet: CountrySetId;
   allowSkips: boolean;
@@ -22,6 +26,7 @@ interface SettingsState {
   preExpertMaxTries: number;
 
   // Actions
+  setTheme: (theme: ThemeMode) => void;
   setCountrySet: (set: CountrySetId) => void;
   setAllowSkips: (allow: boolean) => void;
   setExpertMode: (expert: boolean) => void;
@@ -35,6 +40,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
+      theme: "dark",
       countrySet: "all",
       allowSkips: true,
       expertMode: false,
@@ -49,12 +55,14 @@ export const useSettingsStore = create<SettingsState>()(
       preExpertTimerLimit: null,
       preExpertMaxTries: 3,
 
+      setTheme: (theme) => set({ theme }),
       setCountrySet: (countrySet) => set({ countrySet }),
       setAllowSkips: (allowSkips) => set({ allowSkips }),
+      // Expert mode locks its ruleset in one place: save the player's settings,
+      // apply the locked values, and restore on the way out.
       setExpertMode: (expertMode) => {
         const state = get();
         if (expertMode) {
-          // Save current settings before overriding for expert mode
           set({
             expertMode,
             preExpertAllowSkips: state.allowSkips,
@@ -63,10 +71,10 @@ export const useSettingsStore = create<SettingsState>()(
             preExpertMaxTries: state.maxTries,
             allowSkips: false,
             showHints: false,
+            timerLimit: TIMER_CONFIG.expertModeLimit,
             maxTries: 1,
           });
         } else {
-          // Restore previous settings
           set({
             expertMode,
             allowSkips: state.preExpertAllowSkips,
@@ -84,6 +92,15 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "globe-game-settings",
+      version: 2,
+      // v0 → v1: shape unchanged (expert timer lock moved into setExpertMode)
+      // v1 → v2: added `theme`; existing players keep the dark globe they
+      // already know, so the default is applied rather than system preference
+      migrate: (persisted, version) => {
+        const state = persisted as SettingsState;
+        if (version < 2) return { ...state, theme: "dark" as ThemeMode };
+        return state;
+      },
     }
   )
 );

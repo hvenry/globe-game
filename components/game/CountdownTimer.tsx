@@ -1,87 +1,75 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/lib/store/game-store";
 import { TIMER_CONFIG } from "@/lib/constants";
 import { formatCountdown } from "@/lib/utils";
 
+/**
+ * Countdown dial driven by the engine's wall-clock deadline: remaining time
+ * is always computed from `timerDeadline - now`, so ticks can be throttled
+ * (background tabs) or missed entirely without the countdown drifting.
+ */
 export default function CountdownTimer() {
   const phase = useGameStore((s) => s.phase);
-  const countdownRemaining = useGameStore((s) => s.countdownRemaining);
+  const timerDeadline = useGameStore((s) => s.timerDeadline);
+  const gamePausedAt = useGameStore((s) => s.gamePausedAt);
   const countdownTimerLimit = useGameStore((s) => s.countdownTimerLimit);
-  const setCountdownRemaining = useGameStore((s) => s.setCountdownRemaining);
   const handleTimerExpired = useGameStore((s) => s.handleTimerExpired);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [remainingSec, setRemainingSec] = useState<number | null>(null);
 
   useEffect(() => {
-    // Don't run if timer is disabled
-    if (countdownTimerLimit === null) {
-      return;
-    }
+    // No active deadline (feedback / mustclick): freeze the last shown value
+    if (timerDeadline === null) return;
 
-    // Only run timer during playing phase
-    if (phase !== "playing") {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
-
-    // Start countdown interval
-    intervalRef.current = setInterval(() => {
-      const state = useGameStore.getState();
-
-      // Don't decrement if paused (gamePausedAt is set)
-      if (state.gamePausedAt !== null) {
-        return;
-      }
-
-      const newTime = Math.max(0, state.countdownRemaining - TIMER_CONFIG.updateInterval / 1000);
-
-      if (newTime <= 0) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+    const update = () => {
+      // While paused the clock freezes at the pause moment
+      const effectiveNow = gamePausedAt ?? Date.now();
+      const remaining = Math.max(0, timerDeadline - effectiveNow) / 1000;
+      setRemainingSec(remaining);
+      if (remaining <= 0 && gamePausedAt === null) {
         handleTimerExpired();
-      } else {
-        setCountdownRemaining(newTime);
-      }
-    }, TIMER_CONFIG.updateInterval);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
       }
     };
-  }, [phase, handleTimerExpired, setCountdownRemaining, countdownTimerLimit]);
 
-  // Only render if timer is enabled and game is active
-  if (countdownTimerLimit === null || phase === "idle" || phase === "gameover") {
+    update();
+    const interval = setInterval(update, TIMER_CONFIG.updateInterval);
+    return () => clearInterval(interval);
+  }, [timerDeadline, gamePausedAt, handleTimerExpired]);
+
+  // Only render while an active question has a running countdown
+  if (
+    countdownTimerLimit === null ||
+    remainingSec === null ||
+    (phase !== "playing" && phase !== "feedback" && phase !== "mustclick")
+  ) {
     return null;
   }
 
-  const percentage = countdownTimerLimit > 0 ? countdownRemaining / countdownTimerLimit : 0;
+  const percentage = countdownTimerLimit > 0 ? remainingSec / countdownTimerLimit : 0;
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - percentage);
 
-  // Color based on percentage remaining
-  let color = "#10b981"; // green
+  // Color based on percentage remaining. Reads the DOM token layer rather
+  // than the scene palette: this is an SVG element, so it themes with the
+  // rest of the chrome and stays identical between server and client render.
+  let color = "rgb(var(--signal))";
   if (percentage < TIMER_CONFIG.warningThreshold) {
-    color = "#ef4444"; // red
+    color = "rgb(var(--alert))";
   } else if (percentage < TIMER_CONFIG.criticalThreshold) {
-    color = "#eab308"; // yellow
+    color = "rgb(var(--caution))";
   }
 
   const shouldPulse = percentage < TIMER_CONFIG.warningThreshold;
 
   return (
-    <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
+    <div className="absolute left-4 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-10 md:bottom-auto md:left-6 md:top-1/2 md:-translate-y-1/2">
       <div
-        className={`relative ${shouldPulse ? "animate-timer-pulse" : ""}`}
+        className={`hud-glass relative origin-bottom-left scale-[0.72] rounded-full md:origin-center md:scale-100 ${
+          shouldPulse ? "animate-timer-pulse" : ""
+        }`}
         style={{ width: 80, height: 80 }}
       >
         <svg width="80" height="80" className="transform -rotate-90">
@@ -91,7 +79,7 @@ export default function CountdownTimer() {
             cy="40"
             r={radius}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.1)"
+            stroke="rgb(var(--line) / var(--line-strong-alpha))"
             strokeWidth="6"
           />
           {/* Progress circle */}
@@ -111,10 +99,10 @@ export default function CountdownTimer() {
         {/* Time display */}
         <div className="absolute inset-0 flex items-center justify-center">
           <p
-            className="text-xl font-bold tabular-nums"
+            className="readout text-xl font-medium"
             style={{ color }}
           >
-            {formatCountdown(countdownRemaining)}
+            {formatCountdown(remainingSec)}
           </p>
         </div>
       </div>

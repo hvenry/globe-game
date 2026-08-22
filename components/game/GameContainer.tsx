@@ -7,23 +7,27 @@ import TriesIndicator from "./TriesIndicator";
 import ScoreBoard from "./ScoreBoard";
 import ResultFeedback from "./ResultFeedback";
 import ClickFeedback from "./ClickFeedback";
-import StartScreen from "./StartScreen";
-import GameOver from "./GameOver";
+import StartScreen from "./start/StartScreen";
+import GameOver from "./game-over/GameOver";
 import PauseMenu from "./PauseMenu";
 import CountdownTimer from "./CountdownTimer";
+import DebugStats from "./DebugStats";
 import LoadingScreen from "./LoadingScreen";
 import MenuButton from "./MenuButton";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
 import { getCountrySet } from "@/lib/geo/country-sets";
+import { GAME_CONFIG, GLOBE_CONFIG } from "@/lib/constants";
 
 export default function GameContainer() {
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const lastEscapePress = useRef<number>(0);
+  const lastPauseToggle = useRef<number>(0);
+  const hydrated = useHydrated();
 
   const phase = useGameStore((s) => s.phase);
   const wrongGuessIds = useGameStore((s) => s.wrongGuessIds);
@@ -36,6 +40,9 @@ export default function GameContainer() {
   const goPrev = useGameStore((s) => s.goPrev);
   const forfeitGame = useGameStore((s) => s.forfeitGame);
   const validCountryIds = useGameStore((s) => s.validCountryIds);
+  const gameExpertMode = useGameStore((s) => s.expertMode);
+  const lastResolution = useGameStore((s) => s.lastResolution);
+  const gameEndedAt = useGameStore((s) => s.gameEndedAt);
 
   const countrySetId = useSettingsStore((s) => s.countrySet);
   const expertMode = useSettingsStore((s) => s.expertMode);
@@ -61,18 +68,49 @@ export default function GameContainer() {
     return guessableCountries.filter((c) => idSet.has(c.id));
   }, [countrySetId, guessableCountries]);
 
+  // The game starts with its clock held (engine paused) until the camera's
+  // intro flight lands — the timer never eats into the fly-in.
+  const [isIntroFlying, setIsIntroFlying] = useState(false);
+
   const handleStart = useCallback(() => {
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, countrySetId, expertMode, timerLimit, maxTries);
+    startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
+    pauseTimer();
+    setIsIntroFlying(true);
     setIsPaused(false);
-  }, [startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
+  }, [startGame, pauseTimer, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
     const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, countrySetId, expertMode, timerLimit, maxTries);
+    startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
+    pauseTimer();
+    setIsIntroFlying(true);
     setIsPaused(false);
-  }, [resetGame, startGame, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
+  }, [resetGame, startGame, pauseTimer, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
+
+  const handleIntroArrived = useCallback(() => {
+    setIsIntroFlying(false);
+  }, []);
+
+  // Failsafe: never leave the clock held if the arrival signal goes missing
+  useEffect(() => {
+    if (!isIntroFlying) return;
+    const timer = setTimeout(
+      () => setIsIntroFlying(false),
+      (GLOBE_CONFIG.cameraFlightMaxDuration + 1.5) * 1000,
+    );
+    return () => clearTimeout(timer);
+  }, [isIntroFlying]);
+
+  // Run the clock exactly when nothing holds it: no intro flight, no pause
+  // menu. resumeTimer/pauseTimer are no-ops when already in that state.
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (!isIntroFlying && !isPaused) {
+      resumeTimer();
+    }
+  }, [phase, isIntroFlying, isPaused, resumeTimer]);
 
   const handleMainMenu = useCallback(() => {
     resetGame();
@@ -88,13 +126,13 @@ export default function GameContainer() {
     setIsPaused(false);
   }, []);
 
-  const handleMenuClick = useCallback(() => {
+  const togglePause = useCallback(() => {
     // Debounce: only allow toggle if at least 300ms has passed since last press
     const now = Date.now();
-    if (now - lastEscapePress.current < 300) {
+    if (now - lastPauseToggle.current < 300) {
       return;
     }
-    lastEscapePress.current = now;
+    lastPauseToggle.current = now;
 
     setIsPaused((p) => {
       const newPaused = !p;
@@ -121,7 +159,7 @@ export default function GameContainer() {
 
   const handleCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
-      if ((phase !== "playing" && phase !== "mustclick") || isPaused) return;
+      if ((phase !== "playing" && phase !== "mustclick") || isPaused || isIntroFlying) return;
 
       const currentCountry = useGameStore.getState().currentCountry;
       const base = baseId(countryId);
@@ -129,30 +167,21 @@ export default function GameContainer() {
       // Ignore clicks on countries outside the active game set
       if (!validCountryIds.has(base)) return;
 
-      const isCorrectGuess = currentCountry && base === currentCountry.id;
-      const isAlreadyResolved = resolvedCountries.has(base);
-      const isAlreadyWrongGuess = wrongGuessIds.has(base);
+      const isCorrectGuess = currentCountry !== null && base === currentCountry.id;
 
-      // Show floating label when hints are enabled for:
-      // 1. Already resolved countries (allows user to review what they got)
-      // 2. Already incorrectly guessed countries (allows user to review their mistakes)
-      // 3. New incorrect guesses
-      const shouldShowLabel = showHints && (
-        isAlreadyResolved ||
-        isAlreadyWrongGuess ||
-        !isCorrectGuess
-      );
-
-      if (shouldShowLabel) {
+      // Show floating labels when hints are enabled, for every click that is
+      // not the sought country: new wrong guesses, and reviews of countries
+      // already resolved or already guessed wrong
+      if (showHints && !isCorrectGuess) {
         const feature = allFeatures.find((f) => baseId(f.id) === base);
         if (feature) {
           addFloatingLabel(feature.properties.name, position);
         }
       }
 
-      makeGuess(countryId);
+      makeGuess(base);
     },
-    [phase, isPaused, makeGuess, allFeatures, addFloatingLabel, showHints, resolvedCountries, wrongGuessIds, validCountryIds]
+    [phase, isPaused, isIntroFlying, makeGuess, allFeatures, addFloatingLabel, showHints, validCountryIds]
   );
 
   useEffect(() => {
@@ -160,23 +189,7 @@ export default function GameContainer() {
       // Escape key toggles pause during gameplay
       if (e.key === "Escape" && (phase === "playing" || phase === "feedback" || phase === "mustclick")) {
         e.preventDefault();
-
-        // Debounce: only allow toggle if at least 300ms has passed since last press
-        const now = Date.now();
-        if (now - lastEscapePress.current < 300) {
-          return;
-        }
-        lastEscapePress.current = now;
-
-        setIsPaused((p) => {
-          const newPaused = !p;
-          if (newPaused) {
-            pauseTimer();
-          } else {
-            resumeTimer();
-          }
-          return newPaused;
-        });
+        togglePause();
         return;
       }
 
@@ -192,12 +205,50 @@ export default function GameContainer() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, isPaused, goNext, goPrev, allowSkips, pauseTimer, resumeTimer]);
+  }, [phase, isPaused, goNext, goPrev, allowSkips, togglePause]);
 
   const isGameActive = phase === "playing" || phase === "feedback" || phase === "mustclick";
 
+  // Expert loss reveal: before showing the results card, the camera flies to
+  // the missed country (which pulses on the globe) so the player learns where
+  // it was. The card appears a short hold after the flight actually settles
+  // (onRevealArrived), with a max-wait cap in case the flight never does.
+  // Purely presentational — the engine is already in "gameover".
+  const isExpertLoss =
+    phase === "gameover" && gameExpertMode && lastResolution === "failed";
+  const [revealArrivedAt, setRevealArrivedAt] = useState<number | null>(null);
+  const handleRevealArrived = useCallback(() => {
+    setRevealArrivedAt(Date.now());
+  }, []);
+
+  // An arrival stamped before this game ended belongs to a previous reveal
+  const hasArrived =
+    revealArrivedAt !== null &&
+    gameEndedAt !== null &&
+    revealArrivedAt >= gameEndedAt;
+  const revealEndsAt =
+    isExpertLoss && gameEndedAt !== null
+      ? hasArrived
+        ? Math.min(
+            revealArrivedAt + GAME_CONFIG.expertRevealHold,
+            gameEndedAt + GAME_CONFIG.expertRevealMaxWait,
+          )
+        : gameEndedAt + GAME_CONFIG.expertRevealMaxWait
+      : null;
+  const [revealClock, setRevealClock] = useState(0);
+  const isRevealing = revealEndsAt !== null && revealClock < revealEndsAt;
+
+  useEffect(() => {
+    if (revealEndsAt === null) return;
+    const timer = setTimeout(
+      () => setRevealClock(revealEndsAt),
+      Math.max(0, revealEndsAt - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [revealEndsAt]);
+
   return (
-    <div className="relative h-dvh w-screen overflow-hidden bg-black">
+    <div className="relative h-dvh w-screen overflow-hidden bg-ground">
       {isLoading && <LoadingScreen />}
 
       <div className={`absolute inset-0 transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}>
@@ -205,10 +256,12 @@ export default function GameContainer() {
           features={allFeatures}
           wrongGuessIds={wrongGuessIds}
           resolvedCountries={resolvedCountries}
-          interactive={(phase === "playing" || phase === "mustclick") && !isPaused}
-          autoRotate={phase === "idle" || phase === "gameover"}
+          interactive={(phase === "playing" || phase === "mustclick") && !isPaused && !isIntroFlying}
+          autoRotate={phase === "idle" || (phase === "gameover" && !isExpertLoss)}
           onCountryClick={handleCountryClick}
           onReady={handleGlobeReady}
+          onIntroArrived={handleIntroArrived}
+          onRevealArrived={handleRevealArrived}
           zoomSpeed={zoomSpeed}
           rotateSpeed={rotateSpeed}
         />
@@ -221,10 +274,14 @@ export default function GameContainer() {
         <TriesIndicator />
         <ClickFeedback />
         <ResultFeedback />
-        <MenuButton onClick={handleMenuClick} />
+        <MenuButton onClick={togglePause} />
+        <DebugStats />
 
-        {phase === "idle" && <StartScreen onStart={handleStart} delayAnimation={isInitialLoad} />}
-        {phase === "gameover" && (
+        {/* Persisted stores hydrate on the client; render dependent UI after */}
+        {hydrated && phase === "idle" && (
+          <StartScreen onStart={handleStart} delayAnimation={isInitialLoad} />
+        )}
+        {hydrated && phase === "gameover" && !isRevealing && (
           <GameOver onPlayAgain={handlePlayAgain} onMainMenu={handleMainMenu} />
         )}
         {isPaused && isGameActive && (

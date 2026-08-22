@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 import * as THREE from "three";
+import { useSceneColors } from "@/lib/hooks/useSceneColors";
 
 const STAR_COUNT = 800;
 const STAR_RADIUS = 600; // Distance from center
 const STAR_SIZE = 1.2;
-const STAR_COLOR = "#ffffff";
-const STAR_OPACITY = 0.6;
 
 // Generate star positions once at module level to avoid impure calls during render
 function generateStarData() {
@@ -32,6 +31,8 @@ function generateStarData() {
 }
 
 export default function Stars() {
+  const COLORS = useSceneColors();
+
   // Use lazy initialization to generate star data only once
   const [starData] = useState(generateStarData);
 
@@ -42,13 +43,16 @@ export default function Stars() {
     return geo;
   }, [starData]);
 
+  // Light mode has no sky to put stars in
+  if (COLORS.starOpacity === 0) return null;
+
   return (
     <points geometry={geometry}>
       <pointsMaterial
-        color={STAR_COLOR}
+        color={COLORS.star}
         size={STAR_SIZE}
         transparent
-        opacity={STAR_OPACITY}
+        opacity={COLORS.starOpacity}
         sizeAttenuation={false}
         depthWrite={false}
       />

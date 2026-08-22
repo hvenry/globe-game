@@ -1,25 +1,158 @@
-export const COLORS = {
-  background: "#000000",
-  text: "#FFFFFF",
-  muted: "#A0A0A0",
-  emerald: "#10B981",
-  yellow: "#eab308",
-  error: "#EF4444",
-  surface: "#111111",
-  border: "#222222",
-  globeBase: "#0A0A0A",
-  countryBorder: "#666666",
-  countryDefault: "#ffffff",
-  countryHover: "#ffffff",
-  countryWrongGuess: "#ef4444",
-  countryPerfect: "#10b981",
-  countryImperfect: "#eab308",
-  countryFailed: "#ef4444",
+export type ThemeMode = "dark" | "light";
+
+/**
+ * Three.js scene palette, one per theme.
+ *
+ * A WebGL material can't read a CSS custom property, so the scene keeps a
+ * palette parallel to the DOM's, selected by the same theme setting. The two
+ * themes are different worlds rather than inversions — a night planet and a
+ * printed map — so almost every value differs, including the light rig.
+ *
+ * `land: null` is what keeps the dark globe bare.
+ */
+export interface ScenePalette {
+  /** Sphere color beneath everything — ocean in light, void in dark. */
+  globeBase: string;
+  /** Land fill, or null to leave the globe bare. */
+  land: string | null;
+  countryBorder: string;
+  /** Border line opacity — the pale map needs near-solid outlines. */
+  borderOpacity: number;
+  countryHover: string;
+  /** Hover wash strength; a white wash on pale land needs more of it. */
+  hoverOpacity: number;
+  countryWrongGuess: string;
+  countryPerfect: string;
+  countryAlmost: string;
+  countryFailed: string;
+  /**
+   * A translucent fill over coloured land picks up the land and shifts hue,
+   * where over black it only darkens — so light needs near-solid fills.
+   */
+  fillOpacity: {
+    wrongGuess: number;
+    perfect: number;
+    almost: number;
+    failed: number;
+  };
+  /**
+   * Countries outside the active set. Dark keeps a dim outline — the only way
+   * the rest of the world reads; light paints them as open water, where an
+   * outline would just be grey lines in the sea.
+   */
+  outOfSetScale: number;
+  grid: string;
+  gridOpacity: number;
+  star: string;
+  starOpacity: number;
+  atmosphere: string;
+  atmosphereOpacity: number;
+  /**
+   * Render unlit, so fills land at exactly their palette value. A painted
+   * globe takes its form from the outlines, not from shading, and lighting a
+   * flat palette measurably drags every colour toward mud.
+   */
+  unlit: boolean;
+  /** Only consulted when `unlit` is false. */
+  ambientIntensity: number;
+  directionalIntensity: number;
+}
+
+export const SCENE_PALETTES: Record<ThemeMode, ScenePalette> = {
+  dark: {
+    globeBase: "#0A0A0A",
+    land: null,
+    countryBorder: "#666666",
+    borderOpacity: 0.7,
+    countryHover: "#ffffff",
+    hoverOpacity: 0.22,
+    countryWrongGuess: "#ef4444",
+    countryPerfect: "#10b981",
+    countryAlmost: "#eab308",
+    countryFailed: "#ef4444",
+    fillOpacity: {
+      wrongGuess: 0.5,
+      perfect: 0.65,
+      almost: 0.6,
+      failed: 0.6,
+    },
+    outOfSetScale: 0.1,
+    grid: "#666666",
+    gridOpacity: 0.3,
+    star: "#ffffff",
+    starOpacity: 0.6,
+    atmosphere: "#3ddc84",
+    atmosphereOpacity: 0.04,
+    unlit: false,
+    ambientIntensity: 0.15,
+    directionalIntensity: 0.8,
+  },
+  light: {
+    // Bright is safe for the chromeless HUD: raising saturation raises
+    // luminance, so near-black ink clears ~5:1 on ocean and ~11:1 on land.
+    globeBase: "#1e82d2",
+    land: "#59cf67",
+    // On a coloured map the borders carry the contrast, not the fills.
+    countryBorder: "#05090c",
+    borderOpacity: 0.95,
+    countryHover: "#ffffff",
+    hoverOpacity: 0.5,
+    // Diverges from the DOM channels on purpose: text on a white panel needs
+    // dark accents, a fill on green land needs bright ones. Green-for-correct
+    // is invisible on land, so a cleared country goes white instead.
+    countryWrongGuess: "#dc2626",
+    countryPerfect: "#ffffff",
+    countryAlmost: "#facc15",
+    countryFailed: "#dc2626",
+    fillOpacity: {
+      wrongGuess: 0.8,
+      perfect: 0.88,
+      almost: 0.85,
+      failed: 0.85,
+    },
+    outOfSetScale: 0,
+    grid: "#131b21",
+    gridOpacity: 0.5,
+    star: "#42525c",
+    starOpacity: 0,
+    atmosphere: "#7cc6f5",
+    atmosphereOpacity: 0.12,
+    unlit: true,
+    ambientIntensity: 1,
+    directionalIntensity: 0,
+  },
+};
+
+/**
+ * Paint order for the globe's transparent layers.
+ *
+ * They are all spheres centred on the origin, so they sort to the same depth
+ * and three.js tie-breaks on object id — creation order. A layer that mounts
+ * later (the land map exists only in the light theme) would otherwise jump in
+ * front and hide the ones below until a reload. Any new layer needs an entry.
+ */
+export const GLOBE_LAYER = {
+  grid: 1,
+  atmosphere: 2,
+  land: 3,
+  fills: 4,
+  hover: 5,
+  pulse: 6,
+  borders: 7,
+  markers: 8,
+  pulseRing: 9,
+  picker: 10,
 } as const;
 
 export const GAME_CONFIG = {
   maxTries: 3,
   feedbackDuration: 800,
+  // Expert-mode loss reveal: short hold on the missed country after the
+  // camera arrives, before the results card appears
+  expertRevealHold: 700,
+  // Safety cap: show the results even if the reveal flight never settles
+  // (e.g. no reveal target exists). Must exceed the longest flight time.
+  expertRevealMaxWait: 6000,
 } as const;
 
 export const TIMER_CONFIG = {
@@ -37,10 +170,43 @@ export const GLOBE_CONFIG = {
   segments: 64,
   cameraZ: 350,
   cameraFov: 45,
+  minDistance: 200,
+  maxDistance: 450,
+  // Camera distance while revealing the missed country on an expert loss
+  revealDistance: 280,
+  // Camera flight pacing (continent fly-in, loss reveal). Flight duration is
+  // proportional to the arc travelled — nearby targets arrive fast, far ones
+  // get a longer, readable journey. Time-based, so identical on any display.
+  cameraFlightSpeed: 0.85, // radians per second
+  cameraFlightMinDuration: 0.6, // seconds
+  cameraFlightMaxDuration: 4.5, // seconds
   autoRotateSpeed: 0.3,
   dampingFactor: 0.08, // Increased from 0.04 for smoother rotation with more inertia
+  // Rotate speed scales with distance to the globe SURFACE (d - radius), so
+  // the ground tracks the pointer ~1:1 at every zoom level. This is the floor
+  // the scale can't drop below.
+  rotateSpeedMinFactor: 0.05,
   smallCountryMarkerRadius: 0.6, // 3D sphere radius
   smallCountryClickRadius: 0.8, // degrees for click detection (matches visual size)
+  // Max pointer travel (px) for a press to still count as a click, not a drag
+  dragThreshold: 5,
+
+  // The FOV is vertical, so a portrait phone crops the globe at the desktop
+  // distance. maxDistance has to move with cameraZ or the flight snaps back.
+  narrow: {
+    cameraZ: 470,
+    maxDistance: 540,
+  },
+
+  // Touch (coarse pointer) tuning — no hover, no precise pointer, fat fingers
+  touch: {
+    minDistance: 140, // allow zooming close enough to tap micro-states
+    dampingFactor: 0.18, // stronger damping = globe sticks to the finger
+    rotateSpeedScale: 0.7, // finger drags cover more ground than mouse drags
+    zoomSpeedScale: 0.8, // gentler pinch zoom
+    dragThreshold: 12, // fingers wobble more than mice
+    smallCountryRadiusScale: 1.6, // more forgiving tap radius for micro-states
+  },
 } as const;
 
 // Small countries that need clickable markers (ISO numeric codes)

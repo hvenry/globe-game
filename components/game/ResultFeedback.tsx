@@ -9,6 +9,7 @@ export default function ResultFeedback() {
   const isCorrect = useGameStore((s) => s.isCorrect);
   const lastResolution = useGameStore((s) => s.lastResolution);
   const currentCountry = useGameStore((s) => s.currentCountry);
+  const gamePausedAt = useGameStore((s) => s.gamePausedAt);
   const nextCountry = useGameStore((s) => s.nextCountry);
 
   const [showMustclickFeedback, setShowMustclickFeedback] = useState(false);
@@ -27,16 +28,16 @@ export default function ResultFeedback() {
     setShowMustclickFeedback(false);
   }, []);
 
-  // Auto-advance after feedback duration for normal feedback phase
+  // Auto-advance after feedback duration; suspended while the game is paused
   useEffect(() => {
-    if (phase !== "feedback") return;
+    if (phase !== "feedback" || gamePausedAt !== null) return;
 
     const timer = setTimeout(() => {
       nextCountry();
     }, GAME_CONFIG.feedbackDuration);
 
     return () => clearTimeout(timer);
-  }, [phase, nextCountry]);
+  }, [phase, gamePausedAt, nextCountry]);
 
   const showFeedback = phase === "feedback" && currentCountry;
   const showMustclick = showMustclickFeedback && phase === "mustclick" && currentCountry;
@@ -47,21 +48,23 @@ export default function ResultFeedback() {
   return (
     <div className="absolute inset-0 z-20 flex items-end justify-center pb-24 md:pb-32 pointer-events-none">
       <div
-        className={`${isMustclick ? "animate-fade-in-out-up" : "animate-fade-in-up"} text-center`}
+        className={`hud-glass px-5 py-2.5 text-center ${
+          isMustclick ? "animate-fade-in-out-up" : "animate-fade-in-up"
+        }`}
         onAnimationEnd={isMustclick ? handleAnimationEnd : undefined}
       >
         {isCorrect ? (
           <p
             className={`text-3xl md:text-4xl font-bold ${
               lastResolution === "perfect"
-                ? "text-emerald"
-                : "text-yellow-400"
+                ? "text-success"
+                : "text-caution"
             }`}
           >
             {lastResolution === "perfect" ? "Perfect!" : "Correct!"}
           </p>
         ) : (
-          <p className="text-error text-3xl md:text-4xl font-bold">Incorrect</p>
+          <p className="text-alert text-3xl md:text-4xl font-bold">Incorrect</p>
         )}
       </div>
     </div>

@@ -3,11 +3,19 @@
 import { memo, useMemo } from "react";
 import GeoJsonGeometry from "three-geojson-geometry";
 import type { CountryFeature } from "@/lib/geo/types";
-import { GLOBE_CONFIG, COLORS } from "@/lib/constants";
+import { GLOBE_CONFIG, GLOBE_LAYER } from "@/lib/constants";
+import { useSceneColors } from "@/lib/hooks/useSceneColors";
 
 const noopRaycast = () => {};
 
-function CountryMeshComponent({ feature }: { feature: CountryFeature }) {
+interface CountryMeshProps {
+  feature: CountryFeature;
+  opacity: number;
+}
+
+function CountryMeshComponent({ feature, opacity }: CountryMeshProps) {
+  const COLORS = useSceneColors();
+
   const borderGeometry = useMemo(() => {
     try {
       return new GeoJsonGeometry(
@@ -22,11 +30,15 @@ function CountryMeshComponent({ feature }: { feature: CountryFeature }) {
   if (!borderGeometry) return null;
 
   return (
-    <lineSegments geometry={borderGeometry} raycast={noopRaycast}>
+    <lineSegments
+      geometry={borderGeometry}
+      raycast={noopRaycast}
+      renderOrder={GLOBE_LAYER.borders}
+    >
       <lineBasicMaterial
         color={COLORS.countryBorder}
         transparent
-        opacity={0.7}
+        opacity={opacity}
       />
     </lineSegments>
   );
