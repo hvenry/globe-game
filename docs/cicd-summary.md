@@ -1,289 +1,122 @@
-# CI/CD Implementation Summary
+# CI/CD Overview
 
-## What Was Created
+How globe.expert gets from a branch to production. The step-by-step setup —
+Vercel tokens, GitHub secrets — lives in [cicd-setup.md](./cicd-setup.md).
 
-### 🎯 GitHub Actions Workflows
+## Workflows
 
-1. **`.github/workflows/pr-checks.yml`**
-   - Runs on every pull request to `main`
-   - Executes: Lint → Type Check → Build
-   - Creates Vercel preview deployment
-   - Comments on PR with preview URL
-   - Blocks merging if checks fail
+### `.github/workflows/pr-checks.yml`
 
-2. **`.github/workflows/production-deploy.yml`**
-   - Runs on every push to `main`
-   - Determines version bump automatically
-   - Builds with version injection
-   - Deploys to Vercel production
-   - Creates Git tag (e.g., `v0.2.0`)
-   - Generates changelog from commits
-   - Creates GitHub release
+Runs on every pull request into `main`:
 
-3. **`.github/workflows/manual-release.yml`**
-   - Manually triggered from GitHub UI
-   - Allows custom version input
-   - Optional pre-release marking
-   - Custom release notes support
+1. Lint, type check, tests, build
+2. Vercel **preview** deployment
+3. Comments the preview URL on the PR
 
-### 📦 Code Changes
+### `.github/workflows/production-deploy.yml`
 
-1. **`lib/version.ts`** (NEW)
-   - Utility to access app version
-   - Reads from `NEXT_PUBLIC_APP_VERSION` env var
-   - Shows "dev" in local development
+Runs on every push to `main`:
 
-2. **`components/game/StartScreen.tsx`** (MODIFIED)
-   - Imports version utility
-   - Displays version at bottom of settings menu
-   - Displays version at bottom of main menu
+1. Reads commits since the last tag and calculates the next version
+2. Lint, type check, tests
+3. Builds with the version injected as `NEXT_PUBLIC_APP_VERSION`
+4. Deploys to Vercel production
+5. Creates the git tag
+6. Generates a changelog and publishes a GitHub release
 
-3. **`.github/PULL_REQUEST_TEMPLATE.md`** (NEW)
-   - Standardized PR template
-   - Includes conventional commit type selection
-   - Checklist for PR authors
+### `.github/workflows/manual-release.yml`
 
-### 📚 Documentation
+Triggered by hand from the Actions tab when you need to force a specific
+version. Validates the version is semver and unused, runs the same checks,
+then deploys and releases. Supports pre-release marking and custom notes.
 
-1. **`CICD_SETUP.md`** (NEW)
-   - Complete setup guide
-   - Step-by-step Vercel configuration
-   - GitHub secrets instructions
-   - Testing procedures
-   - Troubleshooting section
+Vercel's own git integration is **off** (`vercel.json` sets
+`git.deploymentEnabled: false`) — every deploy goes through these workflows
+using the Vercel CLI and `VERCEL_TOKEN`.
 
-2. **`README.md`** (MODIFIED)
-   - Added CI/CD section
-   - Links to setup guide
-   - Semantic versioning explanation
+## Versioning
 
-3. **`CICD_SUMMARY.md`** (THIS FILE)
-   - Overview of implementation
+The bump is inferred from commit subjects since the last tag, highest
+precedence wins:
 
-## How It Works
+| Commit prefix | Bump | Example |
+|---|---|---|
+| `BREAKING CHANGE`, `major:` | Major | 0.6.0 to 1.0.0 |
+| `feat:`, `feature:` | Minor | 0.6.0 to 0.7.0 |
+| anything else | Patch | 0.6.0 to 0.6.1 |
 
-### Development Flow
+The changelog groups the same subjects by prefix (`feat:`, `fix:`, `docs:`,
+`style:`, `refactor:`, `perf:`, `test:`, `chore:`); anything unprefixed is
+listed under "Other Changes".
 
-```
-┌─────────────────┐
-│ Create Feature  │
-│ Branch          │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Push Commits    │
-│ with feat:/fix: │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Open Pull       │
-│ Request         │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────────┐
-│ GitHub Actions Run:         │
-│ • Lint                      │
-│ • Type Check               │
-│ • Build                    │
-│ • Preview Deploy           │
-│ • Comment with URL         │
-└────────┬────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Review & Test   │
-│ Preview         │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Merge to Main   │
-└────────┬────────┘
-         │
-         ▼
-┌──────────────────────────────┐
-│ Production Deployment:       │
-│ • Analyze commits            │
-│ • Calculate version          │
-│ • Build with version         │
-│ • Deploy to Vercel           │
-│ • Create Git tag             │
-│ • Generate changelog         │
-│ • Create GitHub release      │
-└──────────────────────────────┘
-```
+**Squash merges collapse this.** A squash produces one commit whose subject is
+the PR title, so the PR title alone decides the bump and the changelog. Use a
+merge commit to keep individual subjects.
 
-### Version Calculation Example
-
-```bash
-# Current version: v0.10.0
-# Recent commits since last tag:
-
-1. "fix: correct Tuvalu coordinates"       → patch
-2. "feat: add dark mode"                   → minor
-3. "docs: update README"                   → patch
-
-# Result: Minor bump (highest precedence)
-# New version: v0.11.0
-```
-
-### Commit Message → Version Mapping
-
-| Commit Prefix | Example | Bump Type | Version Change |
-|--------------|---------|-----------|----------------|
-| `feat:` | `feat: add expert mode` | Minor | 0.10.0 → 0.11.0 |
-| `fix:` | `fix: timer bug` | Patch | 0.10.0 → 0.10.1 |
-| `major:` | `major: redesign API` | Major | 0.10.0 → 1.0.0 |
-| `docs:` | `docs: update guide` | Patch | 0.10.0 → 0.10.1 |
-
-## What You Need to Do
-
-### ⚠️ Required Setup Steps
-
-1. **Get Vercel Token** (5 minutes)
-   - Visit https://vercel.com/account/tokens
-   - Create new token
-   - Copy immediately
-
-2. **Get Vercel IDs** (2 minutes)
-   ```bash
-   cd /Users/hvenry/dev/globe-game
-   vercel link
-   cat .vercel/project.json
-   ```
-
-3. **Add GitHub Secrets** (3 minutes)
-   - Go to repo Settings → Secrets → Actions
-   - Add `VERCEL_TOKEN`
-   - Add `VERCEL_ORG_ID`
-   - Add `VERCEL_PROJECT_ID`
-
-4. **Create Initial Tag** (1 minute)
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-5. **Disable Vercel Auto-Deploy** (2 minutes)
-   - Vercel Dashboard → Settings → Git
-   - Uncheck "Automatically deploy"
-
-### 🎉 Then Test It!
-
-```bash
-# Create test branch
-git checkout -b feature/test-cicd
-
-# Make change
-echo "# Test" >> test.txt
-git add test.txt
-git commit -m "feat: test new CI/CD pipeline"
-
-# Push and create PR
-git push origin feature/test-cicd
-# Go to GitHub and create PR
-
-# Watch the magic happen! ✨
-```
-
-## Benefits
-
-### Before CI/CD
-- ❌ Direct commits to main
-- ❌ Manual deployments
-- ❌ No version tracking
-- ❌ No changelog
-- ❌ No preview deployments
-- ❌ Hard to rollback
-
-### After CI/CD
-- ✅ Feature branch workflow
-- ✅ Automatic deployments
-- ✅ Semantic versioning
-- ✅ Auto-generated changelogs
-- ✅ PR preview URLs
-- ✅ Easy rollback (git tags)
-- ✅ Version visible in app
-- ✅ Professional release pages
-
-## Monitoring & Maintenance
-
-### Check Deployment Status
-
-- **GitHub**: Actions tab shows all workflow runs
-- **Vercel**: Dashboard shows deployment history
-- **Releases**: `https://github.com/YOUR_USERNAME/globe-game/releases`
-
-### Common Operations
-
-**View current version:**
-```bash
-git describe --tags --abbrev=0
-```
-
-**View all releases:**
-```bash
-git tag -l
-```
-
-**Rollback to previous version:**
-```bash
-# Find the version to rollback to
-git tag -l
-
-# Create rollback branch
-git checkout -b rollback/to-v0.10.0 v0.10.0
-
-# Push and merge to trigger deployment
-git push origin rollback/to-v0.10.0
-# Create PR and merge
-```
-
-**Manual release:**
-- Go to Actions tab
-- Select "Manual Release"
-- Click "Run workflow"
-- Enter version (e.g., `1.0.0`)
-
-## File Structure
+## Files involved
 
 ```
 globe-game/
 ├── .github/
 │   ├── workflows/
-│   │   ├── pr-checks.yml           # PR automation
-│   │   ├── production-deploy.yml   # Production deployment
-│   │   └── manual-release.yml      # Manual releases
-│   └── PULL_REQUEST_TEMPLATE.md    # PR template
+│   │   ├── pr-checks.yml            PR checks + preview deploy
+│   │   ├── production-deploy.yml    Version, deploy, tag, release
+│   │   └── manual-release.yml       Manual version override
+│   └── PULL_REQUEST_TEMPLATE.md     Conventional-commit type checklist
+├── docs/
+│   ├── cicd-setup.md                One-time setup instructions
+│   └── cicd-summary.md              This file
 ├── lib/
-│   └── version.ts                   # Version utility (NEW)
-├── components/
-│   └── game/
-│       └── StartScreen.tsx          # Shows version (MODIFIED)
-├── CICD_SETUP.md                    # Setup instructions (NEW)
-├── CICD_SUMMARY.md                  # This file (NEW)
-└── README.md                        # Updated with CI/CD info (MODIFIED)
+│   └── version.ts                   Reads NEXT_PUBLIC_APP_VERSION
+├── components/game/start/
+│   └── SettingsView.tsx             Renders the version in the panel footer
+├── package.json                     Scripts the workflows call
+├── pnpm-lock.yaml                   Installed with --frozen-lockfile in CI
+└── vercel.json                      Disables Vercel's git integration
 ```
 
-## Next Steps
+`lib/version.ts` returns `"dev"` when `NEXT_PUBLIC_APP_VERSION` is unset, which
+is why local builds show `dev` in the settings footer and deployed ones show
+the tag.
 
-1. ✅ Complete setup steps above
-2. ✅ Test with a feature branch PR
-3. ✅ Set up branch protection rules
-4. ✅ Share new workflow with your team
-5. 🚀 Deploy with confidence!
+## Toolchain
 
-## Questions?
+The workflows use **pnpm** (pinned by the `packageManager` field, which
+`pnpm/action-setup` reads) and run tests with **Vitest**:
 
-Check these resources:
-- Full setup guide: [CICD_SETUP.md](./CICD_SETUP.md)
-- GitHub Actions docs: https://docs.github.com/en/actions
-- Vercel CLI docs: https://vercel.com/docs/cli
-- Semantic versioning: https://semver.org
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm exec tsc --noEmit
+pnpm test
+pnpm build
+```
 
----
+Running those four locally reproduces CI exactly. The Vercel CLI is invoked
+through `pnpm dlx vercel@latest` rather than a global install, so the runner
+needs no global bin setup.
 
-**Ready to ship!** 🚀
+## Common operations
+
+**Current version**
+
+```bash
+git describe --tags --abbrev=0
+```
+
+**Roll back** — branch from the good tag and merge it, so the pipeline
+redeploys and re-tags rather than leaving the tag history inconsistent:
+
+```bash
+git checkout -b rollback/to-v0.6.0 v0.6.0
+git push origin rollback/to-v0.6.0
+```
+
+**Force a version** — Actions tab, "Manual Release", "Run workflow", enter the
+version.
+
+## Where to look when something fails
+
+- **GitHub Actions tab** — workflow logs, including which version was computed
+- **Vercel dashboard** — deployment history and build output
+- **Releases page** — the generated changelog for each tag

@@ -6,16 +6,16 @@ CI/CD pipeline setup with GitHub Actions, automated versioning, and Vercel deplo
 
 CI/CD workflow includes:
 
-- **Feature branches** → PR checks + preview deployments
-- **Main branch** → Automatic production deployment with semantic versioning
-- **GitHub Releases** → Automated changelog generation and release creation
-- **Version display** → App version shown in game settings
+-**Feature branches** → PR checks + preview deployments
+-**Main branch** → Automatic production deployment with semantic versioning
+-**GitHub Releases** → Automated changelog generation and release creation
+-**Version display** → App version shown in game settings
 
 ## Prerequisites
 
-- GitHub repository with admin access
-- Vercel account with the project already connected
-- Node.js 20+ installed locally
+-GitHub repository with admin access
+-Vercel account with the project already connected
+-Node.js 20+ installed locally
 
 ## Step 1: Configure Vercel
 
@@ -25,7 +25,7 @@ CI/CD workflow includes:
 
 ```bash
 # Install Vercel CLI
-npm install -g vercel@latest
+pnpm add -g vercel@latest
 
 # Login to Vercel
 vercel login
@@ -105,25 +105,25 @@ git push origin v0.1.0
 4. Create a Pull Request on GitHub
 
 5. Watch the **PR Checks** workflow run:
-   - Linting
-   - Type checking
-   - Build
-   - Preview deployment
-   - PR comment with preview URL
+   -Linting
+   -Type checking
+   -Build
+   -Preview deployment
+   -PR comment with preview URL
 
 ### Test Production Deployment
 
 1. Merge your PR to `main`
 
 2. Watch two workflows run:
-   - **Determine Version**: Analyzes commits and creates version
-   - **Deploy to Production**: Builds, deploys, tags, and creates release
+   -**Determine Version**: Analyzes commits and creates version
+   -**Deploy to Production**: Builds, deploys, tags, and creates release
 
 3. Check:
-   - Vercel deployment
-   - New git tag (e.g., `v0.2.0`)
-   - GitHub Release with changelog
-   - Version displayed in game settings
+   -Vercel deployment
+   -New git tag (e.g., `v0.2.0`)
+   -GitHub Release with changelog
+   -Version displayed in game settings
 
 ## Semantic Versioning Rules
 
@@ -161,40 +161,40 @@ For special releases (e.g., v1.0.0), use the manual release workflow:
 2. Select **Manual Release** workflow
 3. Click **Run workflow**
 4. Fill in:
-   - **Version**: `1.0.0` (without 'v' prefix)
-   - **Pre-release**: Check if this is a beta/RC
-   - **Release notes**: Optional custom notes
+   -**Version**: `1.0.0` (without 'v' prefix)
+   -**Pre-release**: Check if this is a beta/RC
+   -**Release notes**: Optional custom notes
 5. Click **Run workflow**
 
 ## Workflow Files Explained
 
 ### `.github/workflows/pr-checks.yml`
 
-- Runs on every PR to `main`
-- Performs linting, type checking, and build
-- Creates Vercel preview deployment
-- Comments on PR with preview URL
+-Runs on every PR to `main`
+-Performs linting, type checking, and build
+-Creates Vercel preview deployment
+-Comments on PR with preview URL
 
 ### `.github/workflows/production-deploy.yml`
 
-- Runs on every push to `main`
-- Automatically determines version bump
-- Deploys to Vercel production
-- Creates git tag
-- Generates changelog and GitHub release
+-Runs on every push to `main`
+-Automatically determines version bump
+-Deploys to Vercel production
+-Creates git tag
+-Generates changelog and GitHub release
 
 ### `.github/workflows/manual-release.yml`
 
-- Manually triggered from GitHub UI
-- Allows custom version and release notes
-- Useful for major releases or hotfixes
+-Manually triggered from GitHub UI
+-Allows custom version and release notes
+-Useful for major releases or hotfixes
 
 ## Version Display
 
 The app version is now displayed in:
 
-- Game settings menu (bottom)
-- Main menu (bottom)
+-Game settings menu (bottom)
+-Main menu (bottom)
 
 The version comes from the `NEXT_PUBLIC_APP_VERSION` environment variable, which is set during build by GitHub Actions.
 
@@ -202,30 +202,30 @@ The version comes from the `NEXT_PUBLIC_APP_VERSION` environment variable, which
 
 ### "Vercel token is invalid"
 
-- Regenerate your Vercel token
-- Update the `VERCEL_TOKEN` secret in GitHub
+-Regenerate your Vercel token
+-Update the `VERCEL_TOKEN` secret in GitHub
 
 ### "Tag already exists"
 
-- This means the version was already released
-- Check your git tags: `git tag -l`
-- Either use manual release with a new version, or delete the tag if it was a mistake
+-This means the version was already released
+-Check your git tags: `git tag -l`
+-Either use manual release with a new version, or delete the tag if it was a mistake
 
 ### Preview deployment not working
 
-- Check that Vercel preview deployments are enabled in project settings
-- Verify `VERCEL_TOKEN` has correct permissions
-- Check GitHub Actions logs for detailed errors
+-Check that Vercel preview deployments are enabled in project settings
+-Verify `VERCEL_TOKEN` has correct permissions
+-Check GitHub Actions logs for detailed errors
 
 ### Version showing as "dev"
 
-- This is normal in local development
-- In production, ensure `NEXT_PUBLIC_APP_VERSION` is set in the build step
+-This is normal in local development
+-In production, ensure `NEXT_PUBLIC_APP_VERSION` is set in the build step
 
 ### Workflow not triggering
 
-- Ensure workflows are enabled: **Settings** → **Actions** → **General** → **Allow all actions**
-- Check branch protection rules aren't blocking pushes
+-Ensure workflows are enabled: **Settings** → **Actions** → **General** → **Allow all actions**
+-Check branch protection rules aren't blocking pushes
 
 ## Best Practices
 
@@ -242,20 +242,20 @@ Set up branch protection for `main`:
 1. Go to **Settings** → **Branches**
 2. Add rule for `main` branch
 3. Enable:
-   - ✅ Require a pull request before merging
-   - ✅ Require status checks to pass (select "Lint, Type Check & Build")
-   - ✅ Require branches to be up to date
-   - ✅ Do not allow bypassing the above settings
+   -Require a pull request before merging
+   -Require status checks to pass (select "Lint, Type Check & Build")
+   -Require branches to be up to date
+   -Do not allow bypassing the above settings
 
 This ensures all code is reviewed and passes checks before deployment.
 
 ## Next Steps
 
-1. ✅ Complete Steps 1-5 above
-2. ✅ Test with a feature branch PR
-3. ✅ Set up branch protection rules
-4. ✅ Update your team on the new workflow
-5. 🚀 Start shipping with confidence!
+1. Complete Steps 1-5 above
+2. Test with a feature branch PR
+3. Set up branch protection rules
+4. Update your team on the new workflow
+5. Start shipping with confidence!
 
 ---
 
