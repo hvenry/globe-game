@@ -41,6 +41,9 @@ importers:
       three-geojson-geometry:
         specifier: ^2.1.1
         version: 2.1.1(three@0.182.0)
+      three-stdlib:
+        specifier: 2.36.1
+        version: 2.36.1(three@0.182.0)
       topojson-client:
         specifier: ^3.1.0
         version: 3.1.0
@@ -54,6 +57,9 @@ importers:
       '@types/d3-geo':
         specifier: ^3.1.0
         version: 3.1.1
+      '@types/geojson':
+        specifier: 7946.0.16
+        version: 7946.0.16
       '@types/node':
         specifier: ^20
         version: 20.19.43
