@@ -1,82 +1,108 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import { geoCentroid } from "d3-geo";
 import type { CountryFeature } from "@/lib/geo/types";
-import type { CountryData } from "@/lib/geo/types";
-import { GLOBE_CONFIG, COLORS, SMALL_COUNTRIES } from "@/lib/constants";
+import {
+  GLOBE_CONFIG,
+  GLOBE_LAYER,
+  SMALL_COUNTRIES,
+  type ScenePalette,
+} from "@/lib/constants";
+import { useSceneColors } from "@/lib/hooks/useSceneColors";
 import { baseId } from "@/lib/geo/countries";
-import type { Resolution, GamePhase } from "@/lib/store/game-store";
+import { coordsToPosition } from "@/lib/geo/coords";
+import type { Resolution } from "@/lib/engine/types";
 
 interface SmallCountryMarkersProps {
   features: CountryFeature[];
-  resolvedCountries: Map<string, Resolution>;
-  wrongGuessIds: Set<string>;
+  resolvedCountries: Record<string, Resolution>;
+  wrongGuessIds: string[];
   hoveredCountryBase: string | null;
-  gamePhase: GamePhase;
-  currentCountry: CountryData | null;
-  pulseTime: number;
+  /** Base id of the country pulsing during mustclick, or null. */
+  pulseBase: string | null;
+  /** Active-set ids in continent modes (out-of-set markers dim), or null. */
+  emphasisIds: Set<string> | null;
 }
 
 const noopRaycast = () => {};
 
-// Convert [lng, lat] to 3D position on sphere
-function coordsToPosition(
-  lng: number,
-  lat: number,
-  radius: number
-): [number, number, number] {
-  const phi = ((90 - lat) * Math.PI) / 180;
-  const theta = ((90 - lng) * Math.PI) / 180;
-  const x = radius * Math.sin(phi) * Math.cos(theta);
-  const y = radius * Math.cos(phi);
-  const z = radius * Math.sin(phi) * Math.sin(theta);
-  return [x, y, z];
-}
-
 function getMarkerColor(
   base: string,
-  resolvedCountries: Map<string, Resolution>,
-  wrongGuessIds: Set<string>,
+  resolvedCountries: Record<string, Resolution>,
+  wrongGuessIds: string[],
   hoveredCountryBase: string | null,
-  gamePhase: GamePhase,
-  currentCountry: CountryData | null,
-  pulseTime: number
+  COLORS: ScenePalette
 ): string {
-  // Check if in mustclick phase and this is the current country
-  if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
-    // Pulse between red and white
-    const pulse = (Math.sin(pulseTime * 4) + 1) / 2; // 0 to 1
-    return pulse > 0.5 ? COLORS.countryFailed : "#ffffff";
-  }
-
-  const resolution = resolvedCountries.get(base);
+  const resolution = resolvedCountries[base];
   if (resolution === "perfect") return COLORS.countryPerfect;
-  if (resolution === "imperfect") return COLORS.countryImperfect;
+  if (resolution === "almost") return COLORS.countryAlmost;
   if (resolution === "failed") return COLORS.countryFailed;
-  if (wrongGuessIds.has(base)) return COLORS.countryWrongGuess;
+  if (wrongGuessIds.includes(base)) return COLORS.countryWrongGuess;
   if (hoveredCountryBase === base) return COLORS.countryHover;
   return COLORS.countryBorder;
 }
 
 function getMarkerOpacity(
   base: string,
-  resolvedCountries: Map<string, Resolution>,
-  wrongGuessIds: Set<string>,
+  resolvedCountries: Record<string, Resolution>,
+  wrongGuessIds: string[],
   hoveredCountryBase: string | null,
-  gamePhase: GamePhase,
-  currentCountry: CountryData | null
+  isPulsing: boolean
 ): number {
-  // Mustclick phase - high opacity for pulsing effect
-  if (gamePhase === "mustclick" && currentCountry && base === currentCountry.id) {
-    return 0.9;
-  }
-
-  const resolution = resolvedCountries.get(base);
-  if (resolution) return 0.85;
-  if (wrongGuessIds.has(base)) return 0.6;
+  if (isPulsing) return 0.9;
+  if (resolvedCountries[base]) return 0.85;
+  if (wrongGuessIds.includes(base)) return 0.6;
   if (hoveredCountryBase === base) return 0.5;
   return 0.85;
+}
+
+interface MarkerProps {
+  position: [number, number, number];
+  color: string;
+  opacity: number;
+  isPulsing: boolean;
+  /** Flash color for the mustclick pulse, from the active scene palette. */
+  pulseColor: string;
+  pulseAltColor: string;
+}
+
+function Marker({
+  position,
+  color,
+  opacity,
+  isPulsing,
+  pulseColor,
+  pulseAltColor,
+}: MarkerProps) {
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+
+  // Pulse imperatively so the flash never triggers React re-renders
+  useFrame((state) => {
+    const material = materialRef.current;
+    if (!material || !isPulsing) return;
+    const pulse = (Math.sin(state.clock.elapsedTime * 4) + 1) / 2;
+    material.color.set(pulse > 0.5 ? pulseColor : pulseAltColor);
+  });
+
+  return (
+    <mesh
+      position={position}
+      raycast={noopRaycast}
+      renderOrder={GLOBE_LAYER.markers}
+    >
+      <sphereGeometry args={[GLOBE_CONFIG.smallCountryMarkerRadius, 16, 16]} />
+      <meshBasicMaterial
+        ref={materialRef}
+        color={color}
+        transparent
+        opacity={opacity}
+        depthWrite={false}
+      />
+    </mesh>
+  );
 }
 
 export default function SmallCountryMarkers({
@@ -84,10 +110,11 @@ export default function SmallCountryMarkers({
   resolvedCountries,
   wrongGuessIds,
   hoveredCountryBase,
-  gamePhase,
-  currentCountry,
-  pulseTime,
+  pulseBase,
+  emphasisIds,
 }: SmallCountryMarkersProps) {
+  const COLORS = useSceneColors();
+
   const markers = useMemo(() => {
     const result: Array<{
       id: string;
@@ -122,38 +149,33 @@ export default function SmallCountryMarkers({
   return (
     <>
       {markers.map((marker) => {
-        const color = getMarkerColor(
-          marker.base,
-          resolvedCountries,
-          wrongGuessIds,
-          hoveredCountryBase,
-          gamePhase,
-          currentCountry,
-          pulseTime
-        );
+        const isPulsing = pulseBase === marker.base;
+        const outOfSet = emphasisIds !== null && !emphasisIds.has(marker.base);
         const opacity = getMarkerOpacity(
           marker.base,
           resolvedCountries,
           wrongGuessIds,
           hoveredCountryBase,
-          gamePhase,
-          currentCountry
+          isPulsing
         );
-
         return (
-          <mesh
+          <Marker
             key={marker.id}
             position={marker.position}
-            raycast={noopRaycast}
-          >
-            <sphereGeometry args={[GLOBE_CONFIG.smallCountryMarkerRadius, 16, 16]} />
-            <meshBasicMaterial
-              color={color}
-              transparent
-              opacity={opacity}
-              depthWrite={false}
-            />
-          </mesh>
+            color={getMarkerColor(
+              marker.base,
+              resolvedCountries,
+              wrongGuessIds,
+              hoveredCountryBase,
+              COLORS
+            )}
+            opacity={
+              outOfSet ? opacity * COLORS.outOfSetScale : opacity
+            }
+            isPulsing={isPulsing}
+            pulseColor={COLORS.countryFailed}
+            pulseAltColor={COLORS.countryHover}
+          />
         );
       })}
     </>

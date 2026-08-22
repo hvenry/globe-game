@@ -27,13 +27,19 @@ export default function TriesIndicator() {
   if (phase !== "playing" && phase !== "feedback" && phase !== "mustclick") return null;
 
   return (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-      <div className={`flex gap-2 ${shaking ? "animate-shake" : ""}`}>
+    <div className="absolute bottom-[max(2rem,calc(env(safe-area-inset-bottom)+0.75rem))] left-1/2 z-10 -translate-x-1/2 md:bottom-8">
+      <div
+        className={`hud-glass flex items-center gap-1.5 px-2 py-1.5 md:gap-2 md:px-2.5 md:py-2 ${
+          shaking ? "animate-shake" : ""
+        }`}
+      >
         {Array.from({ length: maxTries }).map((_, i) => (
           <div
             key={i}
-            className={`w-3 h-3 rounded-full transition-colors duration-200 ${
-              i < triesRemaining ? "bg-white" : "bg-white/10"
+            className={`h-1.5 w-3 rounded-[1px] transition-colors duration-200 md:h-2 md:w-3.5 ${
+              i < triesRemaining
+                ? "bg-signal shadow-[0_0_8px_rgb(var(--signal)/0.55)]"
+                : "bg-hairline"
             }`}
           />
         ))}

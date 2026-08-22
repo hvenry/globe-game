@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import * as THREE from "three";
-import { GLOBE_CONFIG } from "@/lib/constants";
+import { GLOBE_CONFIG, GLOBE_LAYER } from "@/lib/constants";
+import { useSceneColors } from "@/lib/hooks/useSceneColors";
 
 const noopRaycast = () => {};
 
@@ -11,8 +12,6 @@ const LAT_STEP = 15; // degrees between latitude lines
 const LNG_STEP = 15; // degrees between longitude lines
 const SEGMENTS_PER_LINE = 64;
 const GRID_RADIUS = GLOBE_CONFIG.meshRadius + 0.05; // Above country fill texture sphere
-const GRID_COLOR = "#666666";
-const GRID_OPACITY = 0.3;
 
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -33,6 +32,8 @@ function latLngToPoint(
 }
 
 export default function GlobeGrid() {
+  const COLORS = useSceneColors();
+
   const gridGeometry = useMemo(() => {
     const points: THREE.Vector3[] = [];
 
@@ -65,11 +66,15 @@ export default function GlobeGrid() {
   }, []);
 
   return (
-    <lineSegments geometry={gridGeometry} raycast={noopRaycast}>
+    <lineSegments
+      geometry={gridGeometry}
+      raycast={noopRaycast}
+      renderOrder={GLOBE_LAYER.grid}
+    >
       <lineBasicMaterial
-        color={GRID_COLOR}
+        color={COLORS.grid}
         transparent
-        opacity={GRID_OPACITY}
+        opacity={COLORS.gridOpacity}
         depthTest={true}
         depthWrite={false}
       />

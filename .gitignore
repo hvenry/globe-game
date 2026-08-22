@@ -3,7 +3,6 @@
 /data/countries-50m.json
 # dependencies
 /node_modules
-/local_docs/
 CLAUDE.md
 /.pnp
 .pnp.*

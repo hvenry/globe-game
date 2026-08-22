@@ -3,6 +3,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { GLOBE_LAYER } from "@/lib/constants";
 
 const noopRaycast = () => {};
 
@@ -84,7 +85,7 @@ export default function PulseRing({ position }: PulseRingProps) {
   });
 
   return (
-    <mesh
+    <mesh renderOrder={GLOBE_LAYER.pulseRing}
       position={position}
       quaternion={quaternion}
       raycast={noopRaycast}

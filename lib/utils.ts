@@ -1,19 +1,3 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export function shuffle<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 export function formatTime(seconds: number): string {
   const totalSeconds = Math.floor(seconds);
   const hours = Math.floor(totalSeconds / 3600);
@@ -42,4 +26,22 @@ export function formatScore(raw: number): string {
   if (raw <= 0) return "0";
   if (raw >= 1) return "100";
   return Math.floor(raw * 100).toString();
+}
+
+/**
+ * Length tier for a country name, used to step the type scale down so the long
+ * ones stay on a sensible number of lines.
+ *
+ * The set spans "Chad" (4) to "Democratic Republic of the Congo" (32), so a
+ * single size wraps the long names to three lines in the in-game prompt, which
+ * has to sit between the menu button and the score readout. Used for the HUD
+ * only — the menu and results panels have room to run at a fixed size, and
+ * varying type inside a panel reads as inconsistency rather than as fit.
+ */
+export type NameTier = "short" | "medium" | "long";
+
+export function countryNameTier(name: string): NameTier {
+  if (name.length > 21) return "long";
+  if (name.length > 14) return "medium";
+  return "short";
 }

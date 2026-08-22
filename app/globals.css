@@ -1,90 +1,166 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* globe.expert design tokens. Documented in docs/design-system.md.
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-emerald: #10b981;
-  --color-gold: #f59e0b;
-  --color-gold-light: #fbbf24;
-  --color-error: #ef4444;
-  --color-surface: #111111;
-  --color-surface-border: #222222;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+   Raw values live as plain custom properties; @theme inline maps them onto
+   Tailwind utilities. Because it is `inline`, utilities emit the raw var()
+   reference, so flipping data-theme re-themes everything with no rebuild.
+
+   Colors that get alpha composed onto them are stored as RGB channel triplets
+   so `rgb(var(--signal) / 0.4)` works inside arbitrary Tailwind values,
+   @keyframes and SVG attributes alike. Surfaces and text steps are stored as
+   finished colors — light needs opaque steps, not alphas of a single hue. */
+
+/* -- Raw palette: dark (default) ------------------------------------------- */
+:root {
+  /* True black throughout: any grey reads as haze behind the globe. Structure
+     is carried by hairlines instead. */
+  --surface-ground: #000000; /* page + canvas backdrop */
+  --surface-panel: #000000; /* primary floating panels */
+  --surface-well: #000000; /* inset areas within panels */
+  /* Opaque: any translucency lets the globe behind lift the panel to grey. */
+  --panel-opacity: 1;
+  --panel-blur: 12px;
+
+  /* The tick is the drawn edge of a panel, so it takes the line color at full
+     strength rather than a wash of it. */
+  --line: 255 255 255;
+  --line-alpha: 0.15;
+  --line-strong-alpha: 0.32;
+  --tick-alpha: 1;
+
+  --text-hi: #f2f4f5; /* primary text */
+  --text-mid: rgba(242, 244, 245, 0.6); /* secondary */
+  --text-low: rgba(242, 244, 245, 0.38); /* labels */
+  --text-faint: rgba(242, 244, 245, 0.2); /* de-emphasized */
+
+  /* Normal-mode channel. Grass green, deliberately lighter and a touch
+     yellower than the emerald `--success` below: the two sit next to each
+     other in the results breakdown, so they separate on lightness rather
+     than hue. */
+  --signal: 61 220 132;
+  --expert: 245 166 35; /* expert mode channel — fills, bars, dots */
+  --expert-ink: 245 166 35; /* on black, the fill color is also legible text */
+  /* Text that sits *on* a channel fill. Both channels are bright here, so
+     the fill takes dark type. */
+  --on-signal: #000000;
+  --on-expert: #000000;
+  --success: 16 185 129; /* perfect resolutions (matches globe fills) */
+  --caution: 234 179 8; /* almost / warning */
+  --alert: 239 68 68; /* failed / danger */
+  --accent-soft-alpha: 0.14;
+
+  /* Chromeless HUD ink and its frosted plate. */
+  --hud-ink: #ffffff;
+  --hud-ink-shadow: rgba(0, 0, 0, 0.9);
+  --hud-glass: rgba(0, 0, 0, 0.4);
+  --hud-glass-blur: 10px;
+
+  /* Veil behind the pause panel; heavy here, since the panel is opaque. */
+  --veil: rgb(0 0 0 / 0.4);
+  --veil-blur: 16px;
+
 }
 
-:root {
-  --radius: 0.625rem;
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #111111;
-  --card-foreground: #ffffff;
-  --popover: #111111;
-  --popover-foreground: #ffffff;
-  --primary: #10b981;
-  --primary-foreground: #000000;
-  --secondary: #222222;
-  --secondary-foreground: #ffffff;
-  --muted: #222222;
-  --muted-foreground: #a0a0a0;
-  --accent: #10b981;
-  --accent-foreground: #000000;
-  --destructive: #ef4444;
-  --border: #222222;
-  --input: #222222;
-  --ring: #10b981;
-  --chart-1: #10b981;
-  --chart-2: #059669;
-  --chart-3: #047857;
-  --chart-4: #065f46;
-  --chart-5: #064e3b;
-  --sidebar: #111111;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #10b981;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #222222;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #222222;
-  --sidebar-ring: #10b981;
+/* -- Raw palette: light override ------------------------------------------- */
+[data-theme="light"] {
+  /* Light steps surfaces *down* where dark steps up, so the ground gives up
+     pure white — from #fff the three surfaces collapse into one sheet. */
+
+  --surface-ground: #d7e9fb;
+  --surface-panel: #ffffff;
+  --surface-well: #d3e5f4;
+  /* Frosted, not near-solid: at 0.94 the blur behind the panel had nothing to
+     show through. Letting the globe come through at ~28% keeps the card
+     sitting *on* the scene rather than covering it, and near-black text still
+     clears 13:1 over the lightest composite. */
+  --panel-opacity: 0.78;
+  --panel-blur: 26px;
+
+  --line: 0 0 0;
+  --line-alpha: 0.16;
+  --line-strong-alpha: 0.36;
+
+  --tick-alpha: 1;
+
+  --text-hi: #09090b;
+  --text-mid: #27272a;
+  --text-low: #52525b;
+  --text-faint: #a1a1aa;
+
+  --signal: 21 128 61; /* green-700 */
+  /* Deep gold rather than amber-700, which read as rust. This is about as
+     golden as the hue can get and still carry near-white button text at 4.5:1
+     — the channel has to work as a fill, not just as a label. */
+  /* Gold cannot be one value here: vivid enough to read as gold on white is
+     too pale to put text on. `--expert` fills, `--expert-ink` is text. */
+  --expert: 224 168 26;
+
+  --expert-ink: 156 109 0;
+
+  --on-signal: #ffffff;
+  --on-expert: #0d0a02;
+  --success: 4 120 87;
+  --caution: 161 98 7;
+  --alert: 185 28 28;
+  --accent-soft-alpha: 0.1;
+
+
+  --hud-ink: #09090b;
+  --hud-ink-shadow: rgba(255, 255, 255, 0.75);
+  --hud-glass: rgba(255, 255, 255, 0.72);
+  --hud-glass-blur: 12px;
+
+  /* Barely blurred: the frosted panel in front needs an unblurred backdrop to
+     work on, or its glass stops reading entirely. */
+  --veil: rgb(241 243 245 / 0.2);
+  --veil-blur: 3px;
+
+}
+
+@theme inline {
+  /* -- Typography ---------------------------------------------------------- */
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  /* Instrument readouts: every numeric value renders in mono */
+  --font-data: var(--font-geist-mono), ui-monospace, "SF Mono", "Menlo", monospace;
+
+  /* Micro-label: uppercase, wide-tracked captions */
+  --text-label: 0.625rem; /* 10px */
+  --text-label--line-height: 1rem;
+  --text-label--letter-spacing: 0.18em;
+
+  /* -- Surfaces ------------------------------------------------------------ */
+  --color-ground: var(--surface-ground);
+  --color-panel: var(--surface-panel);
+  --color-well: var(--surface-well);
+
+  /* -- Lines --------------------------------------------------------------- */
+  --color-hairline: rgb(var(--line) / var(--line-alpha));
+  --color-hairline-strong: rgb(var(--line) / var(--line-strong-alpha));
+
+  /* -- Text ---------------------------------------------------------------- */
+  --color-hi: var(--text-hi);
+  --color-mid: var(--text-mid);
+  --color-low: var(--text-low);
+  --color-faint: var(--text-faint);
+
+  /* -- Status channels ----------------------------------------------------- */
+  --color-signal: rgb(var(--signal));
+  --color-signal-soft: rgb(var(--signal) / var(--accent-soft-alpha));
+  --color-expert: rgb(var(--expert));
+  --color-expert-ink: rgb(var(--expert-ink));
+  --color-expert-soft: rgb(var(--expert) / var(--accent-soft-alpha));
+  --color-success: rgb(var(--success));
+  --color-caution: rgb(var(--caution));
+  --color-alert: rgb(var(--alert));
+
+  /* -- Shape --------------------------------------------------------------- */
+  --radius-panel: 0rem; /* primary panels: squared off */
+  --radius-control: 0.125rem; /* buttons, inputs, selects */
+
+  /* -- Base element defaults ----------------------------------------------- */
+  --color-border: rgb(var(--line) / var(--line-alpha));
+  --color-ring: rgb(var(--signal));
 }
 
 @layer base {
@@ -97,12 +173,173 @@
   }
   html,
   body {
-    @apply bg-background text-foreground;
+    @apply bg-ground text-hi;
+    transition: background-color 0.35s ease;
     overflow: hidden;
     position: fixed;
     width: 100%;
     height: 100%;
   }
+}
+
+@layer components {
+  /* Primary floating panel: near-opaque, hairline border, light blur */
+  .panel {
+    @apply relative rounded-panel border border-hairline;
+    background-color: color-mix(
+      in oklab,
+      var(--surface-panel) calc(var(--panel-opacity) * 100%),
+      transparent
+    );
+    /* Standard property only. Hand-writing the -webkit- pair makes Lightning
+       CSS collapse it to the prefixed one and drop the blur off WebKit. */
+    /* Desaturated, or the panel takes on whatever ocean sits behind it. */
+    backdrop-filter: blur(var(--panel-blur)) saturate(65%);
+  }
+
+  /* Corner-tick brackets. Apply alongside .panel. */
+  .panel-ticks::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    pointer-events: none;
+    border-radius: inherit;
+    --tick: rgb(var(--line) / var(--tick-alpha));
+    background:
+      linear-gradient(var(--tick), var(--tick)) 0 0 / 12px 1px,
+      linear-gradient(var(--tick), var(--tick)) 0 0 / 1px 12px,
+      linear-gradient(var(--tick), var(--tick)) 100% 0 / 12px 1px,
+      linear-gradient(var(--tick), var(--tick)) 100% 0 / 1px 12px,
+      linear-gradient(var(--tick), var(--tick)) 0 100% / 12px 1px,
+      linear-gradient(var(--tick), var(--tick)) 0 100% / 1px 12px,
+      linear-gradient(var(--tick), var(--tick)) 100% 100% / 12px 1px,
+      linear-gradient(var(--tick), var(--tick)) 100% 100% / 1px 12px;
+    background-repeat: no-repeat;
+  }
+
+  /* Frosted backing for the chromeless HUD. The readouts sit directly on the
+     scene, which under one line of text can run from the page color to the far
+     side of the globe; the plate normalises that range so a single ink stays
+     legible across it. Borderless and low-contrast on purpose — it should read
+     as the scene going soft behind the text, not as another panel. */
+  .hud-glass,
+  .hud-card,
+  .hud-pill {
+    background-color: var(--hud-glass);
+    backdrop-filter: blur(var(--hud-glass-blur)) saturate(115%);
+    border-radius: var(--radius-control);
+  }
+
+  /* The three surfaces across the top of the screen — menu, country, score.
+     One padding and type scale here is what keeps them a single height and a
+     single top edge. */
+  .hud-card {
+    @apply px-3 py-1.5 text-sm leading-tight sm:text-lg md:px-4 md:py-2 md:text-2xl;
+  }
+
+  /* Holds a card at its base line height. Content that sets a smaller size of
+     its own — a long country name stepping down — would otherwise shorten the
+     card and break it out of line with the others. */
+  .hud-card-row {
+    @apply flex min-h-[1.25em] items-center;
+  }
+
+  /* Track for a channel-filled progress bar. */
+  .progress-track {
+    @apply h-1 w-full overflow-hidden rounded-full bg-hairline;
+  }
+
+  /* Secondary readout beneath a card: sequence counter, elapsed time. */
+  .hud-pill {
+    @apply px-1.5 py-0.5 text-label;
+  }
+
+  /* Shared top edge for the HUD, clearing the notch on the way. */
+  .hud-top {
+    top: max(1rem, env(safe-area-inset-top));
+  }
+  @media (width >= 48rem) {
+    .hud-top {
+      top: 1.5rem;
+    }
+  }
+
+  /* Pair with .panel / .panel-ticks, which supply the surface and marks. */
+  .panel-dialog {
+    @apply mx-4 w-full max-w-[17.5rem] p-5 md:max-w-sm md:p-8;
+    /* Vertical panning only: kills double-tap and in-panel pinch zoom while
+       leaving the settings list scrollable */
+    touch-action: pan-y;
+  }
+
+  /* Pair with a transition-all/transform utility: a colours-only transition
+     makes the scale snap. */
+  .press:active:not(:disabled),
+  .btn-primary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled),
+  .btn-quiet:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  /* Geometry and type only; the channel fill swaps with expert mode. */
+  .btn-primary {
+    @apply h-9 w-full cursor-pointer rounded-control text-xs font-semibold uppercase tracking-[0.14em] transition-all md:h-11 md:text-sm;
+  }
+  /* Fill and its readable type travel together. */
+  .btn-signal {
+    background-color: rgb(var(--signal));
+    color: var(--on-signal);
+  }
+  .btn-expert {
+    background-color: rgb(var(--expert));
+    color: var(--on-expert);
+  }
+  .btn-ghost {
+    @apply flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-control border border-hairline text-label font-medium uppercase tracking-[0.18em] text-low transition-all hover:border-hairline-strong hover:text-mid md:h-9;
+  }
+  .btn-quiet {
+    @apply w-full cursor-pointer py-1 text-label font-medium uppercase tracking-[0.18em] text-faint transition-all hover:text-alert/80;
+  }
+
+  /* Full-screen veil behind a modal panel. Pair with positioning utilities —
+     no `position` here, or it would override them at equal specificity. */
+  .veil {
+    background-color: var(--veil);
+    backdrop-filter: blur(var(--veil-blur));
+  }
+
+  /* Uppercase micro-label above values and sections */
+  .hud-label {
+    @apply text-label font-medium uppercase text-low;
+    letter-spacing: 0.18em;
+  }
+
+  /* Numeric readout: mono, tabular */
+  .readout {
+    @apply font-data tabular-nums;
+  }
+
+  /* Section rule: label with a dashed hairline extending to the right */
+  .hud-rule {
+    @apply flex items-center gap-3;
+  }
+  .hud-rule::after {
+    content: "";
+    height: 0;
+    flex: 1;
+    border-top: 1px dashed rgb(var(--line) / var(--line-strong-alpha));
+  }
+
+  /* Staggered entrance for panel content */
+  .stagger > * {
+    animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger > *:nth-child(6) { animation-delay: 300ms; }
 }
 
 /* Custom animations */
@@ -133,17 +370,6 @@
   100% {
     opacity: 0;
     transform: translateY(-4px);
-  }
-}
-
-@keyframes scoreFloat {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-24px);
   }
 }
 
@@ -180,15 +406,6 @@
   }
 }
 
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 @keyframes shimmer-sweep {
   0% {
     transform: translateX(-100%);
@@ -206,10 +423,6 @@
   animation: fadeInOutUp 2s ease-in-out forwards;
 }
 
-.animate-score-float {
-  animation: scoreFloat 0.8s ease-out forwards;
-}
-
 .animate-shake {
   animation: shake 0.3s ease-in-out;
 }
@@ -222,47 +435,12 @@
   animation: timer-pulse 0.6s ease-in-out infinite;
 }
 
-.animate-shimmer {
-  animation: shimmer 3s ease-in-out infinite;
-}
-
-.animate-shimmer-emerald {
+.animate-shimmer-signal {
   animation: shimmer-sweep 3s ease-in-out infinite;
 }
 
 .animate-shimmer-gold {
   animation: shimmer-sweep 4s ease-in-out infinite;
-}
-
-@keyframes fade-blur-in {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0px);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(24px);
-  }
-}
-
-@keyframes flash-red {
-  0% {
-    background-color: white;
-  }
-  20% {
-    background-color: #ef4444;
-  }
-  100% {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-}
-
-.animate-fade-blur-in {
-  animation: fade-blur-in 0.05 ease-out forwards;
-}
-
-.animate-flash-red {
-  animation: flash-red 0.8s ease-in-out forwards;
 }
 
 @keyframes flash-brackets {
@@ -277,6 +455,24 @@
 
 .animate-flash-brackets {
   animation: flash-brackets 2s step-end infinite;
+}
+
+/* Attention ring: stark signal border that fades away (deep-link highlight) */
+@keyframes highlight-ring {
+  0% {
+    box-shadow:
+      0 0 0 1px rgb(var(--signal)),
+      0 0 20px rgb(var(--signal) / 0.35);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px transparent,
+      0 0 20px transparent;
+  }
+}
+
+.animate-highlight-ring {
+  animation: highlight-ring 1.6s ease-out 0.15s both;
 }
 
 /* Hide scrollbar */

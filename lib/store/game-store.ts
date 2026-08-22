@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import type { CountryData } from "@/lib/geo/types";
 import type { CountrySetId } from "@/lib/geo/country-sets";
-import { shuffle } from "@/lib/utils";
+import type { Resolution, SoloState } from "@/lib/engine/types";
+import * as solo from "@/lib/engine/solo";
+import { randomSeed } from "@/lib/engine/rng";
 import { GAME_CONFIG } from "@/lib/constants";
-import { baseId, getAllFeatures } from "@/lib/geo/countries";
 
+export type { Resolution } from "@/lib/engine/types";
 export type GamePhase = "idle" | "playing" | "feedback" | "gameover" | "mustclick";
-export type Resolution = "perfect" | "imperfect" | "failed";
 
 export interface FloatingLabel {
   id: string;
@@ -15,509 +16,216 @@ export interface FloatingLabel {
   createdAt: number;
 }
 
+export interface StartGameConfig {
+  countrySetId: CountrySetId;
+  expertMode: boolean;
+  /** Seconds per country, or null for no timer. */
+  timerLimit: number | null;
+  maxTries: number;
+}
+
+/**
+ * Thin client adapter around the pure game engine (`lib/engine`).
+ *
+ * All rules live in the engine as pure functions; this store holds the engine
+ * state, mirrors it into the flat fields the UI reads, and owns UI-only
+ * concerns (floating labels, country metadata lookups). In multiplayer, an
+ * equivalent adapter applies server-authoritative engine states instead.
+ */
 interface GameState {
   phase: GamePhase;
-  unansweredCountries: CountryData[];
-  currentIndex: number;
-  currentCountry: CountryData | null;
-  countryTries: Map<string, number>;
-  countryWrongGuesses: Map<string, Set<string>>;
-  totalCountries: number;
-  triesRemaining: number;
-  wrongGuessIds: Set<string>;
-  isCorrect: boolean | null;
-  lastResolution: Resolution | null;
-  lastClickedCountryName: string | null;
-  lastClickedCountryId: string | null;
-  floatingLabels: FloatingLabel[];
-  expertMode: boolean;
-  countrySetId: CountrySetId; // Track which country set is being played
-  validCountryIds: Set<string>;
-  maxTries: number; // Maximum attempts per country
+  engine: SoloState | null;
 
-  resolvedCountries: Map<string, Resolution>;
+  // Mirrored engine state (kept flat for cheap component selectors)
+  currentCountry: CountryData | null;
+  triesRemaining: number;
+  maxTries: number;
+  wrongGuessIds: string[];
+  resolvedCountries: Record<string, Resolution>;
   questionsAnswered: number;
   questionsCorrect: number;
-  totalPoints: number; // Weighted score based on tries used
-
-  // Timer state
-  countdownRemaining: number;
+  totalPoints: number;
+  totalCountries: number;
+  /**
+   * 1-based position of the active country in the run's fixed play order, or
+   * 0 when idle. Distinct from `questionsAnswered`: skipping moves through the
+   * sequence without answering anything, so the two diverge as soon as the
+   * player navigates.
+   */
+  currentPosition: number;
+  unansweredCount: number;
+  expertMode: boolean;
+  countrySetId: CountrySetId;
+  isCorrect: boolean | null;
+  lastResolution: Resolution | null;
+  lastClickedCountryId: string | null;
+  lastClickedCountryName: string | null;
+  /** Epoch ms when the active countdown expires; null when no timer runs. */
+  timerDeadline: number | null;
+  /** Countdown limit in seconds (for the timer dial), null when disabled. */
   countdownTimerLimit: number | null;
   gameStartTime: number | null;
+  gameEndedAt: number | null;
   gamePausedAt: number | null;
   totalPausedTime: number;
-  countryCountdowns: Map<string, number>;
 
-  startGame: (countries: CountryData[], countrySetId: CountrySetId, expertMode?: boolean, timerLimit?: number | null, maxTries?: number) => void;
+  // Game-set lookups (fixed per game)
+  validCountryIds: Set<string>;
+  countriesById: Record<string, CountryData>;
+
+  // UI-only state
+  floatingLabels: FloatingLabel[];
+
+  startGame: (countries: CountryData[], config: StartGameConfig, seed?: number) => void;
   makeGuess: (countryId: string) => void;
-  addFloatingLabel: (name: string, position: [number, number, number]) => void;
-  removeFloatingLabel: (id: string) => void;
   goNext: () => void;
   goPrev: () => void;
   nextCountry: () => void;
-  forfeitGame: () => void;
-  resetGame: () => void;
-  setCountdownRemaining: (time: number) => void;
   handleTimerExpired: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
+  forfeitGame: () => void;
+  resetGame: () => void;
+  addFloatingLabel: (name: string, position: [number, number, number]) => void;
+  removeFloatingLabel: (id: string) => void;
 }
 
-function saveCurrentTriesState(state: GameState): {
-  countryTries: Map<string, number>;
-  countryWrongGuesses: Map<string, Set<string>>;
-  countryCountdowns: Map<string, number>;
-} {
-  if (!state.currentCountry) {
-    return {
-      countryTries: state.countryTries,
-      countryWrongGuesses: state.countryWrongGuesses,
-      countryCountdowns: state.countryCountdowns,
-    };
-  }
-  const newTries = new Map(state.countryTries);
-  newTries.set(state.currentCountry.id, state.triesRemaining);
-  const newWrong = new Map(state.countryWrongGuesses);
-  newWrong.set(state.currentCountry.id, new Set(state.wrongGuessIds));
-  const newCountdowns = new Map(state.countryCountdowns);
-  newCountdowns.set(state.currentCountry.id, state.countdownRemaining);
-  return { countryTries: newTries, countryWrongGuesses: newWrong, countryCountdowns: newCountdowns };
-}
-
-function loadTriesState(
-  country: CountryData,
-  countryTries: Map<string, number>,
-  countryWrongGuesses: Map<string, Set<string>>,
-  countryCountdowns: Map<string, number>,
-  timerLimit: number | null,
-  maxTries: number
-) {
-  return {
-    triesRemaining: countryTries.get(country.id) ?? maxTries,
-    wrongGuessIds: countryWrongGuesses.get(country.id) ?? new Set<string>(),
-    countdownRemaining: countryCountdowns.get(country.id) ?? (timerLimit ?? 0),
-  };
-}
-
-export const useGameStore = create<GameState>((set, get) => ({
-  phase: "idle",
-  unansweredCountries: [],
-  currentIndex: 0,
+const IDLE_MIRROR = {
+  phase: "idle" as GamePhase,
+  engine: null,
   currentCountry: null,
-  countryTries: new Map(),
-  countryWrongGuesses: new Map(),
-  totalCountries: 0,
   triesRemaining: GAME_CONFIG.maxTries,
-  wrongGuessIds: new Set(),
-  isCorrect: null,
-  lastResolution: null,
-  lastClickedCountryName: null,
-  lastClickedCountryId: null,
-  floatingLabels: [],
-  expertMode: false,
-  countrySetId: "all",
-  validCountryIds: new Set(),
   maxTries: GAME_CONFIG.maxTries,
-
-  resolvedCountries: new Map(),
+  wrongGuessIds: [] as string[],
+  resolvedCountries: {} as Record<string, Resolution>,
   questionsAnswered: 0,
   questionsCorrect: 0,
   totalPoints: 0,
-
-  // Timer state
-  countdownRemaining: 0,
+  totalCountries: 0,
+  currentPosition: 0,
+  unansweredCount: 0,
+  expertMode: false,
+  countrySetId: "all" as CountrySetId,
+  isCorrect: null,
+  lastResolution: null,
+  lastClickedCountryId: null,
+  lastClickedCountryName: null,
+  timerDeadline: null,
   countdownTimerLimit: null,
   gameStartTime: null,
+  gameEndedAt: null,
   gamePausedAt: null,
   totalPausedTime: 0,
-  countryCountdowns: new Map(),
+  validCountryIds: new Set<string>(),
+  countriesById: {} as Record<string, CountryData>,
+  floatingLabels: [] as FloatingLabel[],
+};
 
-  startGame: (countries, countrySetId, expertMode = false, timerLimit = null, maxTries = GAME_CONFIG.maxTries) => {
-    const shuffled = shuffle(countries);
-    const tries = new Map<string, number>();
-    const wrongGuesses = new Map<string, Set<string>>();
-    const countdowns = new Map<string, number>();
-    for (const c of shuffled) {
-      tries.set(c.id, maxTries);
-      wrongGuesses.set(c.id, new Set());
-      countdowns.set(c.id, timerLimit ?? 0);
-    }
+/** Flatten an engine state into the fields components subscribe to. */
+function mirror(
+  engine: SoloState,
+  countriesById: Record<string, CountryData>,
+): Partial<GameState> {
+  return {
+    engine,
+    phase: engine.phase,
+    currentCountry: engine.currentId ? (countriesById[engine.currentId] ?? null) : null,
+    triesRemaining: engine.triesRemaining,
+    maxTries: engine.config.maxTries,
+    wrongGuessIds: engine.wrongGuessIds,
+    resolvedCountries: engine.resolved,
+    questionsAnswered: engine.questionsAnswered,
+    questionsCorrect: engine.questionsCorrect,
+    totalPoints: engine.totalPoints,
+    totalCountries: engine.order.length,
+    currentPosition: engine.currentId
+      ? engine.order.indexOf(engine.currentId) + 1
+      : 0,
+    unansweredCount: engine.unanswered.length,
+    expertMode: engine.config.expertMode,
+    countrySetId: engine.config.countrySetId as CountrySetId,
+    isCorrect: engine.isCorrect,
+    lastResolution: engine.lastResolution,
+    lastClickedCountryId: engine.lastClickedId,
+    lastClickedCountryName: engine.lastClickedId
+      ? (countriesById[engine.lastClickedId]?.name ?? "Unknown")
+      : null,
+    timerDeadline: engine.timerDeadline,
+    countdownTimerLimit:
+      engine.config.timerLimitMs !== null ? engine.config.timerLimitMs / 1000 : null,
+    gameStartTime: engine.startedAt,
+    gameEndedAt: engine.endedAt,
+    gamePausedAt: engine.pausedAt,
+    totalPausedTime: engine.totalPausedMs,
+  };
+}
+
+export const useGameStore = create<GameState>((set, get) => {
+  /** Apply an engine transition; no-ops (same reference) leave the store untouched. */
+  function apply(transition: (engine: SoloState, now: number) => SoloState) {
+    const { engine, countriesById } = get();
+    if (!engine) return;
+    const next = transition(engine, Date.now());
+    if (next === engine) return;
     set({
-      phase: "playing",
-      unansweredCountries: shuffled,
-      currentIndex: 0,
-      currentCountry: shuffled[0],
-      countryTries: tries,
-      countryWrongGuesses: wrongGuesses,
-      countryCountdowns: countdowns,
-      totalCountries: shuffled.length,
-      triesRemaining: maxTries,
-      wrongGuessIds: new Set(),
-      isCorrect: null,
-      lastResolution: null,
-      lastClickedCountryName: null,
-      lastClickedCountryId: null,
-      floatingLabels: [],
-      expertMode,
-      countrySetId,
-      validCountryIds: new Set(shuffled.map(c => c.id)),
-      maxTries,
-      resolvedCountries: new Map(),
-      questionsAnswered: 0,
-      questionsCorrect: 0,
-      totalPoints: 0,
-      countdownRemaining: timerLimit ?? 0,
-      countdownTimerLimit: timerLimit,
-      gameStartTime: Date.now(),
-      gamePausedAt: null,
-      totalPausedTime: 0,
+      ...mirror(next, countriesById),
+      // Drop floating labels whenever the question changes
+      ...(next.currentId !== engine.currentId ? { floatingLabels: [] } : null),
     });
-  },
+  }
 
-  addFloatingLabel: (name, position) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    set((state) => ({
-      floatingLabels: [
-        ...state.floatingLabels,
-        { id, name, position, createdAt: Date.now() },
-      ],
-    }));
-  },
+  return {
+    ...IDLE_MIRROR,
 
-  removeFloatingLabel: (id) => {
-    set((state) => ({
-      floatingLabels: state.floatingLabels.filter((label) => label.id !== id),
-    }));
-  },
+    startGame: (countries, config, seed) => {
+      const countriesById: Record<string, CountryData> = {};
+      for (const c of countries) countriesById[c.id] = c;
 
-  goNext: () => {
-    const state = get();
-    if (state.phase !== "playing" || state.unansweredCountries.length <= 1) return;
-    const saved = saveCurrentTriesState(state);
-    const newIndex = (state.currentIndex + 1) % state.unansweredCountries.length;
-    const nextCountry = state.unansweredCountries[newIndex];
-    const loaded = loadTriesState(
-      nextCountry,
-      saved.countryTries,
-      saved.countryWrongGuesses,
-      saved.countryCountdowns,
-      state.countdownTimerLimit,
-      state.maxTries
-    );
-    set({
-      ...saved,
-      currentIndex: newIndex,
-      currentCountry: nextCountry,
-      triesRemaining: loaded.triesRemaining,
-      wrongGuessIds: loaded.wrongGuessIds,
-      countdownRemaining: loaded.countdownRemaining,
-      isCorrect: null,
-      lastClickedCountryName: null,
-      lastClickedCountryId: null,
-      floatingLabels: [],
-    });
-  },
-
-  goPrev: () => {
-    const state = get();
-    if (state.phase !== "playing" || state.unansweredCountries.length <= 1) return;
-    const saved = saveCurrentTriesState(state);
-    const len = state.unansweredCountries.length;
-    const newIndex = (state.currentIndex - 1 + len) % len;
-    const prevCountry = state.unansweredCountries[newIndex];
-    const loaded = loadTriesState(
-      prevCountry,
-      saved.countryTries,
-      saved.countryWrongGuesses,
-      saved.countryCountdowns,
-      state.countdownTimerLimit,
-      state.maxTries
-    );
-    set({
-      ...saved,
-      currentIndex: newIndex,
-      currentCountry: prevCountry,
-      triesRemaining: loaded.triesRemaining,
-      wrongGuessIds: loaded.wrongGuessIds,
-      countdownRemaining: loaded.countdownRemaining,
-      isCorrect: null,
-      lastClickedCountryName: null,
-      lastClickedCountryId: null,
-      floatingLabels: [],
-    });
-  },
-
-  makeGuess: (countryId) => {
-    const state = get();
-    if (!state.currentCountry) return;
-
-    const guessBase = baseId(countryId);
-
-    // Ignore clicks on countries outside the active game set
-    if (!state.validCountryIds.has(guessBase)) return;
-
-    const isCorrect = guessBase === state.currentCountry.id;
-
-    // Special case: mustclick phase - user must click the correct country to proceed
-    if (state.phase === "mustclick") {
-      if (isCorrect) {
-        // User clicked the correct country — resolve and move to next directly
-        const newResolved = new Map(state.resolvedCountries);
-        newResolved.set(state.currentCountry.id, "failed");
-
-        // Remove country from unanswered list
-        const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
-        const newTries = new Map(state.countryTries);
-        newTries.delete(state.currentCountry.id);
-        const newWrong = new Map(state.countryWrongGuesses);
-        newWrong.delete(state.currentCountry.id);
-        const newCountdowns = new Map(state.countryCountdowns);
-        newCountdowns.delete(state.currentCountry.id);
-        const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
-
-        set({
-          resolvedCountries: newResolved,
-          questionsAnswered: state.questionsAnswered + 1,
-          unansweredCountries: newUnanswered,
-          currentIndex: newIndex,
-          countryTries: newTries,
-          countryWrongGuesses: newWrong,
-          countryCountdowns: newCountdowns,
-        });
-
-        // Immediately advance to next country (or gameover)
-        get().nextCountry();
-      }
-      // Ignore clicks on wrong countries during mustclick phase
-      return;
-    }
-
-    if (state.phase !== "playing") return;
-
-    // Check if this country has already been resolved (correctly guessed in a previous question)
-    if (state.resolvedCountries.has(guessBase)) {
-      // Don't penalize for clicking an already-resolved country
-      return;
-    }
-
-    // Check if this country has already been incorrectly guessed for the current question
-    if (state.wrongGuessIds.has(guessBase)) {
-      // Don't penalize for re-clicking an already-wrong guess (allows reviewing)
-      return;
-    }
-
-    // Get the name of the guessed country
-    let guessedCountryName = "";
-    if (!isCorrect) {
-      const features = getAllFeatures();
-      const guessedFeature = features.find((f) => baseId(f.id) === guessBase);
-      guessedCountryName = guessedFeature?.properties.name || "Unknown";
-    }
-
-    if (isCorrect) {
-      const resolution: Resolution =
-        state.triesRemaining === state.maxTries ? "perfect" : "imperfect";
-      const newResolved = new Map(state.resolvedCountries);
-      newResolved.set(state.currentCountry.id, resolution);
-
-      // Calculate points based on tries remaining
-      // Perfect answer (first try) = 1.0 point, decreases with each wrong guess
-      const points = state.triesRemaining / state.maxTries;
-
-      // Remove country from unanswered list
-      const newUnanswered = state.unansweredCountries.filter((_, i) => i !== state.currentIndex);
-      const newTries = new Map(state.countryTries);
-      newTries.delete(state.currentCountry.id);
-      const newWrong = new Map(state.countryWrongGuesses);
-      newWrong.delete(state.currentCountry.id);
-      const newCountdowns = new Map(state.countryCountdowns);
-      newCountdowns.delete(state.currentCountry.id);
-      const newIndex = newUnanswered.length === 0 ? 0 : state.currentIndex >= newUnanswered.length ? 0 : state.currentIndex;
+      const engine = solo.createSoloGame(
+        countries.map((c) => c.id),
+        {
+          countrySetId: config.countrySetId,
+          expertMode: config.expertMode,
+          timerLimitMs: config.timerLimit !== null ? config.timerLimit * 1000 : null,
+          maxTries: config.maxTries,
+        },
+        seed ?? randomSeed(),
+        Date.now(),
+      );
 
       set({
-        phase: "feedback",
-        isCorrect: true,
-        lastResolution: resolution,
-        lastClickedCountryName: null,
-        lastClickedCountryId: null,
-        resolvedCountries: newResolved,
-        questionsAnswered: state.questionsAnswered + 1,
-        questionsCorrect: state.questionsCorrect + 1,
-        totalPoints: state.totalPoints + points,
-        unansweredCountries: newUnanswered,
-        currentIndex: newIndex,
-        countryTries: newTries,
-        countryWrongGuesses: newWrong,
-        countryCountdowns: newCountdowns,
+        ...IDLE_MIRROR,
+        ...mirror(engine, countriesById),
+        countriesById,
+        validCountryIds: new Set(countries.map((c) => c.id)),
       });
-    } else {
-      // Expert mode: one wrong click = game over
-      if (state.expertMode) {
-        const newResolved = new Map(state.resolvedCountries);
-        newResolved.set(state.currentCountry.id, "failed");
-        const newWrongIds = new Set(state.wrongGuessIds);
-        newWrongIds.add(guessBase);
+    },
 
-        set({
-          phase: "gameover",
-          isCorrect: false,
-          triesRemaining: 0,
-          wrongGuessIds: newWrongIds,
-          lastResolution: "failed",
-          lastClickedCountryName: guessedCountryName,
-          lastClickedCountryId: guessBase,
-          resolvedCountries: newResolved,
-          questionsAnswered: state.questionsAnswered + 1,
-        });
-        return;
-      }
+    makeGuess: (countryId) => apply((e, now) => solo.guess(e, countryId, now)),
+    goNext: () => apply((e, now) => solo.skip(e, 1, now)),
+    goPrev: () => apply((e, now) => solo.skip(e, -1, now)),
+    nextCountry: () => apply(solo.advance),
+    handleTimerExpired: () => apply(solo.expireTimer),
+    pauseTimer: () => apply(solo.pause),
+    resumeTimer: () => apply(solo.resume),
+    forfeitGame: () => apply((e, now) => solo.forfeit(e, now)),
 
-      const newTries = state.triesRemaining - 1;
-      const newWrongIds = new Set(state.wrongGuessIds);
-      newWrongIds.add(guessBase);
+    resetGame: () => set({ ...IDLE_MIRROR }),
 
-      if (newTries === 0) {
-        // Non-expert mode: enter mustclick immediately (feedback overlay shown simultaneously)
-        set({
-          phase: "mustclick",
-          isCorrect: false,
-          triesRemaining: 0,
-          wrongGuessIds: newWrongIds,
-          lastResolution: "failed",
-          lastClickedCountryName: guessedCountryName,
-          lastClickedCountryId: guessBase,
-        });
-      } else {
-        set({
-          triesRemaining: newTries,
-          wrongGuessIds: newWrongIds,
-          lastClickedCountryName: guessedCountryName,
-          lastClickedCountryId: guessBase,
-        });
-      }
-    }
-  },
+    addFloatingLabel: (name, position) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      set((state) => ({
+        floatingLabels: [
+          ...state.floatingLabels,
+          { id, name, position, createdAt: Date.now() },
+        ],
+      }));
+    },
 
-  nextCountry: () => {
-    const state = get();
-    if (state.unansweredCountries.length === 0) {
-      set({ phase: "gameover" });
-      return;
-    }
-    const idx = Math.min(state.currentIndex, state.unansweredCountries.length - 1);
-    const country = state.unansweredCountries[idx];
-    const loaded = loadTriesState(
-      country,
-      state.countryTries,
-      state.countryWrongGuesses,
-      state.countryCountdowns,
-      state.countdownTimerLimit,
-      state.maxTries
-    );
-    set({
-      phase: "playing",
-      currentIndex: idx,
-      currentCountry: country,
-      triesRemaining: loaded.triesRemaining,
-      wrongGuessIds: loaded.wrongGuessIds,
-      countdownRemaining: loaded.countdownRemaining,
-      isCorrect: null,
-      lastResolution: null,
-      lastClickedCountryName: null,
-      lastClickedCountryId: null,
-      floatingLabels: [],
-    });
-  },
-
-  forfeitGame: () => {
-    set({ phase: "gameover" });
-  },
-
-  resetGame: () => {
-    set({
-      phase: "idle",
-      unansweredCountries: [],
-      currentIndex: 0,
-      currentCountry: null,
-      countryTries: new Map(),
-      countryWrongGuesses: new Map(),
-      countryCountdowns: new Map(),
-      totalCountries: 0,
-      triesRemaining: GAME_CONFIG.maxTries,
-      wrongGuessIds: new Set(),
-      isCorrect: null,
-      lastResolution: null,
-      lastClickedCountryName: null,
-      lastClickedCountryId: null,
-      floatingLabels: [],
-      expertMode: false,
-      countrySetId: "all",
-      validCountryIds: new Set(),
-      maxTries: GAME_CONFIG.maxTries,
-      resolvedCountries: new Map(),
-      questionsAnswered: 0,
-      questionsCorrect: 0,
-      totalPoints: 0,
-      countdownRemaining: 0,
-      countdownTimerLimit: null,
-      gameStartTime: null,
-      gamePausedAt: null,
-      totalPausedTime: 0,
-    });
-  },
-
-  setCountdownRemaining: (time) => {
-    set({ countdownRemaining: time });
-  },
-
-  handleTimerExpired: () => {
-    const state = get();
-    if (state.phase !== "playing" || !state.currentCountry) return;
-
-    // Expert mode: time expired = game over
-    if (state.expertMode) {
-      const newResolved = new Map(state.resolvedCountries);
-      newResolved.set(state.currentCountry.id, "failed");
-      set({
-        phase: "gameover",
-        isCorrect: false,
-        triesRemaining: 0,
-        countdownRemaining: 0,
-        lastResolution: "failed",
-        lastClickedCountryName: "Time's up!",
-        lastClickedCountryId: null,
-        resolvedCountries: newResolved,
-        questionsAnswered: state.questionsAnswered + 1,
-      });
-      return;
-    }
-
-    // Normal mode: enter mustclick immediately (feedback overlay shown simultaneously)
-    set({
-      phase: "mustclick",
-      isCorrect: false,
-      triesRemaining: 0,
-      countdownRemaining: 0,
-      lastResolution: "failed",
-      lastClickedCountryName: "Time's up!",
-    });
-  },
-
-  pauseTimer: () => {
-    const state = get();
-    if (state.gamePausedAt === null) {
-      set({ gamePausedAt: Date.now() });
-    }
-  },
-
-  resumeTimer: () => {
-    const state = get();
-    if (state.gamePausedAt !== null) {
-      const pauseDuration = Date.now() - state.gamePausedAt;
-      set({
-        totalPausedTime: state.totalPausedTime + pauseDuration,
-        gamePausedAt: null,
-      });
-    }
-  },
-}));
+    removeFloatingLabel: (id) => {
+      set((state) => ({
+        floatingLabels: state.floatingLabels.filter((label) => label.id !== id),
+      }));
+    },
+  };
+});
