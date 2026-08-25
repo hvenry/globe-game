@@ -18,8 +18,7 @@ export const metadata: Metadata = {
   keywords: ["geography", "quiz", "game", "globe", "countries", "map"],
   openGraph: {
     title: "globe.expert",
-    description:
-      "How well do you know the world? Find every country on an interactive 3D globe.",
+    description: "Test your geography",
     url: "https://globe.expert",
     siteName: "globe.expert",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "globe.expert" }],
@@ -28,8 +27,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "globe.expert",
-    description:
-      "How well do you know the world? Find every country on an interactive 3D globe.",
+    description: "Test your geography",
     images: ["/og.png"],
   },
 };
