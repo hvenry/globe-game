@@ -164,6 +164,83 @@ export const TIMER_CONFIG = {
   criticalThreshold: 0.6, // 60% remaining for yellow transition
 } as const;
 
+/**
+ * Head-to-head race defaults (see docs/multiplayer-design.md). The engine never
+ * reads these; whoever creates a race passes them in, so a room can override.
+ */
+/**
+ * A fill the globe paints exactly as given, for colours outside the solo
+ * vocabulary — a race player's own. Anywhere a `Resolution` is accepted, one
+ * of these can stand in its place.
+ */
+export interface CountryFill {
+  color: string;
+  opacity: number;
+}
+
+/**
+ * Race identity colours.
+ *
+ * Kept clear of the globe's own vocabulary — green for correct, red for
+ * missed, yellow for partial — so a player's claim can never be read as a
+ * result. `attempt` is the paler variant a wrong click takes; the same hexes
+ * serve both themes, with the theme's own fill opacity doing the adapting.
+ */
+export type PlayerColorId = "blue" | "purple" | "orange" | "cyan";
+
+export const PLAYER_COLOR_IDS: readonly PlayerColorId[] = [
+  "blue",
+  "purple",
+  "orange",
+  "cyan",
+];
+
+export const PLAYER_COLORS: Record<PlayerColorId, { claim: string; attempt: string }> = {
+  blue: { claim: "#1d4ed8", attempt: "#93c5fd" },
+  purple: { claim: "#a855f7", attempt: "#d8b4fe" },
+  orange: { claim: "#f97316", attempt: "#fdba74" },
+  cyan: { claim: "#06b6d4", attempt: "#67e8f9" },
+};
+
+/**
+ * The same identities as type on a panel, which the globe's hexes cannot be:
+ * blue clears 3:1 on the black panel and cyan and orange clear it on the
+ * white one, but neither pair clears both. Same split the expert channel
+ * makes between `--expert` and `--expert-ink`, for the same reason.
+ */
+export const PLAYER_INKS: Record<ThemeMode, Record<PlayerColorId, string>> = {
+  dark: {
+    blue: "#60a5fa",
+    purple: "#c084fc",
+    orange: "#fb923c",
+    cyan: "#22d3ee",
+  },
+  light: {
+    blue: "#1d4ed8",
+    purple: "#7e22ce",
+    orange: "#c2410c",
+    cyan: "#0e7490",
+  },
+};
+
+export function isPlayerColorId(value: string): value is PlayerColorId {
+  return Object.hasOwn(PLAYER_COLORS, value);
+}
+
+export const RACE_CONFIG = {
+  /**
+   * Countries in play. Deliberately above the 195 guessable ones: the engine
+   * clamps the count to the pool it is handed, so any number past the largest
+   * set reads as "play the whole set", whichever set the host picks.
+   */
+  countryCount: 250,
+  countryWindowMs: 10_000,
+  lockoutMs: 1_500,
+  intermissionMs: 1_200,
+  /** Lobby countdown before the first country appears. */
+  countdownMs: 3_000,
+} as const;
+
 export const GLOBE_CONFIG = {
   radius: 100,
   meshRadius: 100.2,

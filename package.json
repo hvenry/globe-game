@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "race:dev": "pnpm --filter @globe/race-server run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run lib"
+    "type-check": "tsc --noEmit && pnpm --filter @globe/race-server type-check",
+    "test": "vitest run lib && pnpm --filter @globe/race-server test",
+    "race:deploy": "pnpm --filter @globe/race-server run deploy"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

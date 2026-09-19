@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "globe-race",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+
+  // One Durable Object per room. `idFromName(roomId)` is the whole room
+  // registry — no lookup table, no sticky routing.
+  "durable_objects": {
+    "bindings": [{ "name": "RACE_ROOM", "class_name": "RaceRoom" }]
+  },
+  // SQLite-backed storage is the current default for new namespaces.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RaceRoom"] }],
+
+  // 20 room creations per minute per IP. Each room is a Durable Object, so
+  // this is the endpoint that costs real money if left open.
+  "ratelimits": [
+    {
+      "name": "ROOM_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
+
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,https://globe.expert"
+  },
+  "observability": { "enabled": true }
+}

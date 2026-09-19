@@ -1,11 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CountrySetId } from "@/lib/geo/country-sets";
-import { TIMER_CONFIG, type ThemeMode } from "@/lib/constants";
+import { TIMER_CONFIG, type PlayerColorId, type ThemeMode } from "@/lib/constants";
 
 interface SettingsState {
   // Appearance
   theme: ThemeMode;
+  /** Preferred race identity colour. The room has the last word: it hands
+   *  out something else when this one is already taken. */
+  playerColor: PlayerColorId;
+  /** Last name raced under, so an invite link is one click for a returner. */
+  playerName: string;
 
   // Game mode settings
   countrySet: CountrySetId;
@@ -27,6 +32,8 @@ interface SettingsState {
 
   // Actions
   setTheme: (theme: ThemeMode) => void;
+  setPlayerColor: (color: PlayerColorId) => void;
+  setPlayerName: (name: string) => void;
   setCountrySet: (set: CountrySetId) => void;
   setAllowSkips: (allow: boolean) => void;
   setExpertMode: (expert: boolean) => void;
@@ -41,6 +48,8 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       theme: "dark",
+      playerColor: "blue",
+      playerName: "",
       countrySet: "all",
       allowSkips: true,
       expertMode: false,
@@ -56,6 +65,8 @@ export const useSettingsStore = create<SettingsState>()(
       preExpertMaxTries: 3,
 
       setTheme: (theme) => set({ theme }),
+      setPlayerColor: (playerColor) => set({ playerColor }),
+      setPlayerName: (playerName) => set({ playerName }),
       setCountrySet: (countrySet) => set({ countrySet }),
       setAllowSkips: (allowSkips) => set({ allowSkips }),
       // Expert mode locks its ruleset in one place: save the player's settings,
@@ -92,13 +103,16 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "globe-game-settings",
-      version: 2,
+      version: 3,
       // v0 → v1: shape unchanged (expert timer lock moved into setExpertMode)
       // v1 → v2: added `theme`; existing players keep the dark globe they
       // already know, so the default is applied rather than system preference
+      // v2 → v3: added `playerColor`; the room reassigns it if it is taken,
+      // so every returning player starting on blue costs nothing
       migrate: (persisted, version) => {
-        const state = persisted as SettingsState;
-        if (version < 2) return { ...state, theme: "dark" as ThemeMode };
+        let state = persisted as SettingsState;
+        if (version < 2) state = { ...state, theme: "dark" as ThemeMode };
+        if (version < 3) state = { ...state, playerColor: "blue" as PlayerColorId };
         return state;
       },
     }

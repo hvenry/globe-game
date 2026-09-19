@@ -300,6 +300,11 @@
   .btn-quiet {
     @apply w-full cursor-pointer py-1 text-label font-medium uppercase tracking-[0.18em] text-faint transition-all hover:text-alert/80;
   }
+  /* Square affordance in a panel header: back, settings. Sized to sit on the
+     same line as a `.hud-label` title without setting the header's height. */
+  .btn-icon {
+    @apply flex h-7 w-7 cursor-pointer items-center justify-center rounded-control border border-hairline text-mid transition-all hover:border-hairline-strong hover:text-hi;
+  }
 
   /* Full-screen veil behind a modal panel. Pair with positioning utilities —
      no `position` here, or it would override them at equal specificity. */
@@ -455,24 +460,6 @@
 
 .animate-flash-brackets {
   animation: flash-brackets 2s step-end infinite;
-}
-
-/* Attention ring: stark signal border that fades away (deep-link highlight) */
-@keyframes highlight-ring {
-  0% {
-    box-shadow:
-      0 0 0 1px rgb(var(--signal)),
-      0 0 20px rgb(var(--signal) / 0.35);
-  }
-  100% {
-    box-shadow:
-      0 0 0 1px transparent,
-      0 0 20px transparent;
-  }
-}
-
-.animate-highlight-ring {
-  animation: highlight-ring 1.6s ease-out 0.15s both;
 }
 
 /* Hide scrollbar */
