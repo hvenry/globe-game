@@ -8,6 +8,7 @@ import {
   CheckIcon as PhosphorCheck,
   ExportIcon,
   MoonIcon as PhosphorMoon,
+  PlayIcon as PhosphorPlay,
   SlidersHorizontalIcon,
   PlusIcon as PhosphorPlus,
   SunIcon as PhosphorSun,
@@ -27,7 +28,10 @@ export interface IconProps extends PhosphorIconProps {
   size?: number;
 }
 
-const DEFAULTS = { size: 16, weight: "regular" } as const satisfies PhosphorIconProps;
+const DEFAULTS = {
+  size: 16,
+  weight: "regular",
+} as const satisfies PhosphorIconProps;
 
 export function ChevronLeftIcon(props: IconProps) {
   return <CaretLeftIcon {...DEFAULTS} {...props} />;
@@ -48,6 +52,11 @@ export function ArrowLeftIcon(props: IconProps) {
 /** Add / invite */
 export function PlusIcon(props: IconProps) {
   return <PhosphorPlus {...DEFAULTS} {...props} />;
+}
+
+/** Play — audition a sound */
+export function PlayIcon(props: IconProps) {
+  return <PhosphorPlay {...DEFAULTS} {...props} />;
 }
 
 /** Close / remove */

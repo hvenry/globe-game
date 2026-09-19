@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRaceStore, playerPalette } from "@/lib/store/race-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { play } from "@/lib/sound/engine";
+
 import {
   CountrySetSelect,
   TimerLimitSelect,
@@ -80,6 +82,7 @@ function ColorPicker({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
+      play("ui.click");
       setOpen(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
@@ -171,6 +174,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
+      play("ui.click");
       setView("lobby");
     };
     window.addEventListener("keydown", onKeyDown, true);
@@ -366,6 +370,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
                 <button
                   onClick={() => setReady(!p.ready)}
                   aria-pressed={p.ready}
+                  data-sound="toggle"
                   className={`press hud-label cursor-pointer rounded-control border px-2 py-0.5 transition-colors ${
                     p.ready
                       ? "border-signal/60 bg-signal-soft text-signal"

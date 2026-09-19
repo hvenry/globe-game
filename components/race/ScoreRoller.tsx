@@ -7,19 +7,57 @@
  * mid-race, so the readout only ever widens.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const DIGITS = Array.from({ length: 10 }, (_, i) => i);
+/**
+ * Several turns of 0–9 on the strip, so any step from one digit to the next
+ * can be taken upward, wrapping past 9 without ever sliding back down. More
+ * than the two a single step needs: score changes can land faster than one
+ * slide settles, and each one advances the strip further before it snaps.
+ */
+const TURNS = 6;
+/** Every digit on the strip, top to bottom: `TURNS` runs of 0–9. */
+const STRIP = Array.from({ length: 10 * TURNS }, (_, i) => i % 10);
 
+/** Always rolls up: 9 → 0 continues on to the next turn of the strip. */
 function Column({ digit }: { digit: number }) {
+  const [pos, setPos] = useState(digit);
+  const [snapping, setSnapping] = useState(false);
+
+  // Advance during render (the "adjust state on prop change" pattern): the
+  // shortest upward distance to the new digit.
+  const shown = pos % 10;
+  if (shown !== digit) {
+    const next = pos + ((digit - shown + 10) % 10);
+    // Out of strip: rewind a turn first. The digit is unchanged, so the only
+    // visible cost is one slide starting a little higher than it should.
+    setPos(next >= STRIP.length ? next - 10 : next);
+  }
+
+  // Once a slide has landed on the second turn or beyond, drop a whole turn
+  // without animating; the digit on screen is the same, so nothing moves.
+  useEffect(() => {
+    if (!snapping) return;
+    const id = requestAnimationFrame(() => setSnapping(false));
+    return () => cancelAnimationFrame(id);
+  }, [snapping]);
+
   return (
     <span className="relative inline-block h-[1em] w-[0.62em] overflow-hidden">
       <span
-        className="absolute left-0 top-0 flex flex-col transition-transform duration-500 ease-out"
-        style={{ transform: `translateY(-${digit}em)` }}
+        className={`absolute left-0 top-0 flex flex-col ${
+          snapping ? "" : "transition-transform duration-500 ease-out"
+        }`}
+        style={{ transform: `translateY(-${pos}em)` }}
+        onTransitionEnd={() => {
+          if (pos >= 10) {
+            setSnapping(true);
+            setPos(pos - 10);
+          }
+        }}
       >
-        {DIGITS.map((d) => (
-          <span key={d} className="block h-[1em] leading-[1em]">
+        {STRIP.map((d, i) => (
+          <span key={i} className="block h-[1em] leading-[1em]">
             {d}
           </span>
         ))}

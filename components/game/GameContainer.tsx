@@ -15,6 +15,9 @@ import DebugStats from "./DebugStats";
 import LoadingScreen from "./LoadingScreen";
 import MenuButton from "./MenuButton";
 import { RaceOverlay, useRaceGlobe } from "@/components/race/RaceMode";
+import SoundDirector from "@/components/sound/SoundDirector";
+import { play } from "@/lib/sound/engine";
+
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -274,8 +277,13 @@ export default function GameContainer({
         e.preventDefault();
         // One step back at a time: out of the controls panel first, and only
         // then out of the pause menu.
-        if (isPaused && showPauseSettings) setShowPauseSettings(false);
-        else togglePause();
+        if (isPaused && showPauseSettings) {
+          play("ui.click");
+          setShowPauseSettings(false);
+        } else {
+          play(isPaused ? "ui.click" : "ui.open");
+          togglePause();
+        }
         return;
       }
 
@@ -344,6 +352,7 @@ export default function GameContainer({
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-ground">
+      <SoundDirector />
       {isLoading && <LoadingScreen />}
 
       <div

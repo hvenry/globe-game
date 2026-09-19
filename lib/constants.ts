@@ -144,6 +144,34 @@ export const GLOBE_LAYER = {
   picker: 10,
 } as const;
 
+/** A new ring is born, the fill flashes, and the cue plays, every period. */
+const PULSE_PERIOD_MS = 1_200;
+
+/**
+ * The "find it" pulse: radar rings, the fill's red/white swap and the
+ * repeating cue all run on this one beat, so what you see and hear line up.
+ */
+export const PULSE_CONFIG = {
+  periodMs: PULSE_PERIOD_MS,
+  /** The same beat where three.js clocks are, so no caller divides by hand. */
+  periodSeconds: PULSE_PERIOD_MS / 1000,
+  /** Rings in flight at once; each takes `rings × period` to reach the edge. */
+  rings: 3,
+} as const;
+
+/**
+ * Master sound. The engine holds these until the settings store hydrates and
+ * tells it otherwise, so a cue fired before then is already at the right level.
+ */
+export const SOUND_CONFIG = {
+  /** Sound is part of the game, so it starts on; the toggle is one tap away. */
+  defaultEnabled: true,
+  /** Present without taking over a room the player is sitting in. */
+  defaultVolume: 0.7,
+  /** Volume changes ramp over this long, so dragging the slider never clicks. */
+  volumeRampSeconds: 0.02,
+} as const;
+
 export const GAME_CONFIG = {
   maxTries: 3,
   feedbackDuration: 800,
@@ -200,7 +228,10 @@ export const PLAYER_COLOR_IDS: readonly PlayerColorId[] = [
   "cyan",
 ];
 
-export const PLAYER_COLORS: Record<PlayerColorId, { claim: string; attempt: string }> = {
+export const PLAYER_COLORS: Record<
+  PlayerColorId,
+  { claim: string; attempt: string }
+> = {
   blue: { claim: "#1d4ed8", attempt: "#93c5fd" },
   purple: { claim: "#a855f7", attempt: "#d8b4fe" },
   orange: { claim: "#f97316", attempt: "#fdba74" },

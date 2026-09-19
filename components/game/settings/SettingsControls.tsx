@@ -35,6 +35,8 @@ export function Toggle({
   return (
     <button
       onClick={() => !disabled && onChange(!enabled)}
+      aria-pressed={enabled}
+      data-sound="toggle"
       className={`flex w-full items-center justify-between rounded-control border p-3 transition-all duration-200 ${
         disabled ? "opacity-40 cursor-default" : "cursor-pointer"
       } ${
@@ -94,6 +96,8 @@ interface SliderProps {
   displayMin?: number;
   displayMax?: number;
   expertMode?: boolean;
+  /** Fires when the thumb is released (pointer up, or a key released). */
+  onCommit?: () => void;
 }
 
 export function Slider({
@@ -106,6 +110,7 @@ export function Slider({
   displayMin,
   displayMax,
   expertMode = false,
+  onCommit,
 }: SliderProps) {
   const actualMin = min;
   const actualMax = max;
@@ -132,9 +137,7 @@ export function Slider({
   const displayProgress =
     ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
 
-  const fillColor = expertMode
-    ? "var(--color-expert)"
-    : "var(--color-signal)";
+  const fillColor = expertMode ? "var(--color-expert)" : "var(--color-signal)";
   const accentClass = expertMode ? "accent-expert" : "accent-signal";
 
   return (
@@ -150,6 +153,8 @@ export function Slider({
         step={step}
         value={displayValue}
         onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
         className={`h-1.5 w-full cursor-pointer appearance-none rounded-full bg-hairline ${accentClass} transition-colors`}
         style={{
           background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, var(--color-hairline) ${displayProgress}%, var(--color-hairline) 100%)`,
@@ -179,6 +184,8 @@ function OptionButton({
   return (
     <button
       onClick={() => !disabled && onClick()}
+      aria-pressed={selected}
+      data-sound="toggle"
       disabled={disabled}
       className={`flex min-h-8 items-center justify-center rounded-control border p-2 text-center transition-all duration-200 ${
         disabled ? "opacity-40 cursor-default" : "cursor-pointer"
@@ -286,7 +293,9 @@ export function TimerLimitSelect({
       <p className="hud-rule hud-label">Time limit</p>
       <div
         className="grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+        }}
       >
         {options.map((option) => {
           const isSelected = value === option.value;
@@ -437,6 +446,8 @@ export function CountrySetSelect({
       <button
         key={set.id}
         onClick={() => handleContinentClick(set.id)}
+        aria-pressed={isSelected}
+        data-sound="toggle"
         className={`group relative rounded-control border p-3 text-left transition-all duration-200 cursor-pointer ${borderClass} ${
           isSelected
             ? expertMode

@@ -377,3 +377,18 @@ export function standings(state: RaceState): RacePlayer[] {
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
 }
+
+/**
+ * Whether nobody took the lead: the top two are level on every tiebreak
+ * `standings` ranks by, so only the id — which is not a result — separates
+ * them. Takes the ranked list, since a caller showing standings has one.
+ */
+export function isDraw(ranked: readonly RacePlayer[]): boolean {
+  const [leader, runnerUp] = ranked;
+  if (leader === undefined || runnerUp === undefined) return false;
+  return (
+    leader.score === runnerUp.score &&
+    leader.claims === runnerUp.claims &&
+    leader.totalClaimMs === runnerUp.totalClaimMs
+  );
+}

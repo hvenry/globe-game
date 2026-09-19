@@ -3,6 +3,7 @@ import {
   createRace,
   end,
   guess,
+  isDraw,
   leave,
   nextTransitionAt,
   rejoin,
@@ -12,7 +13,12 @@ import {
   timeRemainingMs,
 } from "./race";
 import { seededShuffle } from "./rng";
-import { RACE_EVENT_LOG, type RaceConfig, type RacePlayer, type RaceState } from "./types";
+import {
+  RACE_EVENT_LOG,
+  type RaceConfig,
+  type RacePlayer,
+  type RaceState,
+} from "./types";
 import { RACE_SCORING } from "../constants";
 
 const IDS = ["100", "200", "300", "400", "500"];
@@ -46,6 +52,15 @@ function racing(overrides: Partial<RaceConfig> = {}): RaceState {
 
 function player(state: RaceState, id: string): RacePlayer {
   return state.players.find((p) => p.id === id)!;
+}
+
+/** A race whose roster is exactly these players, for ranking tests. */
+function withPlayers(players: Partial<RacePlayer>[]): RaceState {
+  const s = newRace();
+  return {
+    ...s,
+    players: players.map((p, i) => ({ ...s.players[0], id: String(i), ...p })),
+  };
 }
 
 describe("creation", () => {
@@ -133,7 +148,10 @@ describe("tick", () => {
     expect(s1.currentId).toBe(s0.order[0]);
     expect(s1.results[s0.order[0]]).toBeUndefined();
     expect(s1.phaseDeadline).toBeNull();
-    expect(s1.events.at(-1)).toMatchObject({ type: "expired", countryId: s0.order[0] });
+    expect(s1.events.at(-1)).toMatchObject({
+      type: "expired",
+      countryId: s0.order[0],
+    });
   });
 
   test("reveal waits for a click however long it takes", () => {
@@ -143,7 +161,12 @@ describe("tick", () => {
 
   test("intermission end reveals the next country", () => {
     const s0 = racing();
-    const s1 = guess(tick(s0, START + 10_000), "a", s0.order[0], START + 10_500);
+    const s1 = guess(
+      tick(s0, START + 10_000),
+      "a",
+      s0.order[0],
+      START + 10_500,
+    );
     expect(s1.phase).toBe("intermission");
     const s2 = tick(s1, START + 10_500 + 1_200);
     expect(s2.phase).toBe("racing");
@@ -186,10 +209,18 @@ describe("tick", () => {
     const s0 = racing({ intermissionMs: 0 });
     // The click settles the country; the server's next tick, due at once,
     // rolls the zero-length intermission over.
-    const s1 = tick(guess(tick(s0, START + 10_000), "b", s0.order[0], START + 10_100), START + 10_100);
+    const s1 = tick(
+      guess(tick(s0, START + 10_000), "b", s0.order[0], START + 10_100),
+      START + 10_100,
+    );
     expect(s1.phase).toBe("racing");
     expect(s1.currentIndex).toBe(1);
-    expect(s1.results[s0.order[0]]).toEqual({ by: "b", elapsedMs: 10_100, recovered: true, points: RACE_SCORING.recovery });
+    expect(s1.results[s0.order[0]]).toEqual({
+      by: "b",
+      elapsedMs: 10_100,
+      recovered: true,
+      points: RACE_SCORING.recovery,
+    });
   });
 
   test("an empty order finishes as soon as the countdown ends", () => {
@@ -210,9 +241,16 @@ describe("claims", () => {
     const s1 = guess(s0, "a", s0.currentId!, START + 2_500);
     expect(s1.phase).toBe("intermission");
     expect(s1.currentId).toBe(s0.currentId);
-    expect(s1.results[s0.currentId!]).toMatchObject({ by: "a", elapsedMs: 2_500 });
+    expect(s1.results[s0.currentId!]).toMatchObject({
+      by: "a",
+      elapsedMs: 2_500,
+    });
     expect(s1.results[s0.currentId!].points).toBeGreaterThan(0);
-    expect(player(s1, "a")).toMatchObject({ claims: 1, totalClaimMs: 2_500, lockedUntil: null });
+    expect(player(s1, "a")).toMatchObject({
+      claims: 1,
+      totalClaimMs: 2_500,
+      lockedUntil: null,
+    });
     expect(player(s1, "b")).toEqual(player(s0, "b"));
     expect(s1.phaseDeadline).toBe(START + 3_700);
   });
@@ -250,7 +288,12 @@ describe("claims", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[0], START + 10_001);
     expect(s1.phase).toBe("intermission");
-    expect(s1.results[s0.order[0]]).toEqual({ by: "a", elapsedMs: 10_001, recovered: true, points: RACE_SCORING.recovery });
+    expect(s1.results[s0.order[0]]).toEqual({
+      by: "a",
+      elapsedMs: 10_001,
+      recovered: true,
+      points: RACE_SCORING.recovery,
+    });
     expect(player(s1, "a").claims).toBe(0);
     expect(player(s1, "a").recoveries).toBe(1);
     expect(player(s1, "a").score).toBe(RACE_SCORING.recovery);
@@ -268,7 +311,12 @@ describe("claims", () => {
 
   test("only the first click recovers; the country is then settled", () => {
     const s0 = racing();
-    const s1 = guess(tick(s0, START + 10_000), "b", s0.order[0], START + 10_100);
+    const s1 = guess(
+      tick(s0, START + 10_000),
+      "b",
+      s0.order[0],
+      START + 10_100,
+    );
     const s2 = guess(s1, "a", s0.order[0], START + 10_200);
     expect(s2).toBe(s1);
     expect(player(s2, "b").recoveries).toBe(1);
@@ -282,7 +330,8 @@ describe("scoring", () => {
   test("an instant clean claim earns claim plus full speed plus accuracy", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", first(s0), START);
-    const expected = RACE_SCORING.claim + RACE_SCORING.speedMax + RACE_SCORING.accuracy;
+    const expected =
+      RACE_SCORING.claim + RACE_SCORING.speedMax + RACE_SCORING.accuracy;
     expect(player(s1, "a").score).toBe(expected);
     expect(s1.events.at(-1)).toMatchObject({
       type: "claim",
@@ -302,9 +351,13 @@ describe("scoring", () => {
   test("speed scales down with the window and hits zero at its end", () => {
     const s0 = racing();
     const half = guess(s0, "a", first(s0), START + 5_000);
-    expect(half.events.at(-1)).toMatchObject({ breakdown: { speed: RACE_SCORING.speedMax / 2 } });
+    expect(half.events.at(-1)).toMatchObject({
+      breakdown: { speed: RACE_SCORING.speedMax / 2 },
+    });
     const end = guess(s0, "a", first(s0), START + 9_999);
-    expect((end.events.at(-1) as { breakdown: { speed: number } }).breakdown.speed).toBe(0);
+    expect(
+      (end.events.at(-1) as { breakdown: { speed: number } }).breakdown.speed,
+    ).toBe(0);
   });
 
   test("a wrong click on the way forfeits the accuracy bonus", () => {
@@ -325,7 +378,10 @@ describe("scoring", () => {
     s = guess(s, "a", s.currentId!, now); // streak 1, combo 0
     step();
     s = guess(s, "a", s.currentId!, now); // streak 2, combo one step
-    expect(s.events.at(-1)).toMatchObject({ streak: 2, breakdown: { combo: RACE_SCORING.comboStep } });
+    expect(s.events.at(-1)).toMatchObject({
+      streak: 2,
+      breakdown: { combo: RACE_SCORING.comboStep },
+    });
     step();
     s = guess(s, "b", s.currentId!, now); // b claims: a's streak ends
     expect(player(s, "a").streak).toBe(0);
@@ -349,7 +405,10 @@ describe("scoring", () => {
   });
 
   test("the event log keeps only the most recent entries but never reuses a seq", () => {
-    let s: RaceState = { ...racing(), order: Array.from({ length: 30 }, (_, i) => String(i)) };
+    let s: RaceState = {
+      ...racing(),
+      order: Array.from({ length: 30 }, (_, i) => String(i)),
+    };
     let now = START;
     for (let i = 0; i < 30; i++) {
       s = guess(s, "a", s.currentId!, now);
@@ -408,7 +467,10 @@ describe("lockout", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[1], START + 1_000);
     const s2 = guess(s1, "a", s0.currentId!, START + 2_500);
-    expect(s2.results[s0.currentId!]).toMatchObject({ by: "a", elapsedMs: 2_500 });
+    expect(s2.results[s0.currentId!]).toMatchObject({
+      by: "a",
+      elapsedMs: 2_500,
+    });
     expect(s2.results[s0.currentId!].points).toBeGreaterThan(0);
   });
 
@@ -416,7 +478,10 @@ describe("lockout", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[1], START + 1_000);
     const s2 = guess(s1, "b", s0.currentId!, START + 1_100);
-    expect(s2.results[s0.currentId!]).toMatchObject({ by: "b", elapsedMs: 1_100 });
+    expect(s2.results[s0.currentId!]).toMatchObject({
+      by: "b",
+      elapsedMs: 1_100,
+    });
     expect(s2.results[s0.currentId!].points).toBeGreaterThan(0);
   });
 
@@ -481,16 +546,12 @@ describe("leave and rejoin", () => {
 });
 
 describe("standings", () => {
-  function withPlayers(players: Partial<RacePlayer>[]): RaceState {
-    const s = newRace();
-    return {
-      ...s,
-      players: players.map((p, i) => ({ ...s.players[0], id: String(i), ...p })),
-    };
-  }
-
   test("orders by score descending", () => {
-    const s = withPlayers([{ id: "x", score: 100 }, { id: "y", score: 300 }, { id: "z", score: 200 }]);
+    const s = withPlayers([
+      { id: "x", score: 100 },
+      { id: "y", score: 300 },
+      { id: "z", score: 200 },
+    ]);
     expect(standings(s).map((p) => p.id)).toEqual(["y", "z", "x"]);
   });
 
@@ -512,10 +573,56 @@ describe("standings", () => {
   });
 
   test("fully tied players order by id and the input is not mutated", () => {
-    const s = withPlayers([{ id: "b", claims: 1 }, { id: "a", claims: 1 }]);
+    const s = withPlayers([
+      { id: "b", claims: 1 },
+      { id: "a", claims: 1 },
+    ]);
     const sorted = standings(s);
     expect(sorted.map((p) => p.id)).toEqual(["a", "b"]);
     expect(s.players.map((p) => p.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("isDraw", () => {
+  test("level on score, claims and claim time is a draw", () => {
+    const s = withPlayers([
+      { id: "b", score: 900, claims: 2, totalClaimMs: 4_000 },
+      { id: "a", score: 900, claims: 2, totalClaimMs: 4_000 },
+    ]);
+    expect(isDraw(standings(s))).toBe(true);
+  });
+
+  test("any tiebreak that separates the top two is not a draw", () => {
+    const base = { score: 900, claims: 2, totalClaimMs: 4_000 };
+    const byScore = withPlayers([
+      { ...base, id: "a" },
+      { ...base, id: "b", score: 800 },
+    ]);
+    const byClaims = withPlayers([
+      { ...base, id: "a" },
+      { ...base, id: "b", claims: 1 },
+    ]);
+    const byTime = withPlayers([
+      { ...base, id: "a" },
+      { ...base, id: "b", totalClaimMs: 9_000 },
+    ]);
+    expect(isDraw(standings(byScore))).toBe(false);
+    expect(isDraw(standings(byClaims))).toBe(false);
+    expect(isDraw(standings(byTime))).toBe(false);
+  });
+
+  test("a tie behind the leader is not a draw", () => {
+    const s = withPlayers([
+      { id: "a", score: 900 },
+      { id: "b", score: 800 },
+      { id: "c", score: 800 },
+    ]);
+    expect(isDraw(standings(s))).toBe(false);
+  });
+
+  test("one player, or none, is never a draw", () => {
+    expect(isDraw(standings(withPlayers([{ id: "a" }])))).toBe(false);
+    expect(isDraw([])).toBe(false);
   });
 });
 

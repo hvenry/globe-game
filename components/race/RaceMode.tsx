@@ -23,6 +23,7 @@ import {
   raceFills,
   type RaceStatus,
 } from "@/lib/store/race-store";
+import { play } from "@/lib/sound/engine";
 import MenuButton from "@/components/game/MenuButton";
 import JoinView from "./JoinView";
 import LobbyView from "./LobbyView";
@@ -273,26 +274,36 @@ export function RaceOverlay({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+
       if (status === "racing") {
         e.preventDefault();
         // Closed → menu → closed, and any deeper rung backs up to the menu.
-        if (menuView === null) setMenuView("menu");
-        else setMenuView(menuView === "menu" ? null : "menu");
-      } else if (status === "finished") {
-        // One rung back is the waiting room, ready for another round.
-        e.preventDefault();
-        rematch();
-      } else if (
-        status === "lobby" ||
-        status === "connecting" ||
-        status === "left"
-      ) {
-        e.preventDefault();
-        leaveRoom();
-      } else if (status === "idle" || status === "error") {
-        e.preventDefault();
-        exit();
+        play(menuView === null ? "ui.open" : "ui.click");
+        setMenuView(menuView === "menu" ? null : "menu");
+        return;
       }
+
+      // Everywhere else Escape steps back a rung, and they all sound alike.
+      let back: (() => void) | null = null;
+      switch (status) {
+        case "finished":
+          // One rung back is the waiting room, ready for another round.
+          back = rematch;
+          break;
+        case "lobby":
+        case "connecting":
+        case "left":
+          back = leaveRoom;
+          break;
+        case "idle":
+        case "error":
+          back = exit;
+          break;
+      }
+      if (!back) return;
+      e.preventDefault();
+      play("ui.click");
+      back();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

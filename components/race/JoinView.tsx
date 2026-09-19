@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createRoom, useRaceStore } from "@/lib/store/race-store";
+import { play } from "@/lib/sound/engine";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { LOBBY_LIMITS } from "@/lib/race/types";
 import { ROOM_CODE_LENGTH as CODE_LENGTH } from "@/lib/race/room-code";
@@ -17,6 +18,15 @@ const ACTION_IDLE = "cursor-default border-hairline bg-transparent text-mid";
 
 const NAME_FIELD =
   "min-w-0 flex-1 rounded-control border border-hairline bg-well px-3 py-2 text-hi outline-none placeholder:text-faint focus:border-signal";
+
+/** Enter in a name field does what the button beside it does, sound and all. */
+function onEnter(ready: boolean, submit: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" || !ready) return;
+    play("ui.click");
+    submit();
+  };
+}
 
 export default function JoinView({
   initialRoom,
@@ -56,6 +66,12 @@ export default function JoinView({
     join(roomId, cleanName, preferredColor);
   }
 
+  /** With a name, straight in; without one, the prompt asks for it first. */
+  function joinWithCode() {
+    if (named) enter(code);
+    else setPrompting(true);
+  }
+
   async function host() {
     setBusy(true);
     setError(null);
@@ -84,9 +100,7 @@ export default function JoinView({
             id="race-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && named) enter(code);
-            }}
+            onKeyDown={onEnter(named, () => enter(code))}
             maxLength={LOBBY_LIMITS.maxNameLength}
             placeholder="Enter a name"
             autoFocus
@@ -120,9 +134,7 @@ export default function JoinView({
           id="race-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && canHost) host();
-          }}
+          onKeyDown={onEnter(canHost, host)}
           maxLength={LOBBY_LIMITS.maxNameLength}
           placeholder="Enter a name"
           className={NAME_FIELD}
@@ -145,12 +157,16 @@ export default function JoinView({
         id="race-code"
         value={code}
         onChange={setCode}
-        onSubmit={() => codeReady && (named ? enter(code) : setPrompting(true))}
+        onSubmit={() => {
+          if (!codeReady) return;
+          play("ui.click");
+          joinWithCode();
+        }}
       />
       {/* Live on the code alone: a missing name is answered with the prompt,
           not with a button that sits there doing nothing. */}
       <button
-        onClick={() => (named ? enter(code) : setPrompting(true))}
+        onClick={joinWithCode}
         disabled={!codeReady}
         className="btn-ghost press mt-3 disabled:opacity-40"
       >

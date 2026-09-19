@@ -14,7 +14,12 @@ import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
 import PulseRing from "./PulseRing";
 import type { CountryFeature } from "@/lib/geo/types";
-import { GLOBE_CONFIG, GLOBE_LAYER, type CountryFill } from "@/lib/constants";
+import {
+  GLOBE_CONFIG,
+  GLOBE_LAYER,
+  type CountryFill,
+  PULSE_CONFIG,
+} from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
 import { useHeroFraming } from "@/lib/hooks/useHeroFraming";
 import { baseId } from "@/lib/geo/countries";
@@ -91,11 +96,21 @@ function PulseFillLayer({
     [COLORS.countryFailed, COLORS.countryHover],
   );
 
+  // Swaps colour on each beat of the same clock the radar ring and the
+  // repeating cue run on, started the frame the pulse becomes active.
+  const startRef = useRef<number | null>(null);
   useFrame((state) => {
     const material = materialRef.current;
-    if (!material || !active) return;
-    const flash = (Math.sin(state.clock.elapsedTime * 4) + 1) / 2;
-    material.color.copy(flash > 0.5 ? flashColors.alert : flashColors.alt);
+    if (!material || !active) {
+      startRef.current = null;
+      return;
+    }
+    startRef.current ??= state.clock.elapsedTime;
+    // Solid, and it alternates: red for one beat, white for the next.
+    const beat = Math.floor(
+      (state.clock.elapsedTime - startRef.current) / PULSE_CONFIG.periodSeconds,
+    );
+    material.color.copy(beat % 2 === 0 ? flashColors.alert : flashColors.alt);
   });
 
   return (
@@ -182,7 +197,11 @@ function GlobeScene({
   scene,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const pointerDownRef = useRef<{ x: number; y: number; isTouch: boolean } | null>(null);
+  const pointerDownRef = useRef<{
+    x: number;
+    y: number;
+    isTouch: boolean;
+  } | null>(null);
   const [hoveredCountryBase, setHoveredCountryBase] = useState<string | null>(
     null,
   );
@@ -243,7 +262,8 @@ function GlobeScene({
     try {
       // For MultiPolygon features (e.g. France with French Guiana), use the
       // centroid of the largest polygon so the radar appears on the mainland.
-      let centroidTarget: GeoJSON.Feature = feature as unknown as GeoJSON.Feature;
+      let centroidTarget: GeoJSON.Feature =
+        feature as unknown as GeoJSON.Feature;
       if (feature.geometry.type === "MultiPolygon") {
         let largestArea = -1;
         for (const coords of feature.geometry.coordinates) {
@@ -323,15 +343,16 @@ function GlobeScene({
         ? previewIds
         : null;
 
-  const { landTexture, baseTexture, hoverTexture, pulseTexture } = useCountryTextures({
-    features,
-    resolvedCountries,
-    wrongGuessIds,
-    hoveredCountryBase,
-    pulseBase,
-    emphasisIds,
-    onFirstDraw: handleReady,
-  });
+  const { landTexture, baseTexture, hoverTexture, pulseTexture } =
+    useCountryTextures({
+      features,
+      resolvedCountries,
+      wrongGuessIds,
+      hoveredCountryBase,
+      pulseBase,
+      emphasisIds,
+      onFirstDraw: handleReady,
+    });
 
   const findCountryAtPoint = useCountryPicking(features);
 
@@ -352,10 +373,13 @@ function GlobeScene({
       if (base && validCountryIds.size > 0 && !validCountryIds.has(base)) {
         base = null;
       }
-      // Without hints there is nothing to learn from a painted country
+      // Without hints there is nothing to learn from a painted country — except
+      // the one pulsing to be clicked, which is the live target however it is
+      // painted.
       if (
         base &&
         !hoverFilled &&
+        base !== pulseBase &&
         (resolvedCountries[base] !== undefined || wrongGuessIds.includes(base))
       ) {
         base = null;
@@ -371,6 +395,7 @@ function GlobeScene({
       hoveredCountryBase,
       validCountryIds,
       hoverFilled,
+      pulseBase,
       resolvedCountries,
       wrongGuessIds,
     ],
@@ -467,7 +492,11 @@ function GlobeScene({
             ]}
           />
           {COLORS.unlit ? (
-            <meshBasicMaterial map={landTexture} transparent depthWrite={false} />
+            <meshBasicMaterial
+              map={landTexture}
+              transparent
+              depthWrite={false}
+            />
           ) : (
             <meshPhongMaterial
               map={landTexture}

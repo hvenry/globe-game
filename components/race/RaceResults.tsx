@@ -1,5 +1,6 @@
 "use client";
 
+import { isDraw } from "@/lib/engine/race";
 import { useRaceStore, usePlayerInk } from "@/lib/store/race-store";
 import { COUNTRY_NAMES } from "@/lib/geo/country-names";
 import PlayerDot from "./PlayerDot";
@@ -27,14 +28,8 @@ export default function RaceResults({
 
   if (!race || !standings) return null;
 
-  const [leader, runnerUp] = standings;
-  // Level on every tiebreak the engine ranks by, so nobody took the lead.
-  const drawn =
-    runnerUp !== undefined &&
-    leader.score === runnerUp.score &&
-    leader.claims === runnerUp.claims &&
-    leader.totalClaimMs === runnerUp.totalClaimMs;
-  const youWin = leader.id === playerId && !drawn;
+  const drawn = isDraw(standings);
+  const youWin = standings[0].id === playerId && !drawn;
 
   return (
     <div className="veil absolute inset-0 z-20 flex items-center justify-center p-4">
@@ -134,7 +129,10 @@ export default function RaceResults({
             <summary className="hud-label cursor-pointer text-low">
               Countries
             </summary>
-            <ul className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto">
+            <ul
+              className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto pr-3"
+              style={{ scrollbarGutter: "stable" }}
+            >
               {race.order.map((id) => {
                 const result = race.results[id];
                 const owner = result?.by
