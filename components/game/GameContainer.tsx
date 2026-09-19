@@ -360,6 +360,7 @@ export default function GameContainer({
             onReady={handleGlobeReady}
             zoomSpeed={zoomSpeed}
             rotateSpeed={rotateSpeed}
+            hoverFilled={raceGlobe.hoverFilled}
             scene={raceGlobe.scene}
           />
         ) : (
@@ -381,6 +382,7 @@ export default function GameContainer({
             onRevealArrived={handleRevealArrived}
             zoomSpeed={zoomSpeed}
             rotateSpeed={rotateSpeed}
+            hoverFilled={showHints}
           />
         )}
       </div>

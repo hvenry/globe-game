@@ -285,17 +285,26 @@
   .btn-primary {
     @apply h-9 w-full cursor-pointer rounded-control text-xs font-semibold uppercase tracking-[0.14em] transition-all md:h-11 md:text-sm;
   }
-  /* Fill and its readable type travel together. */
+  /* Fill, readable type and hover glow travel together: every primary action
+     in a channel lights up the same way, so no call site spells the glow out.
+     Pair with a transition utility (`.btn-primary` already carries one). */
   .btn-signal {
+    @apply hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)];
     background-color: rgb(var(--signal));
     color: var(--on-signal);
   }
   .btn-expert {
+    @apply hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--expert)/0.35)];
     background-color: rgb(var(--expert));
     color: var(--on-expert);
   }
   .btn-ghost {
     @apply flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-control border border-hairline text-label font-medium uppercase tracking-[0.18em] text-low transition-all hover:border-hairline-strong hover:text-mid md:h-9;
+  }
+  /* A ghost button in the alert channel: destructive room-level actions
+     (ending the race for everyone). Leaving on your own is `.btn-quiet`. */
+  .btn-danger {
+    @apply flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-control border border-alert/50 text-label font-medium uppercase tracking-[0.18em] text-alert transition-all hover:border-alert md:h-9;
   }
   .btn-quiet {
     @apply w-full cursor-pointer py-1 text-label font-medium uppercase tracking-[0.18em] text-faint transition-all hover:text-alert/80;
@@ -428,12 +437,53 @@
   animation: fadeInOutUp 2s ease-in-out forwards;
 }
 
+/* Race feed entry: in from the right, then a slow fade near the end of its
+   stay. Every step is a percentage of the run, so the whole entrance and exit
+   follows `--feed-ttl` — RaceFeed sets it from the same constant that clears
+   the entry, and the fallback keeps the class usable on its own. */
+@keyframes feedIn {
+  0% {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  8% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-feed-in {
+  animation: feedIn var(--feed-ttl, 4.5s) ease-out forwards;
+}
+
 .animate-shake {
   animation: shake 0.3s ease-in-out;
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 1s ease-in-out infinite;
+}
+
+/* Loading dots: each one brightens in turn; the delay is set per dot inline */
+@keyframes loading-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.animate-loading-dot {
+  animation: loading-dot 1.2s ease-in-out infinite;
 }
 
 .animate-timer-pulse {

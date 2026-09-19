@@ -49,6 +49,12 @@ interface GlobeProps {
   zoomSpeed?: number;
   rotateSpeed?: number;
   /**
+   * Whether countries already painted (resolved or guessed wrong) still light
+   * up under the pointer. Off, the highlight only ever marks a live target,
+   * so nothing invites a click that cannot be answered.
+   */
+  hoverFilled?: boolean;
+  /**
    * Drive the scene from somewhere other than the solo game store. Race mode
    * passes this so set emphasis, hover gating and the camera flights follow
    * the room's settings rather than whatever the solo menu has selected.
@@ -61,6 +67,8 @@ export interface GlobeScene {
   countrySetId: CountrySetId;
   /** Identity of the current run; a change triggers the intro flight. */
   gameKey: number | null;
+  /** A country to pulse (race reveal), or null. Replaces the solo mustclick pulse. */
+  pulseId?: string | null;
 }
 
 // Mustclick pulse fill: the target country is painted white on its own
@@ -170,6 +178,7 @@ function GlobeScene({
   onRevealArrived,
   zoomSpeed = 0.53,
   rotateSpeed = 1.0,
+  hoverFilled = true,
   scene,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -220,7 +229,11 @@ function GlobeScene({
   const showMustclickEffects =
     gamePhase === "mustclick" ||
     (gamePhase === "gameover" && expertMode && lastResolution === "failed");
-  const pulseBase = showMustclickEffects && currentCountry ? currentCountry.id : null;
+  const pulseBase = scene
+    ? (scene.pulseId ?? null)
+    : showMustclickEffects && currentCountry
+      ? currentCountry.id
+      : null;
 
   // Compute centroid position for pulse ring during mustclick phase or expert gameover
   const pulseRingPosition = useMemo(() => {
@@ -339,12 +352,28 @@ function GlobeScene({
       if (base && validCountryIds.size > 0 && !validCountryIds.has(base)) {
         base = null;
       }
+      // Without hints there is nothing to learn from a painted country
+      if (
+        base &&
+        !hoverFilled &&
+        (resolvedCountries[base] !== undefined || wrongGuessIds.includes(base))
+      ) {
+        base = null;
+      }
       if (base !== hoveredCountryBase) {
         setHoveredCountryBase(base);
         document.body.style.cursor = base ? "pointer" : "auto";
       }
     },
-    [interactive, findCountryAtPoint, hoveredCountryBase, validCountryIds],
+    [
+      interactive,
+      findCountryAtPoint,
+      hoveredCountryBase,
+      validCountryIds,
+      hoverFilled,
+      resolvedCountries,
+      wrongGuessIds,
+    ],
   );
 
   const handlePointerOut = useCallback(() => {

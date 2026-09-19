@@ -9,7 +9,9 @@ import {
   ExportIcon,
   MoonIcon as PhosphorMoon,
   SlidersHorizontalIcon,
+  PlusIcon as PhosphorPlus,
   SunIcon as PhosphorSun,
+  XIcon as PhosphorX,
   UsersIcon as PhosphorUsers,
   type IconProps as PhosphorIconProps,
 } from "@phosphor-icons/react";
@@ -41,6 +43,16 @@ export function ChevronDownIcon(props: IconProps) {
 
 export function ArrowLeftIcon(props: IconProps) {
   return <PhosphorArrowLeft {...DEFAULTS} {...props} />;
+}
+
+/** Add / invite */
+export function PlusIcon(props: IconProps) {
+  return <PhosphorPlus {...DEFAULTS} {...props} />;
+}
+
+/** Close / remove */
+export function XIcon(props: IconProps) {
+  return <PhosphorX {...DEFAULTS} {...props} />;
 }
 
 /** Two people — multiplayer / live race */

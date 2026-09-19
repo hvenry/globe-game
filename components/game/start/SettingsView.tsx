@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAppVersion } from "@/lib/version";
-import { ChevronLeftIcon } from "@/components/ui/icons";
+import PanelHeader from "@/components/ui/PanelHeader";
 import ControlsSection from "../settings/ControlsSection";
 import {
   Toggle,
@@ -68,20 +68,9 @@ export default function SettingsView({
   }, []);
 
   return (
-    <div className="relative flex flex-col" style={{ maxHeight: "50vh" }}>
+    <div className="relative flex flex-col" style={{ maxHeight: "40vh" }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
-          aria-label="Back"
-          className="btn-icon press"
-        >
-          <ChevronLeftIcon size={13} />
-        </button>
-        <h2 className="hud-label text-mid">Settings</h2>
-        {/* Balances the back button so the title stays centred. */}
-        <div className="h-7 w-7" />
-      </div>
+      <PanelHeader title="Settings" onBack={onBack} />
 
       {/* Scroll progress */}
       {/* `shrink-0` is load-bearing: this is a flex item in a height-capped

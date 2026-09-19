@@ -140,11 +140,7 @@ export default function MainMenu({
       <div className="space-y-2 md:space-y-2.5">
         <button
           onClick={onStart}
-          className={`btn-primary ${
-            expertMode
-              ? "btn-expert hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--expert)/0.35)]"
-              : "btn-signal hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]"
-          }`}
+          className={`btn-primary ${expertMode ? "btn-expert" : "btn-signal"}`}
         >
           {expertMode ? "Start expert game" : "Start game"}
         </button>

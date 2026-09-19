@@ -67,11 +67,7 @@ export default function GameOver({ onPlayAgain, onMainMenu }: GameOverProps) {
         <div className="mt-6 space-y-2 md:mt-7 md:space-y-2.5">
           <button
             onClick={onPlayAgain}
-            className={`btn-primary ${
-              expertMode
-                ? "btn-expert hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--expert)/0.35)]"
-                : "btn-signal hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]"
-            }`}
+            className={`btn-primary ${expertMode ? "btn-expert" : "btn-signal"}`}
           >
             Play again
           </button>

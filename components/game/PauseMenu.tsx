@@ -5,7 +5,8 @@ import { useStatsStore } from "@/lib/store/stats-store";
 import { formatScore } from "@/lib/utils";
 import ScoreCard, { countResolutions } from "./ResolutionBreakdown";
 import ControlsSection from "./settings/ControlsSection";
-import { ChevronLeftIcon, SlidersIcon } from "@/components/ui/icons";
+import { SlidersIcon } from "@/components/ui/icons";
+import PanelHeader from "@/components/ui/PanelHeader";
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
 
 interface PauseMenuProps {
@@ -64,18 +65,7 @@ export default function PauseMenu({
       <div className="panel panel-ticks panel-dialog animate-fade-in-up text-center">
         {showSettings ? (
           <div className="space-y-6 text-left">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={onCloseSettings}
-                aria-label="Back"
-                className="btn-icon press"
-              >
-                <ChevronLeftIcon size={13} />
-              </button>
-              <h2 className="hud-label text-mid">Controls</h2>
-              {/* Balances the back button so the title stays centred. */}
-              <div className="h-7 w-7" />
-            </div>
+            <PanelHeader title="Controls" onBack={onCloseSettings} />
 
             <ControlsSection expertMode={expertMode} />
 
@@ -141,9 +131,7 @@ export default function PauseMenu({
             <button
               onClick={onResume}
               className={`btn-primary ${
-                expertMode
-                  ? "btn-expert hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--expert)/0.35)]"
-                  : "btn-signal hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]"
+                expertMode ? "btn-expert" : "btn-signal"
               }`}
             >
               Resume

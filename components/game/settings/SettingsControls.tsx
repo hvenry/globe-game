@@ -263,26 +263,31 @@ interface TimerLimitSelectProps {
   onChange: (value: number | null) => void;
   disabled?: boolean;
   expertMode?: boolean;
+  /** Seconds on offer; `null` is "no limit". Race mode leaves `null` out. */
+  limits?: readonly (number | null)[];
 }
+
+const ALL_TIMER_LIMITS: readonly (number | null)[] = [5, 10, 15, 30, null];
 
 export function TimerLimitSelect({
   value,
   onChange,
   disabled = false,
   expertMode = false,
+  limits = ALL_TIMER_LIMITS,
 }: TimerLimitSelectProps) {
-  const options: Array<{ label: string; value: number | null }> = [
-    { label: "5s", value: 5 },
-    { label: "10s", value: 10 },
-    { label: "15s", value: 15 },
-    { label: "30s", value: 30 },
-    { label: "None", value: null },
-  ];
+  const options = limits.map((limit) => ({
+    label: limit === null ? "None" : `${limit}s`,
+    value: limit,
+  }));
 
   return (
     <div className="space-y-3">
       <p className="hud-rule hud-label">Time limit</p>
-      <div className="grid grid-cols-5 gap-2">
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+      >
         {options.map((option) => {
           const isSelected = value === option.value;
           const useExpertStyling = expertMode && option.value === 5;
