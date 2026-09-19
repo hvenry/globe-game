@@ -60,7 +60,11 @@ export default function RootLayout({
           }}
         />
       </head>
+      {/* Extensions (Grammarly and friends) write their own attributes onto
+          the body before React hydrates, which reads as a mismatch. The flag
+          does not cascade from <html>, so it is repeated here. */}
       <body
+        suppressHydrationWarning
         className={`${spaceGrotesk.variable} ${GeistMono.variable} font-sans antialiased bg-ground text-hi`}
       >
         <ThemeSync />

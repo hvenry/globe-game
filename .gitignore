@@ -2,7 +2,7 @@
 
 /data/countries-50m.json
 # dependencies
-/node_modules
+node_modules/
 CLAUDE.md
 /.pnp
 .pnp.*
@@ -37,6 +37,13 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# cloudflare / wrangler
+# Local miniflare state: Durable Object SQLite, caches, dev sessions.
+.wrangler/
+# Local secrets for `wrangler dev`
+.dev.vars
+.dev.vars.*
 
 # typescript
 *.tsbuildinfo

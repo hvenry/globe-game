@@ -1,31 +1,34 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAppVersion } from "@/lib/version";
-import { ChevronLeftIcon, MoonIcon, SunIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon } from "@/components/ui/icons";
+import ControlsSection from "../settings/ControlsSection";
 import {
   Toggle,
-  Slider,
   MaxTriesSelect,
   TimerLimitSelect,
   CountrySetSelect,
 } from "../settings/SettingsControls";
 
+/** Which group the panel opens on. */
+export type SettingsFocus = "top" | "gameOptions";
+
 interface SettingsViewProps {
   onBack: () => void;
+  focus?: SettingsFocus;
   expertMode: boolean;
-  highlightCountrySet?: boolean;
 }
 
 export default function SettingsView({
   onBack,
+  focus = "top",
   expertMode,
-  highlightCountrySet = false,
 }: SettingsViewProps) {
   const progressRef = useRef<HTMLDivElement>(null);
-  const [showHighlight, setShowHighlight] = useState(highlightCountrySet);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const gameOptionsRef = useRef<HTMLElement>(null);
 
   const theme = useSettingsStore((s) => s.theme);
   const countrySet = useSettingsStore((s) => s.countrySet);
@@ -33,17 +36,25 @@ export default function SettingsView({
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
   const maxTries = useSettingsStore((s) => s.maxTries);
-  const zoomSpeed = useSettingsStore((s) => s.zoomSpeed);
-  const rotateSpeed = useSettingsStore((s) => s.rotateSpeed);
-  const setTheme = useSettingsStore((s) => s.setTheme);
   const setCountrySet = useSettingsStore((s) => s.setCountrySet);
   const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
   const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
   const setMaxTries = useSettingsStore((s) => s.setMaxTries);
-  const setZoomSpeed = useSettingsStore((s) => s.setZoomSpeed);
-  const setRotateSpeed = useSettingsStore((s) => s.setRotateSpeed);
+
+  // Opened from the country-set cell, the panel starts on the group that cell
+  // belongs to rather than making the player scroll past the live controls.
+  // Written to `scrollTop` rather than `scrollIntoView`, which would also
+  // scroll every ancestor that can take it.
+  useEffect(() => {
+    if (focus !== "gameOptions") return;
+    const box = scrollRef.current;
+    const section = gameOptionsRef.current;
+    if (!box || !section) return;
+    box.scrollTop +=
+      section.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  }, [focus]);
 
   // Written straight to the node: a re-render per scroll event lands the bar a
   // frame behind the content on top of an already-running WebGL loop.
@@ -56,9 +67,6 @@ export default function SettingsView({
     }
   }, []);
 
-  const iconButton =
-    "press flex h-7 w-7 cursor-pointer items-center justify-center rounded-control border border-hairline text-mid transition-all hover:border-hairline-strong hover:text-hi";
-
   return (
     <div className="relative flex flex-col" style={{ maxHeight: "50vh" }}>
       {/* Header */}
@@ -66,20 +74,13 @@ export default function SettingsView({
         <button
           onClick={onBack}
           aria-label="Back"
-          className={iconButton}
+          className="btn-icon press"
         >
           <ChevronLeftIcon size={13} />
         </button>
         <h2 className="hud-label text-mid">Settings</h2>
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-          className={iconButton}
-        >
-          {theme === "dark" ? <MoonIcon size={13} /> : <SunIcon size={13} />}
-        </button>
+        {/* Balances the back button so the title stays centred. */}
+        <div className="h-7 w-7" />
       </div>
 
       {/* Scroll progress */}
@@ -99,8 +100,8 @@ export default function SettingsView({
           bottom so content sinks into shadow above the footer line */}
       <div className="relative flex min-h-0 flex-1 flex-col">
       <div
-        ref={scrollContainerRef}
-        className="min-h-0 flex-1 space-y-7 text-left overflow-y-auto overflow-x-hidden pt-4 pb-14 px-3 scrollbar-hide"
+        ref={scrollRef}
+        className="min-h-0 flex-1 space-y-8 text-left overflow-y-auto overflow-x-hidden pt-4 pb-14 px-3 scrollbar-hide"
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -109,89 +110,63 @@ export default function SettingsView({
         }}
         onScroll={handleScroll}
       >
-        {/* Stark signal ring that fades out when deep-linked from the menu.
-            Drawn as an overlay 8px outside the section so it never touches
-            the tiles and has zero effect on section spacing. */}
-        <div className="relative">
-          {showHighlight && (
-            <div
-              className="animate-highlight-ring pointer-events-none absolute -inset-2"
-              onAnimationEnd={() => setShowHighlight(false)}
-            />
-          )}
-          <CountrySetSelect
-            value={countrySet}
-            onChange={setCountrySet}
-            expertMode={expertMode}
-          />
-        </div>
+        <section>
+          <p className="hud-label mb-5 text-center text-mid">Controls</p>
+          <ControlsSection expertMode={expertMode} />
+        </section>
 
-        <div className="space-y-3">
-          <p className="hud-rule hud-label">Camera</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Slider
-              label="Zoom"
-              value={zoomSpeed}
-              onChange={setZoomSpeed}
-              min={0.1}
-              max={1.0}
-              displayMin={0.1}
-              displayMax={2.0}
-              step={0.1}
+        <section ref={gameOptionsRef} className="border-t border-hairline-strong pt-7">
+          <p className="hud-label mb-5 text-center text-mid">Game options</p>
+
+          <div className="space-y-7">
+            <CountrySetSelect
+              value={countrySet}
+              onChange={setCountrySet}
               expertMode={expertMode}
             />
-            <Slider
-              label="Rotate"
-              value={rotateSpeed}
-              onChange={setRotateSpeed}
-              min={0.1}
-              max={2.0}
-              step={0.1}
+
+            <TimerLimitSelect
+              value={timerLimit}
+              onChange={setTimerLimit}
+              disabled={expertMode}
               expertMode={expertMode}
             />
-          </div>
-        </div>
 
-        <TimerLimitSelect
-          value={timerLimit}
-          onChange={setTimerLimit}
-          disabled={expertMode}
-          expertMode={expertMode}
-        />
-
-        <MaxTriesSelect
-          value={maxTries}
-          onChange={setMaxTries}
-          disabled={expertMode}
-          expertMode={expertMode}
-        />
-
-        <div className="space-y-3">
-          <p className="hud-rule hud-label">Game options</p>
-          <div className="space-y-2">
-            <Toggle
-              enabled={allowSkips}
-              onChange={setAllowSkips}
-              label="Allow Skips"
-              description="Navigate between countries freely"
+            <MaxTriesSelect
+              value={maxTries}
+              onChange={setMaxTries}
               disabled={expertMode}
+              expertMode={expertMode}
             />
-            <Toggle
-              enabled={showHints}
-              onChange={setShowHints}
-              label="Show Hints"
-              description="Display country names on incorrect guesses"
-              disabled={expertMode}
-            />
-            <Toggle
-              enabled={expertMode}
-              onChange={setExpertMode}
-              label="Expert Mode"
-              description="One wrong click ends the game"
-              variant="gold"
-            />
+
+            <div className="space-y-3">
+              <p className="hud-rule hud-label">Rules</p>
+              <div className="space-y-2">
+                <Toggle
+                  enabled={allowSkips}
+                  onChange={setAllowSkips}
+                  label="Allow Skips"
+                  description="Navigate between countries freely"
+                  disabled={expertMode}
+                />
+                <Toggle
+                  enabled={showHints}
+                  onChange={setShowHints}
+                  label="Show Hints"
+                  description="Display country names on incorrect guesses"
+                  disabled={expertMode}
+                />
+                <Toggle
+                  enabled={expertMode}
+                  onChange={setExpertMode}
+                  label="Expert Mode"
+                  description="One wrong click ends the game"
+                  variant="gold"
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Bottom scrim: content sinks into shadow above the footer line.

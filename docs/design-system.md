@@ -241,6 +241,10 @@ Defined in `@layer components`:
   type. The channel *fill* stays inline on primary buttons, since it swaps
   with expert mode; everything else lives in the class so the dialogs stay in
   step when sizes change.
+- **`.btn-icon`** — the 7×7 square affordance in a panel header (back,
+  settings). Panel headers put one on each side of a centred `.hud-label`
+  title, with an empty `h-7 w-7` box standing in for a missing one so the
+  title stays centred.
 - **`.hud-glass`** — frosted backing for chromeless HUD readouts (see above).
 - **Scroll scrim** (settings panel) — a `from-panel` gradient fading content
   into the footer line. **Dark only.** It works there because the panel is
@@ -262,6 +266,11 @@ Defined in `@layer components`:
   `bg-expert`), `text-ground`, glow on hover.
 - **Ghost button:** `.btn-ghost` — hairline border, label type, brightens on
   hover. **Quiet/destructive:** `.btn-quiet`, hovering toward `text-alert`.
+- **Settings behind a panel:** a dialog that owns live settings puts a
+  `.btn-icon` in its top-right corner and swaps its whole body for the
+  controls, rather than stacking a second panel. Escape backs out one rung, so
+  the view is the caller's state, not the panel's. Solo's pause menu and the
+  race menu are the two.
 - **Mobile scale:** dialogs and HUD are sized down at the base and restored at
   `md:`, not the other way round — the globe is the hero, and on a phone the
   chrome was covering it.

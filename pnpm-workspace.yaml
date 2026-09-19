@@ -1,0 +1,9 @@
+packages:
+  - "."
+  - "server"
+
+# workerd ships a platform binary through a postinstall script; without this
+# `wrangler dev` has no local runtime to start.
+onlyBuiltDependencies:
+  - workerd
+  - esbuild

@@ -10,6 +10,7 @@ import {
   MoonIcon as PhosphorMoon,
   SlidersHorizontalIcon,
   SunIcon as PhosphorSun,
+  UsersIcon as PhosphorUsers,
   type IconProps as PhosphorIconProps,
 } from "@phosphor-icons/react";
 
@@ -40,6 +41,11 @@ export function ChevronDownIcon(props: IconProps) {
 
 export function ArrowLeftIcon(props: IconProps) {
   return <PhosphorArrowLeft {...DEFAULTS} {...props} />;
+}
+
+/** Two people — multiplayer / live race */
+export function UsersIcon(props: IconProps) {
+  return <PhosphorUsers {...DEFAULTS} {...props} />;
 }
 
 /** Sliders — settings/tuning */

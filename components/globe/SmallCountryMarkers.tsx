@@ -9,6 +9,7 @@ import {
   GLOBE_CONFIG,
   GLOBE_LAYER,
   SMALL_COUNTRIES,
+  type CountryFill,
   type ScenePalette,
 } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
@@ -18,7 +19,7 @@ import type { Resolution } from "@/lib/engine/types";
 
 interface SmallCountryMarkersProps {
   features: CountryFeature[];
-  resolvedCountries: Record<string, Resolution>;
+  resolvedCountries: Record<string, Resolution | CountryFill>;
   wrongGuessIds: string[];
   hoveredCountryBase: string | null;
   /** Base id of the country pulsing during mustclick, or null. */
@@ -31,12 +32,13 @@ const noopRaycast = () => {};
 
 function getMarkerColor(
   base: string,
-  resolvedCountries: Record<string, Resolution>,
+  resolvedCountries: Record<string, Resolution | CountryFill>,
   wrongGuessIds: string[],
   hoveredCountryBase: string | null,
   COLORS: ScenePalette
 ): string {
   const resolution = resolvedCountries[base];
+  if (resolution !== undefined && typeof resolution !== "string") return resolution.color;
   if (resolution === "perfect") return COLORS.countryPerfect;
   if (resolution === "almost") return COLORS.countryAlmost;
   if (resolution === "failed") return COLORS.countryFailed;
@@ -47,7 +49,7 @@ function getMarkerColor(
 
 function getMarkerOpacity(
   base: string,
-  resolvedCountries: Record<string, Resolution>,
+  resolvedCountries: Record<string, Resolution | CountryFill>,
   wrongGuessIds: string[],
   hoveredCountryBase: string | null,
   isPulsing: boolean

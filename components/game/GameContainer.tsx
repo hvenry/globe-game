@@ -14,15 +14,56 @@ import CountdownTimer from "./CountdownTimer";
 import DebugStats from "./DebugStats";
 import LoadingScreen from "./LoadingScreen";
 import MenuButton from "./MenuButton";
+import { RaceOverlay, useRaceGlobe } from "@/components/race/RaceMode";
 import { useGameStore } from "@/lib/store/game-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { useHydrated } from "@/lib/hooks/useHydrated";
-import { getAllFeatures, getGuessableCountries, baseId } from "@/lib/geo/countries";
+import {
+  getAllFeatures,
+  getGuessableCountries,
+  baseId,
+} from "@/lib/geo/countries";
 import { getCountrySet } from "@/lib/geo/country-sets";
 import { GAME_CONFIG, GLOBE_CONFIG } from "@/lib/constants";
 
-export default function GameContainer() {
+export type GameMode = "solo" | "race";
+
+interface GameContainerProps {
+  initialMode?: GameMode;
+  /** Room code from an invite link; only meaningful with `initialMode="race"`. */
+  initialRoom?: string;
+}
+
+export default function GameContainer({
+  initialMode = "solo",
+  initialRoom = "",
+}: GameContainerProps) {
+  // One globe for both modes: switching modes swaps overlays and globe props,
+  // never the canvas, so the scene and camera carry over without a reload.
+  const [mode, setMode] = useState<GameMode>(initialMode);
+  const raceGlobe = useRaceGlobe();
+
+  // The URL mirrors the mode so a refresh or a shared link lands in the same
+  // place, without a route change (which would remount the canvas).
+  const enterRace = useCallback(() => {
+    window.history.pushState(null, "", "/race");
+    setMode("race");
+  }, []);
+  const exitRace = useCallback(() => {
+    window.history.replaceState(null, "", "/");
+    setMode("solo");
+  }, []);
+  useEffect(() => {
+    const onPop = () =>
+      setMode(window.location.pathname === "/race" ? "race" : "solo");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   const [isPaused, setIsPaused] = useState(false);
+  // The pause menu's controls sub-panel. Lives here, not in PauseMenu, so the
+  // Escape handler below can close it before it reaches for resume.
+  const [showPauseSettings, setShowPauseSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -73,21 +114,42 @@ export default function GameContainer() {
   const [isIntroFlying, setIsIntroFlying] = useState(false);
 
   const handleStart = useCallback(() => {
-    const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
+    const countries =
+      filteredCountries.length > 0 ? filteredCountries : guessableCountries;
     startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
     pauseTimer();
     setIsIntroFlying(true);
     setIsPaused(false);
-  }, [startGame, pauseTimer, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
+  }, [
+    startGame,
+    pauseTimer,
+    filteredCountries,
+    guessableCountries,
+    countrySetId,
+    expertMode,
+    timerLimit,
+    maxTries,
+  ]);
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
-    const countries = filteredCountries.length > 0 ? filteredCountries : guessableCountries;
+    const countries =
+      filteredCountries.length > 0 ? filteredCountries : guessableCountries;
     startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
     pauseTimer();
     setIsIntroFlying(true);
     setIsPaused(false);
-  }, [resetGame, startGame, pauseTimer, filteredCountries, guessableCountries, countrySetId, expertMode, timerLimit, maxTries]);
+  }, [
+    resetGame,
+    startGame,
+    pauseTimer,
+    filteredCountries,
+    guessableCountries,
+    countrySetId,
+    expertMode,
+    timerLimit,
+    maxTries,
+  ]);
 
   const handleIntroArrived = useCallback(() => {
     setIsIntroFlying(false);
@@ -143,6 +205,9 @@ export default function GameContainer() {
       }
       return newPaused;
     });
+    // Either direction lands on the top level of the menu, so the controls
+    // panel is never still open the next time it opens.
+    setShowPauseSettings(false);
   }, [pauseTimer, resumeTimer]);
 
   const handleGlobeReady = useCallback(() => {
@@ -159,7 +224,12 @@ export default function GameContainer() {
 
   const handleCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
-      if ((phase !== "playing" && phase !== "mustclick") || isPaused || isIntroFlying) return;
+      if (
+        (phase !== "playing" && phase !== "mustclick") ||
+        isPaused ||
+        isIntroFlying
+      )
+        return;
 
       const currentCountry = useGameStore.getState().currentCountry;
       const base = baseId(countryId);
@@ -167,7 +237,8 @@ export default function GameContainer() {
       // Ignore clicks on countries outside the active game set
       if (!validCountryIds.has(base)) return;
 
-      const isCorrectGuess = currentCountry !== null && base === currentCountry.id;
+      const isCorrectGuess =
+        currentCountry !== null && base === currentCountry.id;
 
       // Show floating labels when hints are enabled, for every click that is
       // not the sought country: new wrong guesses, and reviews of countries
@@ -181,15 +252,30 @@ export default function GameContainer() {
 
       makeGuess(base);
     },
-    [phase, isPaused, isIntroFlying, makeGuess, allFeatures, addFloatingLabel, showHints, validCountryIds]
+    [
+      phase,
+      isPaused,
+      isIntroFlying,
+      makeGuess,
+      allFeatures,
+      addFloatingLabel,
+      showHints,
+      validCountryIds,
+    ],
   );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape key toggles pause during gameplay
-      if (e.key === "Escape" && (phase === "playing" || phase === "feedback" || phase === "mustclick")) {
+      if (
+        e.key === "Escape" &&
+        (phase === "playing" || phase === "feedback" || phase === "mustclick")
+      ) {
         e.preventDefault();
-        togglePause();
+        // One step back at a time: out of the controls panel first, and only
+        // then out of the pause menu.
+        if (isPaused && showPauseSettings) setShowPauseSettings(false);
+        else togglePause();
         return;
       }
 
@@ -205,9 +291,18 @@ export default function GameContainer() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, isPaused, goNext, goPrev, allowSkips, togglePause]);
+  }, [
+    phase,
+    isPaused,
+    showPauseSettings,
+    goNext,
+    goPrev,
+    allowSkips,
+    togglePause,
+  ]);
 
-  const isGameActive = phase === "playing" || phase === "feedback" || phase === "mustclick";
+  const isGameActive =
+    phase === "playing" || phase === "feedback" || phase === "mustclick";
 
   // Expert loss reveal: before showing the results card, the camera flies to
   // the missed country (which pulses on the globe) so the player learns where
@@ -251,47 +346,94 @@ export default function GameContainer() {
     <div className="relative h-dvh w-screen overflow-hidden bg-ground">
       {isLoading && <LoadingScreen />}
 
-      <div className={`absolute inset-0 transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}>
-        <GlobeDynamic
-          features={allFeatures}
-          wrongGuessIds={wrongGuessIds}
-          resolvedCountries={resolvedCountries}
-          interactive={(phase === "playing" || phase === "mustclick") && !isPaused && !isIntroFlying}
-          autoRotate={phase === "idle" || (phase === "gameover" && !isExpertLoss)}
-          onCountryClick={handleCountryClick}
-          onReady={handleGlobeReady}
-          onIntroArrived={handleIntroArrived}
-          onRevealArrived={handleRevealArrived}
-          zoomSpeed={zoomSpeed}
-          rotateSpeed={rotateSpeed}
-        />
-      </div>
-
-      <div className={`transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}>
-        <CountryPrompt />
-        <CountdownTimer />
-        <ScoreBoard />
-        <TriesIndicator />
-        <ClickFeedback />
-        <ResultFeedback />
-        <MenuButton onClick={togglePause} />
-        <DebugStats />
-
-        {/* Persisted stores hydrate on the client; render dependent UI after */}
-        {hydrated && phase === "idle" && (
-          <StartScreen onStart={handleStart} delayAnimation={isInitialLoad} />
-        )}
-        {hydrated && phase === "gameover" && !isRevealing && (
-          <GameOver onPlayAgain={handlePlayAgain} onMainMenu={handleMainMenu} />
-        )}
-        {isPaused && isGameActive && (
-          <PauseMenu
-            onResume={handleResume}
-            onRestart={handlePlayAgain}
-            onMainMenu={handleForfeit}
+      <div
+        className={`absolute inset-0 transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}
+      >
+        {mode === "race" ? (
+          <GlobeDynamic
+            features={allFeatures}
+            wrongGuessIds={[]}
+            resolvedCountries={raceGlobe.resolvedCountries}
+            interactive={raceGlobe.interactive}
+            autoRotate={raceGlobe.autoRotate}
+            onCountryClick={raceGlobe.onCountryClick}
+            onReady={handleGlobeReady}
+            zoomSpeed={zoomSpeed}
+            rotateSpeed={rotateSpeed}
+            scene={raceGlobe.scene}
+          />
+        ) : (
+          <GlobeDynamic
+            features={allFeatures}
+            wrongGuessIds={wrongGuessIds}
+            resolvedCountries={resolvedCountries}
+            interactive={
+              (phase === "playing" || phase === "mustclick") &&
+              !isPaused &&
+              !isIntroFlying
+            }
+            autoRotate={
+              phase === "idle" || (phase === "gameover" && !isExpertLoss)
+            }
+            onCountryClick={handleCountryClick}
+            onReady={handleGlobeReady}
+            onIntroArrived={handleIntroArrived}
+            onRevealArrived={handleRevealArrived}
+            zoomSpeed={zoomSpeed}
+            rotateSpeed={rotateSpeed}
           />
         )}
       </div>
+
+      {mode === "race" && (
+        <div
+          className={`transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}
+        >
+          <RaceOverlay initialRoom={initialRoom} onExit={exitRace} />
+        </div>
+      )}
+
+      {/* Solo HUD and menus unmount entirely in race mode: a hidden start
+          screen would still own the Enter shortcut. */}
+      {mode === "solo" && (
+        <div
+          className={`transition-opacity duration-300 ${showContent ? "opacity-100" : "opacity-0"}`}
+        >
+          <CountryPrompt />
+          <CountdownTimer />
+          <ScoreBoard />
+          <TriesIndicator />
+          <ClickFeedback />
+          <ResultFeedback />
+          {isGameActive && <MenuButton onClick={togglePause} />}
+          <DebugStats />
+
+          {/* Persisted stores hydrate on the client; render dependent UI after */}
+          {hydrated && phase === "idle" && (
+            <StartScreen
+              onStart={handleStart}
+              onRace={enterRace}
+              delayAnimation={isInitialLoad}
+            />
+          )}
+          {hydrated && phase === "gameover" && !isRevealing && (
+            <GameOver
+              onPlayAgain={handlePlayAgain}
+              onMainMenu={handleMainMenu}
+            />
+          )}
+          {isPaused && isGameActive && (
+            <PauseMenu
+              onResume={handleResume}
+              onRestart={handlePlayAgain}
+              onMainMenu={handleForfeit}
+              showSettings={showPauseSettings}
+              onOpenSettings={() => setShowPauseSettings(true)}
+              onCloseSettings={() => setShowPauseSettings(false)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

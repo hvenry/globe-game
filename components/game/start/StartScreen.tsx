@@ -4,19 +4,22 @@ import { useEffect, useState, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
 import MainMenu from "./MainMenu";
-import SettingsView from "./SettingsView";
+import SettingsView, { type SettingsFocus } from "./SettingsView";
 
 interface StartScreenProps {
   onStart: () => void;
+  onRace: () => void;
   delayAnimation?: boolean;
 }
 
 export default function StartScreen({
   onStart,
+  onRace,
   delayAnimation = false,
 }: StartScreenProps) {
   const [showSettings, setShowSettings] = useState(false);
-  const [highlightCountrySet, setHighlightCountrySet] = useState(false);
+  /** Which section the panel should open on, set by whichever entry was used. */
+  const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>("top");
   const lastEscapePress = useRef<number>(0);
 
   const expertMode = useSettingsStore((s) => s.expertMode);
@@ -54,20 +57,18 @@ export default function StartScreen({
         {showSettings ? (
           <SettingsView
             key="settings"
-            onBack={() => {
-              setShowSettings(false);
-              setHighlightCountrySet(false);
-            }}
+            onBack={() => setShowSettings(false)}
+            focus={settingsFocus}
             expertMode={expertMode}
-            highlightCountrySet={highlightCountrySet}
           />
         ) : (
           <MainMenu
             key="menu"
             onStart={onStart}
-            onOpenSettings={(highlight) => {
+            onRace={onRace}
+            onOpenSettings={(focus = "top") => {
+              setSettingsFocus(focus);
               setShowSettings(true);
-              setHighlightCountrySet(highlight ?? false);
             }}
             delayAnimation={delayAnimation}
             expertMode={expertMode}

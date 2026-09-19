@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { geoEquirectangular, geoPath, type GeoPath } from "d3-geo";
 import type { CountryFeature } from "@/lib/geo/types";
 import type { Resolution } from "@/lib/engine/types";
-import type { ScenePalette } from "@/lib/constants";
+import type { CountryFill, ScenePalette } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
 import { baseId } from "@/lib/geo/countries";
 
@@ -31,6 +31,16 @@ function getFillColor(state: StaticVisualState, COLORS: ScenePalette): string {
     case "failed":
       return COLORS.countryFailed;
   }
+}
+
+/** A named state resolves against the palette; an explicit fill is its own. */
+function resolveFill(
+  state: StaticVisualState | CountryFill,
+  COLORS: ScenePalette,
+): CountryFill {
+  return typeof state === "string"
+    ? { color: getFillColor(state, COLORS), opacity: COLORS.fillOpacity[state] }
+    : state;
 }
 
 interface Layer {
@@ -84,7 +94,7 @@ function disposeLayer(layer: Layer) {
 
 interface CountryTexturesParams {
   features: CountryFeature[];
-  resolvedCountries: Record<string, Resolution>;
+  resolvedCountries: Record<string, Resolution | CountryFill>;
   wrongGuessIds: string[];
   hoveredCountryBase: string | null;
   /** Base id of the country flashing during mustclick, or null. */
@@ -170,17 +180,13 @@ export function useCountryTextures({
     for (const [countryBase, countryFeatures] of featuresByBase) {
       // The pulsing country is painted by the pulse layer
       if (countryBase === pulseBase) continue;
-      const state: StaticVisualState | null =
+      const state: StaticVisualState | CountryFill | null =
         resolvedCountries[countryBase] ??
         (wrongGuessIds.includes(countryBase) ? "wrongGuess" : null);
       if (!state) continue;
+      const { color, opacity } = resolveFill(state, COLORS);
       for (const feature of countryFeatures) {
-        paintFeature(
-          base,
-          feature,
-          getFillColor(state, COLORS),
-          COLORS.fillOpacity[state],
-        );
+        paintFeature(base, feature, color, opacity);
       }
     }
     commitLayer(base);

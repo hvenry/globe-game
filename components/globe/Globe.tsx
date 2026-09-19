@@ -14,15 +14,15 @@ import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
 import PulseRing from "./PulseRing";
 import type { CountryFeature } from "@/lib/geo/types";
-import { GLOBE_CONFIG, GLOBE_LAYER } from "@/lib/constants";
+import { GLOBE_CONFIG, GLOBE_LAYER, type CountryFill } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
 import { useHeroFraming } from "@/lib/hooks/useHeroFraming";
 import { baseId } from "@/lib/geo/countries";
 import { coordsToPosition } from "@/lib/geo/coords";
 import type { Resolution } from "@/lib/engine/types";
 import { useSettingsStore } from "@/lib/store/settings-store";
-import { getCountrySet } from "@/lib/geo/country-sets";
-import { useGameStore } from "@/lib/store/game-store";
+import { getCountrySet, type CountrySetId } from "@/lib/geo/country-sets";
+import { useGameStore, type GamePhase } from "@/lib/store/game-store";
 import { useLabelProjectionStore } from "@/lib/store/label-projection-store";
 import { useIsCoarsePointer } from "@/lib/hooks/useIsCoarsePointer";
 import { useCameraAnimation } from "./hooks/useCameraAnimation";
@@ -34,7 +34,7 @@ const noopRaycast = () => {};
 interface GlobeProps {
   features: CountryFeature[];
   wrongGuessIds: string[];
-  resolvedCountries: Record<string, Resolution>;
+  resolvedCountries: Record<string, Resolution | CountryFill>;
   interactive: boolean;
   autoRotate: boolean;
   onCountryClick?: (
@@ -48,6 +48,19 @@ interface GlobeProps {
   onRevealArrived?: () => void;
   zoomSpeed?: number;
   rotateSpeed?: number;
+  /**
+   * Drive the scene from somewhere other than the solo game store. Race mode
+   * passes this so set emphasis, hover gating and the camera flights follow
+   * the room's settings rather than whatever the solo menu has selected.
+   */
+  scene?: GlobeScene;
+}
+
+export interface GlobeScene {
+  phase: GamePhase;
+  countrySetId: CountrySetId;
+  /** Identity of the current run; a change triggers the intro flight. */
+  gameKey: number | null;
 }
 
 // Mustclick pulse fill: the target country is painted white on its own
@@ -157,13 +170,14 @@ function GlobeScene({
   onRevealArrived,
   zoomSpeed = 0.53,
   rotateSpeed = 1.0,
+  scene,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const pointerDownRef = useRef<{ x: number; y: number; isTouch: boolean } | null>(null);
   const [hoveredCountryBase, setHoveredCountryBase] = useState<string | null>(
     null,
   );
-  const validCountryIds = useGameStore((s) => s.validCountryIds);
+  const storeValidCountryIds = useGameStore((s) => s.validCountryIds);
   const { camera } = useThree();
   const COLORS = useSceneColors();
 
@@ -181,11 +195,24 @@ function GlobeScene({
   const baseZoomSpeed =
     zoomSpeed * (isCoarsePointer ? GLOBE_CONFIG.touch.zoomSpeedScale : 1);
 
-  const gamePhase = useGameStore((s) => s.phase);
+  const storePhase = useGameStore((s) => s.phase);
   const currentCountry = useGameStore((s) => s.currentCountry);
-  const gameCountrySetId = useGameStore((s) => s.countrySetId);
+  const storeCountrySetId = useGameStore((s) => s.countrySetId);
   const settingsCountrySet = useSettingsStore((s) => s.countrySet);
-  const gameStartTime = useGameStore((s) => s.gameStartTime);
+  const storeGameStartTime = useGameStore((s) => s.gameStartTime);
+
+  const gamePhase = scene?.phase ?? storePhase;
+  const gameCountrySetId = scene?.countrySetId ?? storeCountrySetId;
+  const gameStartTime = scene ? scene.gameKey : storeGameStartTime;
+
+  // With an override the playable set is fixed by the caller's set id, in
+  // every phase — the solo store's set only means something in solo mode.
+  const sceneSetIds = useMemo(() => {
+    if (!scene) return null;
+    const ids = getCountrySet(scene.countrySetId).countryIds;
+    return new Set(ids ?? []);
+  }, [scene]);
+  const validCountryIds = sceneSetIds ?? storeValidCountryIds;
   const expertMode = useGameStore((s) => s.expertMode);
   const lastResolution = useGameStore((s) => s.lastResolution);
 
@@ -273,8 +300,11 @@ function GlobeScene({
     return ids ? new Set(ids) : null;
   }, [settingsCountrySet]);
 
-  const emphasisIds =
-    gameCountrySetId !== "all" && validCountryIds.size > 0
+  const emphasisIds = scene
+    ? scene.countrySetId !== "all"
+      ? sceneSetIds
+      : null
+    : gameCountrySetId !== "all" && validCountryIds.size > 0
       ? validCountryIds
       : gamePhase === "idle"
         ? previewIds

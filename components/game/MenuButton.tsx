@@ -1,16 +1,12 @@
 "use client";
 
-import { useGameStore } from "@/lib/store/game-store";
-
 interface MenuButtonProps {
   onClick: () => void;
 }
 
+/** Presentational: when it belongs on screen is the caller's business, since
+ *  solo and race decide that from different state. */
 export default function MenuButton({ onClick }: MenuButtonProps) {
-  const phase = useGameStore((s) => s.phase);
-
-  if (phase !== "playing" && phase !== "feedback" && phase !== "mustclick") return null;
-
   return (
     <button
       onClick={onClick}

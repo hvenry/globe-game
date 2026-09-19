@@ -6,6 +6,8 @@ import {
   type CountrySetId,
 } from "@/lib/geo/country-sets";
 import { GUESSABLE_IDS } from "@/lib/geo/country-names";
+import type { ThemeMode } from "@/lib/constants";
+import { MoonIcon, SunIcon } from "@/components/ui/icons";
 
 // ============================================================================
 // Toggle Component
@@ -34,7 +36,7 @@ export function Toggle({
     <button
       onClick={() => !disabled && onChange(!enabled)}
       className={`flex w-full items-center justify-between rounded-control border p-3 transition-all duration-200 ${
-        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+        disabled ? "opacity-40 cursor-default" : "cursor-pointer"
       } ${
         isGold
           ? enabled
@@ -179,7 +181,7 @@ function OptionButton({
       onClick={() => !disabled && onClick()}
       disabled={disabled}
       className={`flex min-h-8 items-center justify-center rounded-control border p-2 text-center transition-all duration-200 ${
-        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+        disabled ? "opacity-40 cursor-default" : "cursor-pointer"
       } ${
         expertStyled
           ? selected
@@ -304,6 +306,58 @@ export function TimerLimitSelect({
               >
                 {option.label}
               </p>
+            </OptionButton>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ThemeSelect Component
+// ============================================================================
+
+interface ThemeSelectProps {
+  value: ThemeMode;
+  onChange: (value: ThemeMode) => void;
+  expertMode?: boolean;
+}
+
+export function ThemeSelect({
+  value,
+  onChange,
+  expertMode = false,
+}: ThemeSelectProps) {
+  const options = [
+    { label: "Dark", value: "dark" as const, Icon: MoonIcon },
+    { label: "Light", value: "light" as const, Icon: SunIcon },
+  ];
+  const selectedClass = expertMode ? "text-expert-ink" : "text-signal";
+
+  return (
+    <div className="space-y-3">
+      <p className="hud-rule hud-label">Appearance</p>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map(({ label, value: option, Icon }) => {
+          const isSelected = value === option;
+
+          return (
+            <OptionButton
+              key={option}
+              selected={isSelected}
+              expertStyled={expertMode}
+              disabled={false}
+              onClick={() => onChange(option)}
+            >
+              <span
+                className={`flex items-center gap-1.5 text-xs font-medium ${
+                  isSelected ? selectedClass : "text-mid"
+                }`}
+              >
+                <Icon size={13} />
+                {label}
+              </span>
             </OptionButton>
           );
         })}

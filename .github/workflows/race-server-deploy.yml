@@ -1,0 +1,91 @@
+name: Race Server Deploy
+
+# The Cloudflare Worker deploys independently of the website: it has its own
+# lifecycle, and a change to the globe UI should not redeploy the game server.
+# Only the paths the Worker actually bundles trigger it.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "lib/engine/**"
+      - "lib/constants.ts"
+      - "lib/geo/country-sets.ts"
+      - "lib/race/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/race-server-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: race-server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Verify & Deploy Worker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The same gates the website ships behind. `type-check` and `test` both
+      # cover the Worker, so a broken server never reaches Cloudflare.
+      - name: Run linter
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Run tests
+        run: pnpm test
+
+      # Proves the Worker bundles and its bindings resolve before we deploy.
+      - name: Build Worker (dry run)
+        run: pnpm --filter @globe/race-server exec wrangler deploy --dry-run
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          packageManager: pnpm
+
+      - name: Smoke test the deployment
+        run: |
+          set -euo pipefail
+          URL="${{ vars.RACE_SERVER_URL }}"
+          if [ -z "$URL" ]; then
+            echo "RACE_SERVER_URL repo variable not set — skipping smoke test."
+            exit 0
+          fi
+          echo "Checking $URL/health"
+          for i in 1 2 3 4 5; do
+            CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" "$URL/health" || true)
+            if [ "$CODE" = "200" ]; then
+              cat /tmp/health.json
+              echo "Healthy."
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $CODE — retrying."
+            sleep 5
+          done
+          echo "Worker did not report healthy after deploy."
+          exit 1
