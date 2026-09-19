@@ -1,16 +1,19 @@
 import { describe, expect, test } from "vitest";
 import {
   createRace,
+  end,
   guess,
   leave,
   nextTransitionAt,
   rejoin,
+  scoreClaim,
   standings,
   tick,
   timeRemainingMs,
 } from "./race";
 import { seededShuffle } from "./rng";
-import type { RaceConfig, RacePlayer, RaceState } from "./types";
+import { RACE_EVENT_LOG, type RaceConfig, type RacePlayer, type RaceState } from "./types";
+import { RACE_SCORING } from "../constants";
 
 const IDS = ["100", "200", "300", "400", "500"];
 const T0 = 1_000_000;
@@ -27,6 +30,7 @@ function config(overrides: Partial<RaceConfig> = {}): RaceConfig {
     countryWindowMs: 10_000,
     lockoutMs: 1_500,
     intermissionMs: 1_200,
+    showHints: false,
     ...overrides,
   };
 }
@@ -78,6 +82,10 @@ describe("creation", () => {
         lockedUntil: null,
         attemptIds: [],
         claims: 0,
+        recoveries: 0,
+        score: 0,
+        streak: 0,
+        bestStreak: 0,
         totalClaimMs: 0,
       },
       {
@@ -88,6 +96,10 @@ describe("creation", () => {
         lockedUntil: null,
         attemptIds: [],
         claims: 0,
+        recoveries: 0,
+        score: 0,
+        streak: 0,
+        bestStreak: 0,
         totalClaimMs: 0,
       },
     ]);
@@ -114,24 +126,31 @@ describe("tick", () => {
     expect(tick(s, START + 9_999)).toBe(s);
   });
 
-  test("expired window resolves unclaimed and enters intermission", () => {
+  test("expired window enters reveal with no deadline, and logs it", () => {
     const s0 = racing();
     const s1 = tick(s0, START + 10_000);
-    expect(s1.phase).toBe("intermission");
+    expect(s1.phase).toBe("reveal");
     expect(s1.currentId).toBe(s0.order[0]);
-    expect(s1.results[s0.order[0]]).toEqual({ by: null, elapsedMs: null });
-    expect(s1.phaseDeadline).toBe(START + 11_200);
+    expect(s1.results[s0.order[0]]).toBeUndefined();
+    expect(s1.phaseDeadline).toBeNull();
+    expect(s1.events.at(-1)).toMatchObject({ type: "expired", countryId: s0.order[0] });
+  });
+
+  test("reveal waits for a click however long it takes", () => {
+    const s1 = tick(racing(), START + 10_000);
+    expect(tick(s1, START + 999_999)).toBe(s1);
   });
 
   test("intermission end reveals the next country", () => {
     const s0 = racing();
-    const s1 = tick(s0, START + 10_000);
-    const s2 = tick(s1, START + 11_200);
+    const s1 = guess(tick(s0, START + 10_000), "a", s0.order[0], START + 10_500);
+    expect(s1.phase).toBe("intermission");
+    const s2 = tick(s1, START + 10_500 + 1_200);
     expect(s2.phase).toBe("racing");
     expect(s2.currentIndex).toBe(1);
     expect(s2.currentId).toBe(s0.order[1]);
-    expect(s2.shownAt).toBe(START + 11_200);
-    expect(s2.phaseDeadline).toBe(START + 21_200);
+    expect(s2.shownAt).toBe(START + 11_700);
+    expect(s2.phaseDeadline).toBe(START + 21_700);
   });
 
   test("the last intermission finishes the race", () => {
@@ -139,7 +158,9 @@ describe("tick", () => {
     let now = START;
     for (let i = 0; i < 3; i++) {
       now += 10_000;
-      s = tick(s, now); // window expires
+      s = tick(s, now); // window expires into reveal
+      now += 500;
+      s = guess(s, "a", s.currentId!, now); // recovered
       now += 1_200;
       s = tick(s, now); // intermission ends
     }
@@ -152,21 +173,23 @@ describe("tick", () => {
     expect(tick(s, now + 99_999)).toBe(s);
   });
 
-  test("a late tick catches up from the present instead of cascading", () => {
+  test("a late tick lands in reveal rather than cascading through the schedule", () => {
     const s0 = racing();
     const late = START + 50_000;
     const s1 = tick(s0, late);
-    expect(s1.phase).toBe("intermission");
-    expect(Object.keys(s1.results)).toEqual([s0.order[0]]);
-    expect(s1.phaseDeadline).toBe(late + 1_200);
+    expect(s1.phase).toBe("reveal");
+    expect(s1.currentIndex).toBe(0);
+    expect(Object.keys(s1.results)).toEqual([]);
   });
 
-  test("zero intermission rolls straight into the next country", () => {
+  test("zero intermission rolls straight into the next country after a recovery", () => {
     const s0 = racing({ intermissionMs: 0 });
-    const s1 = tick(s0, START + 10_000);
+    // The click settles the country; the server's next tick, due at once,
+    // rolls the zero-length intermission over.
+    const s1 = tick(guess(tick(s0, START + 10_000), "b", s0.order[0], START + 10_100), START + 10_100);
     expect(s1.phase).toBe("racing");
     expect(s1.currentIndex).toBe(1);
-    expect(s1.results[s0.order[0]]).toEqual({ by: null, elapsedMs: null });
+    expect(s1.results[s0.order[0]]).toEqual({ by: "b", elapsedMs: 10_100, recovered: true, points: RACE_SCORING.recovery });
   });
 
   test("an empty order finishes as soon as the countdown ends", () => {
@@ -187,7 +210,8 @@ describe("claims", () => {
     const s1 = guess(s0, "a", s0.currentId!, START + 2_500);
     expect(s1.phase).toBe("intermission");
     expect(s1.currentId).toBe(s0.currentId);
-    expect(s1.results[s0.currentId!]).toEqual({ by: "a", elapsedMs: 2_500 });
+    expect(s1.results[s0.currentId!]).toMatchObject({ by: "a", elapsedMs: 2_500 });
+    expect(s1.results[s0.currentId!].points).toBeGreaterThan(0);
     expect(player(s1, "a")).toMatchObject({ claims: 1, totalClaimMs: 2_500, lockedUntil: null });
     expect(player(s1, "b")).toEqual(player(s0, "b"));
     expect(s1.phaseDeadline).toBe(START + 3_700);
@@ -222,23 +246,119 @@ describe("claims", () => {
     expect(guess(s1, "a", s0.currentId!, START + 2)).toBe(s1);
   });
 
-  test("a guess after the window expired is judged against the settled state", () => {
+  test("a correct guess after the window expired is a recovery, not a claim", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[0], START + 10_001);
-    expect(s1).not.toBe(s0);
     expect(s1.phase).toBe("intermission");
-    expect(s1.results[s0.order[0]]).toEqual({ by: null, elapsedMs: null });
+    expect(s1.results[s0.order[0]]).toEqual({ by: "a", elapsedMs: 10_001, recovered: true, points: RACE_SCORING.recovery });
     expect(player(s1, "a").claims).toBe(0);
+    expect(player(s1, "a").recoveries).toBe(1);
+    expect(player(s1, "a").score).toBe(RACE_SCORING.recovery);
+    expect(s1.events.at(-1)).toMatchObject({ type: "recovery", playerId: "a" });
   });
 
-  test("a guess after a missed reveal applies to the next country", () => {
+  test("a wrong click during reveal locks the player like any other miss", () => {
     const s0 = racing();
-    const s1 = tick(s0, START + 10_000); // intermission until START + 11_200
-    const s2 = guess(s1, "a", s0.order[1], START + 11_500);
-    expect(s2.phase).toBe("intermission");
-    expect(s2.currentIndex).toBe(1);
-    expect(s2.shownAt).toBe(START + 11_500);
-    expect(s2.results[s0.order[1]]).toEqual({ by: "a", elapsedMs: 0 });
+    const s1 = tick(s0, START + 10_000);
+    const s2 = guess(s1, "a", s0.order[3], START + 10_100);
+    expect(s2.phase).toBe("reveal");
+    expect(player(s2, "a").lockedUntil).toBe(START + 11_600);
+    expect(guess(s2, "a", s0.order[0], START + 10_200)).toBe(s2);
+  });
+
+  test("only the first click recovers; the country is then settled", () => {
+    const s0 = racing();
+    const s1 = guess(tick(s0, START + 10_000), "b", s0.order[0], START + 10_100);
+    const s2 = guess(s1, "a", s0.order[0], START + 10_200);
+    expect(s2).toBe(s1);
+    expect(player(s2, "b").recoveries).toBe(1);
+    expect(player(s2, "a").recoveries).toBe(0);
+  });
+});
+
+describe("scoring", () => {
+  const first = (s: RaceState) => s.order[0];
+
+  test("an instant clean claim earns claim plus full speed plus accuracy", () => {
+    const s0 = racing();
+    const s1 = guess(s0, "a", first(s0), START);
+    const expected = RACE_SCORING.claim + RACE_SCORING.speedMax + RACE_SCORING.accuracy;
+    expect(player(s1, "a").score).toBe(expected);
+    expect(s1.events.at(-1)).toMatchObject({
+      type: "claim",
+      playerId: "a",
+      points: expected,
+      breakdown: {
+        claim: RACE_SCORING.claim,
+        speed: RACE_SCORING.speedMax,
+        accuracy: RACE_SCORING.accuracy,
+        combo: 0,
+        recovery: 0,
+      },
+      streak: 1,
+    });
+  });
+
+  test("speed scales down with the window and hits zero at its end", () => {
+    const s0 = racing();
+    const half = guess(s0, "a", first(s0), START + 5_000);
+    expect(half.events.at(-1)).toMatchObject({ breakdown: { speed: RACE_SCORING.speedMax / 2 } });
+    const end = guess(s0, "a", first(s0), START + 9_999);
+    expect((end.events.at(-1) as { breakdown: { speed: number } }).breakdown.speed).toBe(0);
+  });
+
+  test("a wrong click on the way forfeits the accuracy bonus", () => {
+    const s0 = racing();
+    const s1 = guess(s0, "a", s0.order[2], START + 100);
+    const s2 = guess(s1, "a", first(s0), START + 2_000);
+    expect(s2.events.at(-1)).toMatchObject({ breakdown: { accuracy: 0 } });
+  });
+
+  test("combo grows per consecutive claim, caps, and another player's claim breaks it", () => {
+    let s = racing();
+    let now = START;
+    const step = () => {
+      now += 500;
+      s = tick(s, now + 1_200) as RaceState; // through intermission
+      now += 1_200;
+    };
+    s = guess(s, "a", s.currentId!, now); // streak 1, combo 0
+    step();
+    s = guess(s, "a", s.currentId!, now); // streak 2, combo one step
+    expect(s.events.at(-1)).toMatchObject({ streak: 2, breakdown: { combo: RACE_SCORING.comboStep } });
+    step();
+    s = guess(s, "b", s.currentId!, now); // b claims: a's streak ends
+    expect(player(s, "a").streak).toBe(0);
+    expect(player(s, "a").bestStreak).toBe(2);
+    expect(player(s, "b").streak).toBe(1);
+  });
+
+  test("combo never exceeds its cap", () => {
+    const s0 = racing();
+    const long = { ...player(s0, "a"), streak: 99 };
+    expect(scoreClaim(s0, long, 0).breakdown.combo).toBe(RACE_SCORING.comboMax);
+  });
+
+  test("an expired window breaks every streak", () => {
+    let s = guess(racing(), "a", racing().order[0], START);
+    s = tick(s, START + 1_200); // next country
+    s = tick(s, START + 1_200 + 10_000); // nobody got it
+    expect(s.phase).toBe("reveal");
+    expect(player(s, "a").streak).toBe(0);
+    expect(player(s, "a").bestStreak).toBe(1);
+  });
+
+  test("the event log keeps only the most recent entries but never reuses a seq", () => {
+    let s: RaceState = { ...racing(), order: Array.from({ length: 30 }, (_, i) => String(i)) };
+    let now = START;
+    for (let i = 0; i < 30; i++) {
+      s = guess(s, "a", s.currentId!, now);
+      now += 1_200;
+      s = tick(s, now);
+    }
+    expect(s.events.length).toBe(RACE_EVENT_LOG);
+    expect(s.events[0].seq).toBe(30 - RACE_EVENT_LOG);
+    expect(s.nextSeq).toBe(30);
   });
 });
 
@@ -288,14 +408,16 @@ describe("lockout", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[1], START + 1_000);
     const s2 = guess(s1, "a", s0.currentId!, START + 2_500);
-    expect(s2.results[s0.currentId!]).toEqual({ by: "a", elapsedMs: 2_500 });
+    expect(s2.results[s0.currentId!]).toMatchObject({ by: "a", elapsedMs: 2_500 });
+    expect(s2.results[s0.currentId!].points).toBeGreaterThan(0);
   });
 
   test("one player's lockout does not affect the other", () => {
     const s0 = racing();
     const s1 = guess(s0, "a", s0.order[1], START + 1_000);
     const s2 = guess(s1, "b", s0.currentId!, START + 1_100);
-    expect(s2.results[s0.currentId!]).toEqual({ by: "b", elapsedMs: 1_100 });
+    expect(s2.results[s0.currentId!]).toMatchObject({ by: "b", elapsedMs: 1_100 });
+    expect(s2.results[s0.currentId!].points).toBeGreaterThan(0);
   });
 
   test("lockout carries across the rollover to the next country", () => {
@@ -306,7 +428,8 @@ describe("lockout", () => {
     expect(s3.currentId).toBe(s0.order[1]);
     expect(guess(s3, "a", s0.order[1], START + 10_900)).toBe(s3);
     const s4 = guess(s3, "a", s0.order[1], START + 11_000);
-    expect(s4.results[s0.order[1]]).toEqual({ by: "a", elapsedMs: 200 });
+    expect(s4.results[s0.order[1]]).toMatchObject({ by: "a", elapsedMs: 200 });
+    expect(s4.results[s0.order[1]].points).toBeGreaterThan(0);
   });
 });
 
@@ -366,9 +489,18 @@ describe("standings", () => {
     };
   }
 
-  test("orders by claims descending", () => {
-    const s = withPlayers([{ id: "x", claims: 1 }, { id: "y", claims: 3 }, { id: "z", claims: 2 }]);
+  test("orders by score descending", () => {
+    const s = withPlayers([{ id: "x", score: 100 }, { id: "y", score: 300 }, { id: "z", score: 200 }]);
     expect(standings(s).map((p) => p.id)).toEqual(["y", "z", "x"]);
+  });
+
+  test("breaks a score tie by claims, then by lower total claim time", () => {
+    const s = withPlayers([
+      { id: "slow", claims: 2, totalClaimMs: 9_000 },
+      { id: "fast", claims: 2, totalClaimMs: 4_000 },
+      { id: "fewer", claims: 1, totalClaimMs: 1_000 },
+    ]);
+    expect(standings(s).map((p) => p.id)).toEqual(["fast", "slow", "fewer"]);
   });
 
   test("breaks ties by lower total claim time", () => {
@@ -394,5 +526,24 @@ describe("timeRemainingMs", () => {
     const s1 = racing();
     expect(timeRemainingMs(s1, START + 4_000)).toBe(6_000);
     expect(timeRemainingMs(s1, START + 20_000)).toBe(0);
+  });
+});
+
+describe("end", () => {
+  test("finishes a running race at once, keeping what was played", () => {
+    const s0 = guess(racing(), "a", racing().order[0], START + 1_000);
+    const s1 = end(s0, START + 5_000);
+    expect(s1.phase).toBe("finished");
+    expect(s1.endedAt).toBe(START + 5_000);
+    expect(s1.phaseDeadline).toBeNull();
+    expect(Object.keys(s1.results)).toEqual([s0.order[0]]);
+    expect(player(s1, "a").claims).toBe(1);
+  });
+
+  test("is a no-op once finished, and ends a reveal too", () => {
+    const revealing = tick(racing(), START + 10_000);
+    const ended = end(revealing, START + 20_000);
+    expect(ended.phase).toBe("finished");
+    expect(end(ended, START + 30_000)).toBe(ended);
   });
 });

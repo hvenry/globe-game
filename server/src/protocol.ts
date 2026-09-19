@@ -11,11 +11,9 @@
  * connected one does.
  */
 
-import type { RaceConfig, RaceState } from "../../lib/engine/types";
 import type {
   ClientMessage,
   ErrorCode,
-  LobbyState,
   ServerMessage,
 } from "../../lib/race/types";
 
@@ -39,10 +37,16 @@ const SHAPES: Record<ClientMessage["t"], Record<string, Field>> = {
   configure: {
     countrySetId: { type: "string", optional: true },
     countryCount: { type: "number", optional: true },
+    maxPlayers: { type: "number", optional: true },
+    showHints: { type: "boolean", optional: true },
+    countryWindowSec: { type: "number", optional: true },
   },
   color: { color: { type: "string" } },
+  kick: { playerId: { type: "string" } },
   start: {},
   guess: { countryId: { type: "string" } },
+  rematch: {},
+  end: {},
   ping: {},
 };
 
@@ -73,4 +77,4 @@ export function decode(raw: string | ArrayBuffer): ClientMessage | null {
   return msg as ClientMessage;
 }
 
-export type { ClientMessage, ErrorCode, ServerMessage, RaceConfig, RaceState, LobbyState };
+export type { ClientMessage, ErrorCode, ServerMessage };

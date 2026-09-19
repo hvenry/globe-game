@@ -7,8 +7,10 @@ import {
   createLobby,
   defaultRaceConfig,
   join,
+  kick,
   leave,
   markStarted,
+  reopen,
   sanitizeName,
   setColor,
   setReady,
@@ -20,11 +22,14 @@ import { PLAYER_COLOR_IDS } from "../../lib/constants";
 
 const base = () => createLobby("ABC123", defaultRaceConfig(), 1_000);
 
-/** Seat n ready, connected players. */
+/** Seat n ready, connected players, opening enough seats for them first. */
 function roomOf(count: number): LobbyState {
   let lobby = base();
   for (let i = 0; i < count; i++) {
     lobby = join(lobby, `p${i}`, `Player ${i}`);
+    if (i === 0 && count > LOBBY_LIMITS.defaultPlayers) {
+      lobby = configure(lobby, "p0", { maxPlayers: count });
+    }
     lobby = setReady(lobby, `p${i}`, true);
   }
   return lobby;
@@ -77,7 +82,7 @@ describe("join", () => {
 
   test("a full room returns the same state, so callers can detect the no-op", () => {
     let lobby = base();
-    for (let i = 0; i < LOBBY_LIMITS.maxPlayers; i++) {
+    for (let i = 0; i < LOBBY_LIMITS.defaultPlayers; i++) {
       lobby = join(lobby, `p${i}`, `P${i}`);
     }
     expect(join(lobby, "late", "Late")).toBe(lobby);
@@ -157,6 +162,68 @@ describe("configure", () => {
   test("settings freeze once the race starts", () => {
     const lobby = markStarted(join(base(), "p0", "Ada"));
     expect(configure(lobby, "p0", { countrySetId: "asia" })).toBe(lobby);
+  });
+
+  test("hints are a room setting, host only, off by default", () => {
+    const lobby = join(join(base(), "p0", "Ada"), "p1", "Grace");
+    expect(lobby.config.showHints).toBe(false);
+    expect(configure(lobby, "p1", { showHints: true })).toBe(lobby);
+    expect(configure(lobby, "p0", { showHints: true }).config.showHints).toBe(true);
+  });
+
+  test("the window per country is one of the offered lengths, default ten seconds", () => {
+    const lobby = join(join(base(), "p0", "Ada"), "p1", "Grace");
+    expect(lobby.config.countryWindowMs).toBe(10_000);
+    expect(configure(lobby, "p0", { countryWindowSec: 30 }).config.countryWindowMs).toBe(30_000);
+    expect(configure(lobby, "p0", { countryWindowSec: 7 })).toBe(lobby);
+    expect(configure(lobby, "p1", { countryWindowSec: 30 })).toBe(lobby);
+  });
+
+  test("host sets the number of seats within the room's range", () => {
+    const lobby = join(base(), "p0", "Ada");
+    expect(lobby.maxPlayers).toBe(LOBBY_LIMITS.defaultPlayers);
+    expect(configure(lobby, "p0", { maxPlayers: 4 }).maxPlayers).toBe(4);
+    expect(configure(lobby, "p0", { maxPlayers: 1 })).toBe(lobby);
+    expect(configure(lobby, "p0", { maxPlayers: LOBBY_LIMITS.maxPlayers + 1 })).toBe(lobby);
+  });
+
+  test("seats cannot shrink below the players already present", () => {
+    let lobby = configure(join(base(), "p0", "Ada"), "p0", { maxPlayers: 4 });
+    lobby = join(join(lobby, "p1", "Grace"), "p2", "Mary");
+    expect(configure(lobby, "p0", { maxPlayers: 2 })).toBe(lobby);
+    expect(configure(lobby, "p0", { maxPlayers: 3 }).maxPlayers).toBe(3);
+  });
+
+  test("a full room turns new players away, by the host's count not the cap", () => {
+    const lobby = configure(join(join(base(), "p0", "Ada"), "p1", "Grace"), "p0", { maxPlayers: 3 });
+    expect(join(lobby, "p2", "Mary").players).toHaveLength(3);
+    expect(join(lobby, "p3", "Late")).not.toBe(lobby);
+    const full = join(lobby, "p2", "Mary");
+    expect(join(full, "p3", "Late")).toBe(full);
+  });
+});
+
+describe("kick", () => {
+  test("host removes a seat and that id cannot rejoin", () => {
+    const lobby = join(join(base(), "p0", "Ada"), "p1", "Grace");
+    const after = kick(lobby, "p0", "p1");
+    expect(after.players.map((p) => p.id)).toEqual(["p0"]);
+    expect(join(after, "p1", "Grace")).toBe(after);
+    expect(join(after, "p2", "Mary").players).toHaveLength(2);
+  });
+
+  test("only the host kicks, and never themselves", () => {
+    const lobby = join(join(base(), "p0", "Ada"), "p1", "Grace");
+    expect(kick(lobby, "p1", "p0")).toBe(lobby);
+    expect(kick(lobby, "p0", "p0")).toBe(lobby);
+    expect(kick(lobby, "p0", "nobody")).toBe(lobby);
+  });
+
+  test("a kicked seat frees its colour", () => {
+    const lobby = join(join(base(), "p0", "Ada"), "p1", "Grace");
+    const freed = lobby.players[1].color;
+    const after = join(kick(lobby, "p0", "p1"), "p2", "Mary", freed);
+    expect(after.players[1].color).toBe(freed);
   });
 });
 
@@ -246,5 +313,23 @@ describe("identity colours", () => {
       lobby.players[0].color,
       lobby.players[1].color,
     ]);
+  });
+});
+
+describe("reopen", () => {
+  test("clears started and every ready flag, keeping seats and settings", () => {
+    const lobby = markStarted(configure(roomOf(2), "p0", { countrySetId: "asia" }));
+    const again = reopen(lobby);
+    expect(again.started).toBe(false);
+    expect(again.players.map((p) => p.ready)).toEqual([false, false]);
+    expect(again.players.map((p) => p.id)).toEqual(["p0", "p1"]);
+    expect(again.hostId).toBe("p0");
+    expect(again.config.countrySetId).toBe("asia");
+    expect(canStart(again)).toBe(false);
+  });
+
+  test("is a no-op for a room that has not started", () => {
+    const lobby = roomOf(2);
+    expect(reopen(lobby)).toBe(lobby);
   });
 });

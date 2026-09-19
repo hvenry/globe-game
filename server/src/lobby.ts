@@ -18,7 +18,12 @@ import {
 import type { RaceConfig } from "../../lib/engine/types";
 import type { CountrySetId } from "../../lib/geo/country-sets";
 import type { RacePlayerInput } from "../../lib/engine/race";
-import { LOBBY_LIMITS, type LobbyPlayer, type LobbyState } from "../../lib/race/types";
+import {
+  LOBBY_LIMITS,
+  RACE_WINDOW_SECONDS,
+  type LobbyPlayer,
+  type LobbyState,
+} from "../../lib/race/types";
 
 export { LOBBY_LIMITS };
 export type { LobbyPlayer, LobbyState };
@@ -28,7 +33,10 @@ export type { LobbyPlayer, LobbyState };
  * for a blank name and equally for one too short to identify a player by.
  */
 export function sanitizeName(raw: string, fallback = "Player"): string {
-  const cleaned = raw.replace(/\s+/g, " ").trim().slice(0, LOBBY_LIMITS.maxNameLength);
+  const cleaned = raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, LOBBY_LIMITS.maxNameLength);
   return cleaned.length >= LOBBY_LIMITS.minNameLength ? cleaned : fallback;
 }
 
@@ -43,6 +51,7 @@ export function defaultRaceConfig(): RaceConfig {
     countryWindowMs: RACE_CONFIG.countryWindowMs,
     lockoutMs: RACE_CONFIG.lockoutMs,
     intermissionMs: RACE_CONFIG.intermissionMs,
+    showHints: false,
   };
 }
 
@@ -59,8 +68,21 @@ function freeColor(state: LobbyState): PlayerColorId {
   );
 }
 
-export function createLobby(roomId: string, config: RaceConfig, createdAt: number): LobbyState {
-  return { roomId, hostId: null, players: [], config, createdAt, started: false };
+export function createLobby(
+  roomId: string,
+  config: RaceConfig,
+  createdAt: number,
+): LobbyState {
+  return {
+    roomId,
+    hostId: null,
+    players: [],
+    maxPlayers: LOBBY_LIMITS.defaultPlayers,
+    kickedIds: [],
+    config,
+    createdAt,
+    started: false,
+  };
 }
 
 /** First connected player in seat order, or null when the room is empty. */
@@ -89,7 +111,8 @@ export function join(
   }
 
   if (state.started) return state;
-  if (connectedPlayers(state).length >= LOBBY_LIMITS.maxPlayers) return state;
+  if (state.kickedIds.includes(id)) return state;
+  if (connectedPlayers(state).length >= state.maxPlayers) return state;
 
   // A preference is honoured only if the seat next to you is not already
   // wearing it; two identical dots on the globe would defeat the point.
@@ -101,7 +124,11 @@ export function join(
     connected: true,
     ready: false,
   };
-  return { ...state, players: [...state.players, seat], hostId: state.hostId ?? id };
+  return {
+    ...state,
+    players: [...state.players, seat],
+    hostId: state.hostId ?? id,
+  };
 }
 
 /**
@@ -133,10 +160,18 @@ export function leave(state: LobbyState, id: string): LobbyState {
   const players = state.players.map((p) =>
     p.id === id ? { ...p, connected: false, ready: false } : p,
   );
-  return { ...state, players, hostId: state.hostId === id ? nextHost(players) : state.hostId };
+  return {
+    ...state,
+    players,
+    hostId: state.hostId === id ? nextHost(players) : state.hostId,
+  };
 }
 
-export function setReady(state: LobbyState, id: string, ready: boolean): LobbyState {
+export function setReady(
+  state: LobbyState,
+  id: string,
+  ready: boolean,
+): LobbyState {
   const player = state.players.find((p) => p.id === id);
   if (!player || !player.connected || player.ready === ready) return state;
   return {
@@ -145,28 +180,87 @@ export function setReady(state: LobbyState, id: string, ready: boolean): LobbySt
   };
 }
 
+/**
+ * Host removes a player. The seat goes entirely, and the id is remembered so
+ * the same credential cannot walk straight back in. The host cannot kick
+ * themselves; that is `leave`.
+ */
+export function kick(
+  state: LobbyState,
+  hostId: string,
+  targetId: string,
+): LobbyState {
+  if (state.hostId !== hostId || hostId === targetId || state.started)
+    return state;
+  if (!state.players.some((p) => p.id === targetId)) return state;
+  return {
+    ...state,
+    players: state.players.filter((p) => p.id !== targetId),
+    kickedIds: [...state.kickedIds, targetId],
+  };
+}
+
 /** Host-only room settings. Non-hosts and out-of-range values are ignored. */
 export function configure(
   state: LobbyState,
   id: string,
-  patch: { countrySetId?: CountrySetId; countryCount?: number },
+  patch: {
+    countrySetId?: CountrySetId;
+    countryCount?: number;
+    maxPlayers?: number;
+    showHints?: boolean;
+    countryWindowSec?: number;
+  },
 ): LobbyState {
   if (state.hostId !== id || state.started) return state;
 
+  let next = state;
+  if (patch.maxPlayers !== undefined) {
+    // Never below the people already in the room: shrinking cannot evict.
+    const floor = Math.max(
+      LOBBY_LIMITS.minPlayers,
+      connectedPlayers(state).length,
+    );
+    const seats = Math.round(patch.maxPlayers);
+    if (
+      seats >= floor &&
+      seats <= LOBBY_LIMITS.maxPlayers &&
+      seats !== state.maxPlayers
+    ) {
+      next = { ...next, maxPlayers: seats };
+    }
+  }
+
   let config = state.config;
-  if (patch.countrySetId !== undefined && patch.countrySetId !== config.countrySetId) {
+  if (
+    patch.countrySetId !== undefined &&
+    patch.countrySetId !== config.countrySetId
+  ) {
     config = { ...config, countrySetId: patch.countrySetId };
   }
   if (patch.countryCount !== undefined) {
     // NaN and the infinities fall out of the range check on their own.
     const count = Math.round(patch.countryCount);
     const inRange =
-      count >= LOBBY_LIMITS.minCountryCount && count <= LOBBY_LIMITS.maxCountryCount;
+      count >= LOBBY_LIMITS.minCountryCount &&
+      count <= LOBBY_LIMITS.maxCountryCount;
     if (inRange && count !== config.countryCount) {
       config = { ...config, countryCount: count };
     }
   }
-  return config === state.config ? state : { ...state, config };
+  if (patch.showHints !== undefined && patch.showHints !== config.showHints) {
+    config = { ...config, showHints: patch.showHints };
+  }
+  if (
+    patch.countryWindowSec !== undefined &&
+    RACE_WINDOW_SECONDS.includes(patch.countryWindowSec)
+  ) {
+    const ms = patch.countryWindowSec * 1000;
+    if (ms !== config.countryWindowMs)
+      config = { ...config, countryWindowMs: ms };
+  }
+  if (config !== state.config) next = { ...next, config };
+  return next;
 }
 
 export function connectedPlayers(state: LobbyState): LobbyPlayer[] {
@@ -177,7 +271,9 @@ export function connectedPlayers(state: LobbyState): LobbyPlayer[] {
 export function canStart(state: LobbyState): boolean {
   if (state.started) return false;
   const present = connectedPlayers(state);
-  return present.length >= LOBBY_LIMITS.minPlayers && present.every((p) => p.ready);
+  return (
+    present.length >= LOBBY_LIMITS.minPlayers && present.every((p) => p.ready)
+  );
 }
 
 /** The roster handed to `createRace`. Disconnected seats are not dealt in. */
@@ -191,4 +287,18 @@ export function toRacePlayers(state: LobbyState): RacePlayerInput[] {
 
 export function markStarted(state: LobbyState): LobbyState {
   return state.started ? state : { ...state, started: true };
+}
+
+/**
+ * Back to the waiting room after a race. Seats, colours, host and settings
+ * all carry over; only readiness resets, so nobody is dealt into the next
+ * race by accident.
+ */
+export function reopen(state: LobbyState): LobbyState {
+  if (!state.started) return state;
+  return {
+    ...state,
+    started: false,
+    players: state.players.map((p) => (p.ready ? { ...p, ready: false } : p)),
+  };
 }

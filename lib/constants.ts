@@ -176,6 +176,11 @@ export const TIMER_CONFIG = {
 export interface CountryFill {
   color: string;
   opacity: number;
+  /**
+   * `dots` stipples the country instead of flooding it. A miss painted this
+   * way cannot be mistaken for a claim, whatever colour it takes.
+   */
+  pattern?: "dots";
 }
 
 /**
@@ -239,6 +244,26 @@ export const RACE_CONFIG = {
   intermissionMs: 1_200,
   /** Lobby countdown before the first country appears. */
   countdownMs: 3_000,
+} as const;
+
+/**
+ * Race points. Awarded by the engine, so every client and the server agree
+ * to the point. Sized so a race of a few dozen countries lands in the
+ * thousands, with the bonuses worth chasing but never worth more than the
+ * claim itself.
+ */
+export const RACE_SCORING = {
+  /** A correct click inside the window. */
+  claim: 500,
+  /** Added on top, scaled by the fraction of the window still left. */
+  speedMax: 250,
+  /** No wrong clicks on the way to this claim. */
+  accuracy: 100,
+  /** Per consecutive claim beyond the first, up to `comboMax`. */
+  comboStep: 50,
+  comboMax: 250,
+  /** First to click a country everyone missed, once it is revealed. */
+  recovery: 100,
 } as const;
 
 export const GLOBE_CONFIG = {

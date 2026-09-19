@@ -11,10 +11,15 @@ import type { RaceConfig, RacePlayer, RaceState } from "../engine/types";
 import type { CountrySetId } from "../geo/country-sets";
 import type { PlayerColorId } from "../constants";
 
+/** Window lengths a host may pick, in seconds. No "unlimited": a race has to advance. */
+export const RACE_WINDOW_SECONDS: readonly number[] = [5, 10, 15, 30];
+
 export const LOBBY_LIMITS = {
   /** One seat per identity colour, so no two players share one. */
   maxPlayers: 4,
   minPlayers: 2,
+  /** Seats a new room opens with; the host can raise it up to `maxPlayers`. */
+  defaultPlayers: 2,
   minNameLength: 2,
   maxNameLength: 16,
   minCountryCount: 5,
@@ -36,6 +41,10 @@ export interface LobbyState {
   /** First connected joiner. Reassigned when the host disconnects. */
   hostId: string | null;
   players: LobbyPlayer[];
+  /** Seats the host has opened, between `minPlayers` and `LOBBY_LIMITS.maxPlayers`. */
+  maxPlayers: number;
+  /** Ids the host has removed. Their reconnect credential no longer seats them. */
+  kickedIds: string[];
   /** Includes the country set — `RaceConfig` owns it, so the lobby does not. */
   config: RaceConfig;
   createdAt: number;
@@ -48,11 +57,25 @@ export type ClientMessage =
   | { t: "join"; name: string; color?: PlayerColorId; playerId?: string }
   | { t: "ready"; ready: boolean }
   /** Host only, lobby only. */
-  | { t: "configure"; countrySetId?: CountrySetId; countryCount?: number }
+  | {
+      t: "configure";
+      countrySetId?: CountrySetId;
+      countryCount?: number;
+      maxPlayers?: number;
+      showHints?: boolean;
+      /** Seconds per country; must be one of `RACE_WINDOW_SECONDS`. */
+      countryWindowSec?: number;
+    }
+  /** Host only, lobby only. Removes the seat and closes its sockets. */
+  | { t: "kick"; playerId: string }
   | { t: "color"; color: PlayerColorId }
   /** Host only. Validated against `canStart`. */
   | { t: "start" }
   | { t: "guess"; countryId: string }
+  /** After a race finishes: reopen the room so the same players can go again. */
+  | { t: "rematch" }
+  /** Host only. Ends a running race; standings are whatever was played. */
+  | { t: "end" }
   | { t: "ping" };
 
 export type ServerMessage =
@@ -71,5 +94,6 @@ export type ErrorCode =
   | "not_host"
   | "cannot_start"
   | "room_full"
+  | "kicked"
   | "already_started"
   | "rate_limited";
