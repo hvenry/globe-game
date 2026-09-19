@@ -12,8 +12,7 @@ import CodeInput from "./CodeInput";
    are tokens, so light mode follows. */
 const ACTION =
   "press shrink-0 rounded-control border px-4 text-sm font-semibold uppercase tracking-[0.14em] transition-all";
-const ACTION_READY =
-  "btn-signal cursor-pointer border-signal hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]";
+const ACTION_READY = "btn-signal cursor-pointer border-signal";
 const ACTION_IDLE = "cursor-default border-hairline bg-transparent text-mid";
 
 const NAME_FIELD =
@@ -42,7 +41,9 @@ export default function JoinView({
    * neighbouring "Next" would start a second room by mistake. The same
    * prompt catches a join attempted without a name.
    */
-  const [prompting, setPrompting] = useState(initialRoom.length === CODE_LENGTH);
+  const [prompting, setPrompting] = useState(
+    initialRoom.length === CODE_LENGTH,
+  );
 
   const cleanName = name.trim();
   const named = cleanName.length >= LOBBY_LIMITS.minNameLength;

@@ -11,5 +11,7 @@ import { normalizeRoomCode } from "@/lib/race/room-code";
  */
 export default function RaceRoute() {
   const room = useSearchParams().get("room") ?? "";
-  return <GameContainer initialMode="race" initialRoom={normalizeRoomCode(room)} />;
+  return (
+    <GameContainer initialMode="race" initialRoom={normalizeRoomCode(room)} />
+  );
 }
