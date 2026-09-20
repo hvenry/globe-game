@@ -27,6 +27,7 @@ import PanelHeader from "@/components/ui/PanelHeader";
 import ScrollColumn from "@/components/ui/ScrollColumn";
 import ControlsSection from "@/components/game/settings/ControlsSection";
 import PlayerDot from "./PlayerDot";
+import Confirm from "./Confirm";
 
 /** A seat count in the segmented chip: chosen, unreachable, or on offer. */
 function seatChipTone(selected: boolean, blocked: boolean): string {
@@ -159,21 +160,25 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   const { copied, copy } = useCopied();
   // The map picker is its own view, like the solo menu's game options, so the
   // lobby itself stays short: a summary tile here, the choices one step in.
-  const [view, setView] = useState<"lobby" | "options" | "controls">("lobby");
+  const [view, setView] = useState<
+    "lobby" | "options" | "controls" | "confirm-leave"
+  >("lobby");
 
-  // Escape in the options view is one rung back to the room, not out of it.
-  // Capture phase, so the room-level handler that leaves never sees it.
+  // Escape steps one rung back: out of a sub-view to the room, and from the
+  // room to the leave question rather than straight out. On the document
+  // rather than the window so the colour picker's own Escape, which stops
+  // at the window, wins while it is open; and capture, so the room-level
+  // handler that would leave never sees it.
   useEffect(() => {
-    if (view === "lobby") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
       play("ui.click");
-      setView("lobby");
+      setView(view === "lobby" ? "confirm-leave" : "lobby");
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [view]);
 
   if (!lobby) return null;
@@ -213,6 +218,22 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
     if (missing > 0) return `Waiting for ${missing} more`;
     if (!canStart) return "Waiting for everyone to ready up";
     return isHost ? "Everyone is ready" : "Waiting for the host";
+  }
+
+  if (view === "confirm-leave") {
+    return (
+      <div className="panel panel-ticks panel-dialog">
+        <p className="hud-label text-center text-mid">Room {roomId}</p>
+        <Confirm
+          question="Leave the room?"
+          consequence="Your seat is freed; the code gets you back in while the room lasts."
+          cancelLabel="Stay"
+          confirmLabel="Yes, leave the room"
+          onCancel={() => setView("lobby")}
+          onConfirm={onLeave}
+        />
+      </div>
+    );
   }
 
   if (view === "controls") {
@@ -466,7 +487,10 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
 
       <p className="hud-label mt-4 text-center text-faint">{waitingOn()}</p>
 
-      <button onClick={onLeave} className="btn-quiet press mt-4">
+      <button
+        onClick={() => setView("confirm-leave")}
+        className="btn-quiet press mt-4"
+      >
         Leave room
       </button>
     </div>

@@ -37,6 +37,7 @@ import { useGameStore } from "@/lib/store/game-store";
 import { COUNTRY_NAMES } from "@/lib/geo/country-names";
 import RaceMenu, { type RaceMenuView } from "./RaceMenu";
 import RaceResults from "./RaceResults";
+import Confirm from "./Confirm";
 
 export interface RaceGlobeProps {
   resolvedCountries: Record<string, Resolution | CountryFill>;
@@ -227,6 +228,37 @@ function LeftRaceView({
   const racePlayers = useRaceStore((s) => s.race?.players);
   const lobbyPlayers = useRaceStore((s) => s.lobby?.players);
   const players = racePlayers ?? lobbyPlayers ?? EMPTY_PLAYERS;
+  const [confirming, setConfirming] = useState(false);
+
+  // Escape asks before leaving, and backs out of the question. Document
+  // capture, so the overlay's window handler that would leave never sees it.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      play("ui.click");
+      setConfirming((open) => !open);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
+  if (confirming) {
+    return (
+      <div className="panel panel-ticks panel-dialog">
+        <p className="hud-label text-center text-mid">Room {roomId}</p>
+        <Confirm
+          question="Leave the room?"
+          consequence="Your seat and score stay while the race runs; the code gets you back in."
+          cancelLabel="Stay"
+          confirmLabel="Yes, leave the room"
+          onCancel={() => setConfirming(false)}
+          onConfirm={onLeaveRoom}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="panel panel-ticks panel-dialog">
@@ -258,7 +290,10 @@ function LeftRaceView({
       <button onClick={onRejoin} className="btn-primary btn-signal press">
         Rejoin race
       </button>
-      <button onClick={onLeaveRoom} className="btn-quiet press mt-3">
+      <button
+        onClick={() => setConfirming(true)}
+        className="btn-quiet press mt-3"
+      >
         Leave room
       </button>
     </div>
