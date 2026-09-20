@@ -6,7 +6,8 @@ import { play } from "@/lib/sound/engine";
 
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
 import MainMenu from "./MainMenu";
-import SettingsView, { type SettingsFocus } from "./SettingsView";
+import SettingsView from "./SettingsView";
+import CountrySetView from "./CountrySetView";
 
 interface StartScreenProps {
   onStart: () => void;
@@ -19,9 +20,9 @@ export default function StartScreen({
   onRace,
   delayAnimation = false,
 }: StartScreenProps) {
-  const [showSettings, setShowSettings] = useState(false);
-  /** Which section the panel should open on, set by whichever entry was used. */
-  const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>("top");
+  const [view, setView] = useState<"menu" | "settings" | "countrySet">("menu");
+  /** Where the country set panel goes back to: wherever it was opened from. */
+  const [setOrigin, setSetOrigin] = useState<"menu" | "settings">("menu");
   const lastEscapePress = useRef<number>(0);
 
   const expertMode = useSettingsStore((s) => s.expertMode);
@@ -34,34 +35,47 @@ export default function StartScreen({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && showSettings) {
+      if (e.key === "Escape" && view !== "menu") {
         e.preventDefault();
         const now = Date.now();
         if (now - lastEscapePress.current < 300) return;
         lastEscapePress.current = now;
         play("ui.click");
-        setShowSettings(false);
-      } else if (e.key === "Enter" && !showSettings) {
+        setView(view === "countrySet" ? setOrigin : "menu");
+      } else if (e.key === "Enter" && view === "menu") {
         e.preventDefault();
         onStart();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showSettings, onStart]);
+  }, [view, setOrigin, onStart]);
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center">
       <div
         className={`panel panel-ticks panel-dialog ${
-          showSettings ? "max-w-[20rem] md:max-w-md" : ""
+          view === "settings"
+            ? "max-w-[20rem] md:max-w-md"
+            : view === "countrySet"
+              ? "max-w-[22rem] md:max-w-2xl"
+              : ""
         }`}
       >
-        {showSettings ? (
+        {view === "settings" ? (
           <SettingsView
             key="settings"
-            onBack={() => setShowSettings(false)}
-            focus={settingsFocus}
+            onBack={() => setView("menu")}
+            onOpenCountrySet={() => {
+              setSetOrigin("settings");
+              setView("countrySet");
+            }}
+            expertMode={expertMode}
+          />
+        ) : view === "countrySet" ? (
+          <CountrySetView
+            key="countrySet"
+            onBack={() => setView(setOrigin)}
             expertMode={expertMode}
           />
         ) : (
@@ -69,9 +83,10 @@ export default function StartScreen({
             key="menu"
             onStart={onStart}
             onRace={onRace}
-            onOpenSettings={(focus = "top") => {
-              setSettingsFocus(focus);
-              setShowSettings(true);
+            onOpenSettings={() => setView("settings")}
+            onOpenCountrySet={() => {
+              setSetOrigin("menu");
+              setView("countrySet");
             }}
             delayAnimation={delayAnimation}
             expertMode={expertMode}

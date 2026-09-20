@@ -8,13 +8,13 @@ import { getCountrySet } from "@/lib/geo/country-sets";
 import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import { SlidersIcon, UsersIcon } from "@/components/ui/icons";
 import BestScoresCard from "./BestScoresCard";
-import type { SettingsFocus } from "./SettingsView";
 
 interface MainMenuProps {
   onStart: () => void;
   onRace: () => void;
   /** The section to open on; the country-set cell asks for its own. */
-  onOpenSettings: (focus?: SettingsFocus) => void;
+  onOpenSettings: () => void;
+  onOpenCountrySet: () => void;
   delayAnimation: boolean;
   expertMode: boolean;
 }
@@ -23,6 +23,7 @@ export default function MainMenu({
   onStart,
   onRace,
   onOpenSettings,
+  onOpenCountrySet,
   delayAnimation,
   expertMode,
 }: MainMenuProps) {
@@ -120,7 +121,7 @@ export default function MainMenu({
           </p>
         </button>
         <button
-          onClick={() => onOpenSettings("gameOptions")}
+          onClick={onOpenCountrySet}
           className="group cursor-pointer bg-well px-2.5 py-2 text-left transition-colors hover:bg-panel md:px-3 md:py-2.5"
         >
           <p className="hud-label mb-1">Country set</p>
@@ -144,7 +145,7 @@ export default function MainMenu({
           <span>Live race</span>
         </button>
 
-        <button onClick={() => onOpenSettings()} className="btn-ghost group">
+        <button onClick={onOpenSettings} className="btn-ghost group">
           <SlidersIcon size={14} />
           <span>Settings</span>
         </button>

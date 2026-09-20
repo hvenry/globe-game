@@ -408,13 +408,20 @@ interface CountrySetSelectProps {
   value: CountrySetId;
   onChange: (value: CountrySetId) => void;
   expertMode: boolean;
+  /** Tiles per row on desktop; phones always get two. */
+  columns?: 2 | 3;
 }
 
 export function CountrySetSelect({
   value,
   onChange,
   expertMode,
+  columns = 2,
 }: CountrySetSelectProps) {
+  const grid =
+    columns === 3
+      ? "grid grid-cols-2 gap-2 md:grid-cols-3"
+      : "grid grid-cols-2 gap-2";
   const bestScores = useStatsStore((s) => s.bestScores);
   const expertBestScores = useStatsStore((s) => s.expertBestScores);
   const dailyToday = useStatsStore((s) => s.daily[dailyKey()]);
@@ -599,14 +606,12 @@ export function CountrySetSelect({
       {SET_GROUPS.map(([label, sets]) => (
         <div key={label} className="space-y-3">
           <p className="hud-rule hud-label">{label}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {sets.map((set) => renderSetButton(set))}
-          </div>
+          <div className={grid}>{sets.map((set) => renderSetButton(set))}</div>
         </div>
       ))}
       <div className="space-y-3">
         <p className="hud-rule hud-label">Rankings</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className={grid}>
           {renderRankTile("area")}
           {renderRankTile("population")}
         </div>
