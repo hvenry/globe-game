@@ -138,16 +138,19 @@ export function useRaceGlobe(): RaceGlobeProps {
   // punish curiosity.
   const showHints = race?.config.showHints ?? lobby?.config.showHints ?? false;
   const addFloatingLabel = useGameStore((s) => s.addFloatingLabel);
+  const currentId = race?.currentId ?? null;
   const onCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
       const base = baseId(countryId);
-      if (showHints && resolvedCountries[base] !== undefined) {
+      // With hints on, every click that is not the target names the country,
+      // as solo does: a miss teaches, and a painted country just answers.
+      if (showHints && base !== currentId) {
         addFloatingLabel(COUNTRY_NAMES[base] ?? base, position);
-        return;
+        if (resolvedCountries[base] !== undefined) return;
       }
       guess(base);
     },
-    [guess, showHints, resolvedCountries, addFloatingLabel],
+    [guess, showHints, currentId, resolvedCountries, addFloatingLabel],
   );
 
   const racing = status === "racing" || status === "finished";
