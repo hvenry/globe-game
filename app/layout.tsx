@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import ThemeSync from "@/components/ThemeSync";
+import { FEATURES } from "@/lib/flags";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -54,11 +55,13 @@ export default function RootLayout({
             default, so this only ever opts into light and a failure here
             (private mode, cleared storage) renders the default rather than
             the wrong theme. ThemeSync keeps it in sync from then on. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var s=localStorage.getItem("globe-game-settings");if(s&&JSON.parse(s).state.theme==="light"){document.documentElement.dataset.theme="light"}}catch(e){}`,
-          }}
-        />
+        {FEATURES.lightMode && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `try{var s=localStorage.getItem("globe-game-settings");if(s&&JSON.parse(s).state.theme==="light"){document.documentElement.dataset.theme="light"}}catch(e){}`,
+            }}
+          />
+        )}
       </head>
       {/* Extensions (Grammarly and friends) write their own attributes onto
           the body before React hydrates, which reads as a mismatch. The flag

@@ -8,6 +8,7 @@
  */
 
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { FEATURES } from "@/lib/flags";
 import { Slider, ThemeSelect, Toggle } from "./SettingsControls";
 import { play } from "@/lib/sound/engine";
 
@@ -78,7 +79,13 @@ export default function ControlsSection({
         )}
       </div>
 
-      <ThemeSelect value={theme} onChange={setTheme} expertMode={expertMode} />
+      {FEATURES.lightMode && (
+        <ThemeSelect
+          value={theme}
+          onChange={setTheme}
+          expertMode={expertMode}
+        />
+      )}
     </div>
   );
 }
