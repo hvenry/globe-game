@@ -101,6 +101,21 @@ export const SOUND_CUES = {
       fx("doorOpen_000"),
     ],
   },
+  "ui.tick": {
+    file: picked["ui.tick"],
+    group: "ui",
+    description: "A slider stepping through its range; one tick per step.",
+    gain: 0.5,
+    minIntervalMs: 30,
+    rate: [0.97, 1.03],
+    candidates: [
+      ui("tick_001"),
+      ui("tick_002"),
+      ui("tick_004"),
+      ui("click_005"),
+      ui("select_008"),
+    ],
+  },
   "ui.error": {
     file: picked["ui.error"],
     group: "ui",

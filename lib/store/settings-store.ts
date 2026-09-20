@@ -32,8 +32,8 @@ interface SettingsState {
   soundVolume: number;
 
   // Camera controls
-  zoomSpeed: number; // 0.1 to 1.0 (actual), default 0.53 (displays as 1.0x)
-  rotateSpeed: number; // 0.1 to 2.0, default 1.0
+  zoomSpeed: number; // 0.1 to 2.0 (actual), default 0.53 (displays as 1.0x)
+  rotateSpeed: number; // 0.1 to 4.0, default 1.0
 
   // Saved settings from before expert mode was enabled
   preExpertAllowSkips: boolean;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useStatsStore } from "@/lib/store/stats-store";
+import { play } from "@/lib/sound/engine";
 import { dailyKey } from "@/lib/geo/draws";
 import {
   setSize,
@@ -155,7 +156,12 @@ export function Slider({
         max={dispMax}
         step={step}
         value={displayValue}
-        onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
+        onChange={(e) => {
+          // One tick per step: the browser fires change only when the value
+          // moves, so a held thumb at the end of the range stays quiet.
+          play("ui.tick");
+          onChange(displayToActual(parseFloat(e.target.value)));
+        }}
         onPointerUp={onCommit}
         onKeyUp={onCommit}
         className={`h-1.5 w-full cursor-pointer appearance-none rounded-full bg-hairline ${accentClass} transition-colors`}

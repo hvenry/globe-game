@@ -28,5 +28,6 @@
   "race.win": "electro-sounds/electro-win-sound.mp3",
   "race.lose": "electro-sounds/electro-loose-sound.mp3",
   "race.draw": "electro-sounds/electro-open-sound.mp3",
-  "room.closed": "interface-sounds/error_003.mp3"
+  "room.closed": "interface-sounds/error_003.mp3",
+  "ui.tick": "interface-sounds/tick_001.mp3"
 }
