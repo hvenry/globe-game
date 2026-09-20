@@ -398,10 +398,14 @@ export function ThemeSelect({
 const RANK_DEFAULT_COUNT = 25;
 const RANKED_SETS = setsOfKind("ranked");
 
-const SET_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
+/** Listed sets, in display order. Rankings render between quick play and continents. */
+const QUICK_PLAY: [label: string, sets: CountrySetConfig[]] = [
+  "Quick play",
+  setsOfKind("draw"),
+];
+const LISTED_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
   ["Continents", setsOfKind("continent")],
   ["Regions", setsOfKind("region")],
-  ["Quick play", setsOfKind("draw")],
 ];
 
 interface CountrySetSelectProps {
@@ -601,14 +605,18 @@ export function CountrySetSelect({
     );
   };
 
+  const renderGroup = ([label, sets]: [string, CountrySetConfig[]]) => (
+    <div key={label} className="space-y-3">
+      <p className="hud-rule hud-label">{label}</p>
+      <div className={grid}>{sets.map((set) => renderSetButton(set))}</div>
+    </div>
+  );
+
+  // Short sessions first: quick play and rankings are what a returning player
+  // reaches for; the full continents and regions follow.
   return (
     <div className="space-y-5">
-      {SET_GROUPS.map(([label, sets]) => (
-        <div key={label} className="space-y-3">
-          <p className="hud-rule hud-label">{label}</p>
-          <div className={grid}>{sets.map((set) => renderSetButton(set))}</div>
-        </div>
-      ))}
+      {renderGroup(QUICK_PLAY)}
       <div className="space-y-3">
         <p className="hud-rule hud-label">Rankings</p>
         <div className={grid}>
@@ -616,6 +624,7 @@ export function CountrySetSelect({
           {renderRankTile("population")}
         </div>
       </div>
+      {LISTED_GROUPS.map(renderGroup)}
     </div>
   );
 }

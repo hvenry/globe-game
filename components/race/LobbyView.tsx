@@ -22,7 +22,7 @@ import {
   setSize,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
-import { SlidersIcon, XIcon } from "@/components/ui/icons";
+import { GearIcon, SlidersIcon, XIcon } from "@/components/ui/icons";
 import PanelHeader from "@/components/ui/PanelHeader";
 import ScrollColumn from "@/components/ui/ScrollColumn";
 import ControlsSection from "@/components/game/settings/ControlsSection";
@@ -353,14 +353,18 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
 
   return (
     <div className="panel panel-ticks panel-dialog">
-      {/* Camera, theme and sound: the same corner button the race menu has. */}
-      <button
-        onClick={() => setView("controls")}
-        aria-label="Controls"
-        className="btn-icon press absolute right-3 top-3 md:right-4 md:top-4"
-      >
-        <SlidersIcon size={13} />
-      </button>
+      {/* A header row rather than a floating corner button, so the controls
+          icon never sits over the invite box on a narrow panel. */}
+      <div className="mb-3 flex items-center justify-between">
+        <p className="hud-label text-mid">Room</p>
+        <button
+          onClick={() => setView("controls")}
+          aria-label="Controls"
+          className="btn-icon press"
+        >
+          <SlidersIcon size={13} />
+        </button>
+      </div>
 
       {/* The code and the way to share it are one target: the whole box is
           the copy button. Squared and hairline-bordered like the roster rows
@@ -503,20 +507,30 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       {/* One tile for the room's options: the map on show, hints and the
           picker one step in. Everyone can open it; only the host can change
           the map inside. */}
-      <button
-        onClick={() => setView("options")}
-        className="group mb-6 w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:bg-panel md:px-3 md:py-2.5"
-      >
-        <p className="hud-label mb-1">Game options</p>
-        <p className="flex items-center justify-between gap-2 text-xs font-medium md:text-sm">
-          <span className="truncate text-mid underline-offset-2 group-hover:text-hi group-hover:underline">
-            {getCountrySet(setId).name}
-          </span>
-          <span className="readout shrink-0 text-label text-faint">
-            {inPlay}
-          </span>
-        </p>
-      </button>
+      <div className="relative mb-6">
+        <button
+          onClick={() => setView("options")}
+          className="w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 pr-12 text-left transition-colors hover:border-hairline-strong hover:bg-panel md:px-3 md:py-2.5"
+        >
+          <p className="hud-label mb-1">Game options</p>
+          <p className="flex items-center justify-between gap-2 text-xs font-medium md:text-sm">
+            <span className="truncate text-mid">
+              {getCountrySet(setId).name}
+            </span>
+            <span className="readout shrink-0 text-label text-faint">
+              {inPlay}
+            </span>
+          </p>
+        </button>
+        {/* Says "this opens something" without the card having to. */}
+        <button
+          onClick={() => setView("options")}
+          aria-label="Configure game options"
+          className="btn-icon press absolute right-2 top-1/2 -translate-y-1/2"
+        >
+          <GearIcon size={13} />
+        </button>
+      </div>
 
       {isHost && (
         <button
