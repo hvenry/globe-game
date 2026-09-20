@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { play } from "@/lib/sound/engine";
 
@@ -23,6 +23,15 @@ export default function StartScreen({
   const [view, setView] = useState<"menu" | "settings" | "countrySet">("menu");
   /** Where the country set panel goes back to: wherever it was opened from. */
   const [setOrigin, setSetOrigin] = useState<"menu" | "settings">("menu");
+  // The settings page unmounts while the picker has the panel. Its scroll
+  // position is tracked in a ref (a render per scroll event would be waste)
+  // and snapshotted into state at the moment the picker opens, so coming
+  // back lands on the same spot.
+  const settingsScroll = useRef(0);
+  const [settingsResumeAt, setSettingsResumeAt] = useState(0);
+  const rememberSettingsScroll = useCallback((top: number) => {
+    settingsScroll.current = top;
+  }, []);
   const lastEscapePress = useRef<number>(0);
 
   const expertMode = useSettingsStore((s) => s.expertMode);
@@ -41,6 +50,7 @@ export default function StartScreen({
         if (now - lastEscapePress.current < 300) return;
         lastEscapePress.current = now;
         play("ui.click");
+        if (view === "settings") setSettingsResumeAt(0);
         setView(view === "countrySet" ? setOrigin : "menu");
       } else if (e.key === "Enter" && view === "menu") {
         e.preventDefault();
@@ -65,11 +75,17 @@ export default function StartScreen({
         {view === "settings" ? (
           <SettingsView
             key="settings"
-            onBack={() => setView("menu")}
+            onBack={() => {
+              setSettingsResumeAt(0);
+              setView("menu");
+            }}
             onOpenCountrySet={() => {
+              setSettingsResumeAt(settingsScroll.current);
               setSetOrigin("settings");
               setView("countrySet");
             }}
+            initialScrollTop={settingsResumeAt}
+            onScrollTop={rememberSettingsScroll}
             expertMode={expertMode}
           />
         ) : view === "countrySet" ? (

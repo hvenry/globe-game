@@ -15,12 +15,17 @@ import { getCountrySet, setSize } from "@/lib/geo/country-sets";
 interface SettingsViewProps {
   onBack: () => void;
   onOpenCountrySet: () => void;
+  /** Scroll position to come back to, and where to report the current one. */
+  initialScrollTop?: number;
+  onScrollTop?: (top: number) => void;
   expertMode: boolean;
 }
 
 export default function SettingsView({
   onBack,
   onOpenCountrySet,
+  initialScrollTop,
+  onScrollTop,
   expertMode,
 }: SettingsViewProps) {
   const countrySet = useSettingsStore((s) => s.countrySet);
@@ -38,6 +43,8 @@ export default function SettingsView({
     <ScrollColumn
       header={<PanelHeader title="Settings" onBack={onBack} />}
       accent={expertMode ? "expert" : "signal"}
+      initialScrollTop={initialScrollTop}
+      onScrollTop={onScrollTop}
       footer={
         <div className="border-t border-hairline">
           <p className="readout pt-3 text-label text-faint text-center">

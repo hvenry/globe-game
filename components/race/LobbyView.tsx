@@ -161,7 +161,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   // The map picker is its own view, like the solo menu's game options, so the
   // lobby itself stays short: a summary tile here, the choices one step in.
   const [view, setView] = useState<
-    "lobby" | "options" | "controls" | "confirm-leave"
+    "lobby" | "options" | "controls" | "confirm-leave" | "countrySet"
   >("lobby");
 
   // Escape steps one rung back: out of a sub-view to the room, and from the
@@ -175,7 +175,13 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       e.preventDefault();
       e.stopPropagation();
       play("ui.click");
-      setView(view === "lobby" ? "confirm-leave" : "lobby");
+      setView(
+        view === "lobby"
+          ? "confirm-leave"
+          : view === "countrySet"
+            ? "options"
+            : "lobby",
+      );
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
@@ -236,6 +242,37 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
     );
   }
 
+  if (view === "countrySet") {
+    return (
+      <div className="panel panel-ticks panel-dialog max-w-[22rem] md:max-w-2xl">
+        <ScrollColumn
+          header={
+            <PanelHeader
+              title="Country set"
+              onBack={() => setView("options")}
+            />
+          }
+          footer={
+            !isHost ? (
+              <p className="border-t border-hairline pt-3 text-center text-label text-faint">
+                Only the host can change this
+              </p>
+            ) : undefined
+          }
+        >
+          <div className={isHost ? "" : "pointer-events-none opacity-40"}>
+            <CountrySetSelect
+              value={setId}
+              onChange={(id) => configure({ countrySetId: id })}
+              expertMode={false}
+              columns={3}
+            />
+          </div>
+        </ScrollColumn>
+      </div>
+    );
+  }
+
   if (view === "controls") {
     return (
       <div className="panel panel-ticks panel-dialog text-left">
@@ -271,12 +308,22 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
           <div
             className={`space-y-8 ${isHost ? "" : "pointer-events-none opacity-40"}`}
           >
+            {/* The picker has its own, wider panel; this is the way in. */}
             <div className="space-y-3">
-              <CountrySetSelect
-                value={setId}
-                onChange={(id) => configure({ countrySetId: id })}
-                expertMode={false}
-              />
+              <p className="hud-rule hud-label">Country set</p>
+              <button
+                onClick={() => setView("countrySet")}
+                className="group w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:border-hairline-strong hover:bg-panel"
+              >
+                <p className="flex items-center justify-between gap-2 text-sm">
+                  <span className="font-medium text-hi group-hover:underline underline-offset-2">
+                    {getCountrySet(setId).name}
+                  </span>
+                  <span className="readout text-label text-faint">
+                    {inPlay}
+                  </span>
+                </p>
+              </button>
             </div>
 
             <TimerLimitSelect
