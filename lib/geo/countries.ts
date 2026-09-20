@@ -28,12 +28,17 @@ export function getAllFeatures(): CountryFeature[] {
 
   const geojson = topojson.feature(
     topology,
-    topology.objects.countries as GeometryCollection
+    topology.objects.countries as GeometryCollection,
   );
 
   const seen = new Set<string>();
 
   _allFeatures = (geojson as GeoJSON.FeatureCollection).features
+    // Kosovo has no ISO 3166-1 numeric code, so Natural Earth ships it with
+    // none; "383" is the code the rest of the ecosystem settled on.
+    .map((f) =>
+      f.id == null && f.properties?.name === "Kosovo" ? { ...f, id: "383" } : f,
+    )
     .filter((f) => f.id != null)
     .map((f, i) => {
       const baseId = String(f.id);

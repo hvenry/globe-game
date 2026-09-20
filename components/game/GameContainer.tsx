@@ -26,7 +26,8 @@ import {
   getGuessableCountries,
   baseId,
 } from "@/lib/geo/countries";
-import { getCountrySet } from "@/lib/geo/country-sets";
+import { idsFor, seedFor } from "@/lib/geo/draws";
+import { randomSeed } from "@/lib/engine/rng";
 import { GAME_CONFIG, GLOBE_CONFIG } from "@/lib/constants";
 
 export type GameMode = "solo" | "race";
@@ -103,30 +104,28 @@ export default function GameContainer({
   const allFeatures = useMemo(() => getAllFeatures(), []);
   const guessableCountries = useMemo(() => getGuessableCountries(), []);
 
-  const filteredCountries = useMemo(() => {
-    const set = getCountrySet(countrySetId);
-    if (!set.countryIds) {
-      return guessableCountries;
-    }
-    const idSet = new Set(set.countryIds);
-    return guessableCountries.filter((c) => idSet.has(c.id));
-  }, [countrySetId, guessableCountries]);
-
   // The game starts with its clock held (engine paused) until the camera's
   // intro flight lands — the timer never eats into the fly-in.
   const [isIntroFlying, setIsIntroFlying] = useState(false);
 
-  const handleStart = useCallback(() => {
-    const countries =
-      filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
+  // One run. The seed decides the countries — fixed sets ignore it, draws
+  // sample by it, and Daily 20 pins it to the UTC date — and the engine keeps
+  // it, so the same seed replays the same game anywhere.
+  const beginRun = useCallback(() => {
+    const seed = seedFor(countrySetId, randomSeed());
+    const ids = new Set(idsFor(countrySetId, seed));
+    const picked = guessableCountries.filter((c) => ids.has(c.id));
+    startGame(
+      picked.length > 0 ? picked : guessableCountries,
+      { countrySetId, expertMode, timerLimit, maxTries },
+      seed,
+    );
     pauseTimer();
     setIsIntroFlying(true);
     setIsPaused(false);
   }, [
     startGame,
     pauseTimer,
-    filteredCountries,
     guessableCountries,
     countrySetId,
     expertMode,
@@ -136,23 +135,8 @@ export default function GameContainer({
 
   const handlePlayAgain = useCallback(() => {
     resetGame();
-    const countries =
-      filteredCountries.length > 0 ? filteredCountries : guessableCountries;
-    startGame(countries, { countrySetId, expertMode, timerLimit, maxTries });
-    pauseTimer();
-    setIsIntroFlying(true);
-    setIsPaused(false);
-  }, [
-    resetGame,
-    startGame,
-    pauseTimer,
-    filteredCountries,
-    guessableCountries,
-    countrySetId,
-    expertMode,
-    timerLimit,
-    maxTries,
-  ]);
+    beginRun();
+  }, [resetGame, beginRun]);
 
   const handleIntroArrived = useCallback(() => {
     setIsIntroFlying(false);
@@ -422,7 +406,7 @@ export default function GameContainer({
           {/* Persisted stores hydrate on the client; render dependent UI after */}
           {hydrated && phase === "idle" && (
             <StartScreen
-              onStart={handleStart}
+              onStart={beginRun}
               onRace={enterRace}
               delayAnimation={isInitialLoad}
             />

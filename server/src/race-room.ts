@@ -32,7 +32,7 @@ import {
 import type { RaceState } from "../../lib/engine/types";
 
 import { isPlayerColorId } from "../../lib/constants";
-import { isCountrySetId, poolFor } from "./country-pool";
+import { countFor, isCountrySetId, poolFor, raceSeed } from "./country-pool";
 import type { Env } from "./env";
 import { ROOM_LIMITS } from "./limits";
 import {
@@ -331,10 +331,17 @@ export class RaceRoom extends DurableObject<Env> {
       return this.fail(ws, "cannot_start", "Everyone needs to be ready first.");
     }
 
+    // A draw set brings its own seed (the day's, for Daily 20) and count;
+    // the pool is already the drawn countries, in seeded order.
+    const setId = lobby.config.countrySetId;
+    const seed = raceSeed(setId, randomSeed());
     const race = createRace(
-      poolFor(lobby.config.countrySetId),
-      lobby.config,
-      randomSeed(),
+      poolFor(setId, seed),
+      {
+        ...lobby.config,
+        countryCount: countFor(setId, lobby.config.countryCount),
+      },
+      seed,
       toRacePlayers(lobby),
       Date.now() + RACE_CONFIG.countdownMs,
     );

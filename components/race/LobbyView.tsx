@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRaceStore, playerPalette } from "@/lib/store/race-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { useCopied } from "@/lib/hooks/useCopied";
 import { play } from "@/lib/sound/engine";
 
 import {
@@ -16,22 +17,16 @@ import {
   RACE_WINDOW_SECONDS,
   type LobbyPlayer,
 } from "@/lib/race/types";
-import { getCountrySet, type CountrySetId } from "@/lib/geo/country-sets";
-import { GUESSABLE_IDS } from "@/lib/geo/country-names";
-import { XIcon } from "@/components/ui/icons";
+import {
+  getCountrySet,
+  setSize,
+  type CountrySetId,
+} from "@/lib/geo/country-sets";
+import { SlidersIcon, XIcon } from "@/components/ui/icons";
 import PanelHeader from "@/components/ui/PanelHeader";
+import ScrollColumn from "@/components/ui/ScrollColumn";
+import ControlsSection from "@/components/game/settings/ControlsSection";
 import PlayerDot from "./PlayerDot";
-
-/** How long the invite button reads "copied" before going back. */
-const COPIED_MS = 2_000;
-
-/** How many countries a set can actually put in play. */
-function setSize(id: CountrySetId): number {
-  const ids = getCountrySet(id).countryIds;
-  return ids
-    ? ids.filter((c) => GUESSABLE_IDS.has(c)).length
-    : GUESSABLE_IDS.size;
-}
 
 /** A seat count in the segmented chip: chosen, unreachable, or on offer. */
 function seatChipTone(selected: boolean, blocked: boolean): string {
@@ -161,15 +156,15 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   const configure = useRaceStore((s) => s.configure);
   const kick = useRaceStore((s) => s.kick);
   const start = useRaceStore((s) => s.start);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopied();
   // The map picker is its own view, like the solo menu's game options, so the
   // lobby itself stays short: a summary tile here, the choices one step in.
-  const [view, setView] = useState<"lobby" | "options">("lobby");
+  const [view, setView] = useState<"lobby" | "options" | "controls">("lobby");
 
   // Escape in the options view is one rung back to the room, not out of it.
   // Capture phase, so the room-level handler that leaves never sees it.
   useEffect(() => {
-    if (view !== "options") return;
+    if (view === "lobby") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
@@ -209,11 +204,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   }
 
   function copyInvite() {
-    navigator.clipboard.writeText(
-      `${window.location.origin}/race?room=${roomId}`,
-    );
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPIED_MS);
+    copy(`${window.location.origin}/race?room=${roomId}`);
   }
 
   /** The one line under the roster saying what the room is still waiting on. */
@@ -224,61 +215,85 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
     return isHost ? "Everyone is ready" : "Waiting for the host";
   }
 
+  if (view === "controls") {
+    return (
+      <div className="panel panel-ticks panel-dialog text-left">
+        <PanelHeader title="Controls" onBack={() => setView("lobby")} />
+        <div className="mt-6">
+          <ControlsSection expertMode={false} />
+        </div>
+      </div>
+    );
+  }
+
   if (view === "options") {
     return (
-      // Same width as the solo settings panel, so the same controls sit the
-      // same way here.
+      // Same width and scroll frame as the solo settings panel, so the same
+      // controls sit the same way here.
       <div className="panel panel-ticks panel-dialog max-w-[20rem] md:max-w-md">
-        <PanelHeader title="Game options" onBack={() => setView("lobby")} />
-
-        {/* The solo settings panel's own controls, cut down to what a race
-            uses, laid out as that panel lays them out. The host edits; for
-            everyone else the controls are inert but drawn the same, so the
-            room's settings read identically on every screen. */}
-        <div
-          className={`mt-4 space-y-8 px-3 text-left ${
-            isHost ? "" : "pointer-events-none opacity-40"
-          }`}
+        <ScrollColumn
+          header={
+            <PanelHeader title="Game options" onBack={() => setView("lobby")} />
+          }
+          footer={
+            !isHost ? (
+              <p className="border-t border-hairline pt-3 text-center text-label text-faint">
+                Only the host can change these
+              </p>
+            ) : undefined
+          }
         >
-          <div className="space-y-3">
-            <CountrySetSelect
-              value={setId}
-              onChange={(id) => configure({ countrySetId: id })}
-              expertMode={false}
-            />
-          </div>
-
-          <TimerLimitSelect
-            value={lobby.config.countryWindowMs / 1000}
-            onChange={(sec) =>
-              sec !== null && configure({ countryWindowSec: sec })
-            }
-            limits={RACE_WINDOW_SECONDS}
-          />
-
-          <div className="space-y-3">
-            <p className="hud-rule hud-label">Rules</p>
-            <div className="space-y-2">
-              <Toggle
-                enabled={lobby.config.showHints}
-                onChange={(show) => configure({ showHints: show })}
-                label="Show Hints"
-                description="Display country names on incorrect guesses"
+          {/* The solo settings panel's own controls, cut down to what a race
+              uses. The host edits; for everyone else the controls are inert
+              but drawn the same, so the room's settings read identically on
+              every screen. */}
+          <div
+            className={`space-y-8 ${isHost ? "" : "pointer-events-none opacity-40"}`}
+          >
+            <div className="space-y-3">
+              <CountrySetSelect
+                value={setId}
+                onChange={(id) => configure({ countrySetId: id })}
+                expertMode={false}
               />
             </div>
+
+            <TimerLimitSelect
+              value={lobby.config.countryWindowMs / 1000}
+              onChange={(sec) =>
+                sec !== null && configure({ countryWindowSec: sec })
+              }
+              limits={RACE_WINDOW_SECONDS}
+            />
+
+            <div className="space-y-3">
+              <p className="hud-rule hud-label">Rules</p>
+              <div className="space-y-2">
+                <Toggle
+                  enabled={lobby.config.showHints}
+                  onChange={(show) => configure({ showHints: show })}
+                  label="Show Hints"
+                  description="Display country names on incorrect guesses"
+                />
+              </div>
+            </div>
           </div>
-        </div>
-        {!isHost && (
-          <p className="mt-6 text-center text-label text-faint">
-            Only the host can change these
-          </p>
-        )}
+        </ScrollColumn>
       </div>
     );
   }
 
   return (
     <div className="panel panel-ticks panel-dialog">
+      {/* Camera, theme and sound: the same corner button the race menu has. */}
+      <button
+        onClick={() => setView("controls")}
+        aria-label="Controls"
+        className="btn-icon press absolute right-3 top-3 md:right-4 md:top-4"
+      >
+        <SlidersIcon size={13} />
+      </button>
+
       {/* The code and the way to share it are one target: the whole box is
           the copy button. Squared and hairline-bordered like the roster rows
           below it, since in dark every surface is the same black. */}

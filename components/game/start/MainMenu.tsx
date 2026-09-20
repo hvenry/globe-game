@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useStatsStore } from "@/lib/store/stats-store";
 import { useSettingsStore } from "@/lib/store/settings-store";
-import { getAvailableCountrySets } from "@/lib/geo/country-sets";
+import { useCopied } from "@/lib/hooks/useCopied";
+import { getCountrySet } from "@/lib/geo/country-sets";
 import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import { SlidersIcon, UsersIcon } from "@/components/ui/icons";
 import BestScoresCard from "./BestScoresCard";
@@ -29,7 +30,7 @@ export default function MainMenu({
   const expertBestScores = useStatsStore((s) => s.expertBestScores);
   const countrySet = useSettingsStore((s) => s.countrySet);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopied();
 
   const handleShare = useCallback(() => {
     if (copied) return;
@@ -59,18 +60,11 @@ export default function MainMenu({
       message += `\nNormal  [${makeBar(normalPercentage)}] ${normalPercentage}%`;
     }
 
-    navigator.clipboard.writeText(message).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [bestScores.all, expertBestScores.all, copied]);
+    copy(message);
+  }, [bestScores.all, expertBestScores.all, copied, copy]);
 
   const hasScores = bestScores.all > 0 || expertBestScores.all > 0;
-  const countrySetName =
-    countrySet === "all"
-      ? "All Countries"
-      : getAvailableCountrySets().find((s) => s.id === countrySet)?.name ||
-        "All Countries";
+  const countrySetName = getCountrySet(countrySet).name;
 
   const channel = expertMode ? "text-expert-ink" : "text-signal";
   const channelDot = expertMode ? "bg-expert" : "bg-signal";
@@ -150,10 +144,7 @@ export default function MainMenu({
           <span>Live race</span>
         </button>
 
-        <button
-          onClick={() => onOpenSettings()}
-          className="btn-ghost group"
-        >
+        <button onClick={() => onOpenSettings()} className="btn-ghost group">
           <SlidersIcon size={14} />
           <span>Settings</span>
         </button>

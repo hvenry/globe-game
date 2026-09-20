@@ -74,6 +74,8 @@ export interface GlobeScene {
   gameKey: number | null;
   /** A country to pulse (race reveal), or null. Replaces the solo mustclick pulse. */
   pulseId?: string | null;
+  /** The exact ids in play when the set alone cannot say (a draw set's sample). */
+  validIds?: ReadonlySet<string> | null;
 }
 
 // Mustclick pulse fill: the target country is painted white on its own
@@ -237,6 +239,7 @@ function GlobeScene({
   // every phase — the solo store's set only means something in solo mode.
   const sceneSetIds = useMemo(() => {
     if (!scene) return null;
+    if (scene.validIds) return new Set(scene.validIds);
     const ids = getCountrySet(scene.countrySetId).countryIds;
     return new Set(ids ?? []);
   }, [scene]);
@@ -333,15 +336,20 @@ function GlobeScene({
     return ids ? new Set(ids) : null;
   }, [settingsCountrySet]);
 
-  const emphasisIds = scene
-    ? scene.countrySetId !== "all"
-      ? sceneSetIds
-      : null
-    : gameCountrySetId !== "all" && validCountryIds.size > 0
-      ? validCountryIds
-      : gamePhase === "idle"
-        ? previewIds
-        : null;
+  // The ids the globe treats as the playfield — everything outside them dims
+  // to `outOfSetOpacityScale`. Null means the whole world is in play.
+  function activeEmphasisIds(): Set<string> | null {
+    if (scene) {
+      if (scene.countrySetId === "all") return null;
+      return sceneSetIds && sceneSetIds.size > 0 ? sceneSetIds : null;
+    }
+    if (gameCountrySetId !== "all" && validCountryIds.size > 0) {
+      return validCountryIds;
+    }
+    return gamePhase === "idle" ? previewIds : null;
+  }
+
+  const emphasisIds = activeEmphasisIds();
 
   const { landTexture, baseTexture, hoverTexture, pulseTexture } =
     useCountryTextures({

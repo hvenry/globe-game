@@ -4,6 +4,8 @@
  */
 export const COUNTRY_NAMES: Record<string, string> = {
   "004": "Afghanistan",
+  "158": "Taiwan",
+  "383": "Kosovo",
   "008": "Albania",
   "012": "Algeria",
   "020": "Andorra",

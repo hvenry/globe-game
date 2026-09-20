@@ -1,12 +1,38 @@
 /**
- * Country Sets for Game Modes
+ * Country sets for game modes.
  *
- * Each set contains an array of country IDs (ISO 3166-1 numeric codes as strings).
- * The "all" set is handled dynamically by using all guessable countries.
+ * Three kinds:
+ * - `continent`: the six continents. They partition the guessable world, so
+ *   their union is "all" — the race server relies on that to build its pool.
+ * - `region`: sub-regions people want to drill. They overlap continents and
+ *   are never used to derive anything.
+ * - `draw`: not a list but a rule — a random sample of the world, sized and
+ *   seeded per `draw`. `daily` seeds from the UTC date so everyone gets the
+ *   same countries; otherwise every game redraws.
  *
- * To add countries to a set, add their ISO numeric code to the array.
- * You can find codes at: https://en.wikipedia.org/wiki/ISO_3166-1_numeric
+ * Ids are ISO 3166-1 numeric codes as strings, plus "383" for Kosovo (which
+ * has none). Sizes are derived, never written down, so they cannot drift.
  */
+
+import { GUESSABLE_IDS } from "./country-names";
+
+export type CountrySetKind = "continent" | "region" | "draw";
+
+export interface DrawSpec {
+  /** How many countries to draw from the whole world. */
+  count: number;
+  /** Seed from the UTC date, so the draw is the same for everyone that day. */
+  daily?: boolean;
+}
+
+export interface CountrySetConfig {
+  id: CountrySetId;
+  name: string;
+  kind: CountrySetKind;
+  /** Fixed membership, or null for "all" and for draws. */
+  countryIds: readonly string[] | null;
+  draw?: DrawSpec;
+}
 
 export type CountrySetId =
   | "all"
@@ -15,26 +41,29 @@ export type CountrySetId =
   | "europe"
   | "north_america"
   | "south_america"
-  | "oceania";
+  | "oceania"
+  | "caribbean"
+  | "central_america"
+  | "middle_east"
+  | "southeast_asia"
+  | "balkans"
+  | "nordics"
+  | "stans"
+  | "west_africa"
+  | "east_africa"
+  | "southern_africa"
+  | "quick_10"
+  | "sprint_25"
+  | "daily_20";
 
-export interface CountrySetConfig {
-  id: CountrySetId;
-  name: string;
-  description: string;
-  countryIds: string[] | null; // null means use all countries
-}
-
-export const COUNTRY_SETS: CountrySetConfig[] = [
-  {
-    id: "all",
-    name: "All Countries",
-    description: "All countries",
-    countryIds: null,
-  },
+export const COUNTRY_SETS: readonly CountrySetConfig[] = [
+  // "all" is the deselected state rather than a tile in the picker, so
+  // `setsOfKind` leaves it out; its null ids keep it out of WORLD_IDS too.
+  { id: "all", name: "All Countries", kind: "continent", countryIds: null },
   {
     id: "africa",
     name: "Africa",
-    description: "54 countries",
+    kind: "continent",
     countryIds: [
       "012", // Algeria
       "024", // Angola
@@ -95,7 +124,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
   {
     id: "asia",
     name: "Asia",
-    description: "48 countries",
+    kind: "continent",
     countryIds: [
       "004", // Afghanistan
       "051", // Armenia
@@ -144,12 +173,13 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "860", // Uzbekistan
       "704", // Vietnam
       "887", // Yemen
+      "158", // Taiwan
     ],
   },
   {
     id: "europe",
     name: "Europe",
-    description: "44 countries",
+    kind: "continent",
     countryIds: [
       "008", // Albania
       "020", // Andorra
@@ -196,12 +226,13 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "804", // Ukraine
       "826", // United Kingdom
       "336", // Vatican City
+      "383", // Kosovo
     ],
   },
   {
     id: "north_america",
     name: "North America",
-    description: "23 countries",
+    kind: "continent",
     countryIds: [
       "028", // Antigua and Barbuda
       "044", // Bahamas
@@ -231,7 +262,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
   {
     id: "south_america",
     name: "South America",
-    description: "12 countries",
+    kind: "continent",
     countryIds: [
       "032", // Argentina
       "068", // Bolivia
@@ -250,7 +281,7 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
   {
     id: "oceania",
     name: "Oceania",
-    description: "14 countries",
+    kind: "continent",
     countryIds: [
       "036", // Australia
       "242", // Fiji
@@ -268,15 +299,230 @@ export const COUNTRY_SETS: CountrySetConfig[] = [
       "548", // Vanuatu
     ],
   },
+  {
+    id: "caribbean",
+    name: "Caribbean",
+    kind: "region",
+    countryIds: [
+      "028", // Antigua and Barbuda
+      "044", // Bahamas
+      "052", // Barbados
+      "192", // Cuba
+      "212", // Dominica
+      "214", // Dominican Republic
+      "308", // Grenada
+      "332", // Haiti
+      "388", // Jamaica
+      "659", // Saint Kitts and Nevis
+      "662", // Saint Lucia
+      "670", // Saint Vincent and the Grenadines
+      "780", // Trinidad and Tobago
+    ],
+  },
+  {
+    id: "central_america",
+    name: "Central America",
+    kind: "region",
+    countryIds: [
+      "084", // Belize
+      "188", // Costa Rica
+      "222", // El Salvador
+      "320", // Guatemala
+      "340", // Honduras
+      "558", // Nicaragua
+      "591", // Panama
+    ],
+  },
+  {
+    id: "middle_east",
+    name: "Middle East",
+    kind: "region",
+    countryIds: [
+      "048", // Bahrain
+      "818", // Egypt
+      "364", // Iran
+      "368", // Iraq
+      "376", // Israel
+      "400", // Jordan
+      "414", // Kuwait
+      "422", // Lebanon
+      "512", // Oman
+      "275", // Palestine
+      "634", // Qatar
+      "682", // Saudi Arabia
+      "760", // Syria
+      "792", // Turkey
+      "784", // United Arab Emirates
+      "887", // Yemen
+    ],
+  },
+  {
+    id: "southeast_asia",
+    name: "Southeast Asia",
+    kind: "region",
+    countryIds: [
+      "096", // Brunei
+      "116", // Cambodia
+      "626", // East Timor
+      "360", // Indonesia
+      "418", // Laos
+      "458", // Malaysia
+      "104", // Myanmar
+      "608", // Philippines
+      "702", // Singapore
+      "764", // Thailand
+      "704", // Vietnam
+    ],
+  },
+  {
+    id: "balkans",
+    name: "Balkans",
+    kind: "region",
+    countryIds: [
+      "008", // Albania
+      "070", // Bosnia and Herzegovina
+      "100", // Bulgaria
+      "191", // Croatia
+      "300", // Greece
+      "383", // Kosovo
+      "499", // Montenegro
+      "807", // North Macedonia
+      "642", // Romania
+      "688", // Serbia
+      "705", // Slovenia
+    ],
+  },
+  {
+    id: "nordics",
+    name: "Nordics",
+    kind: "region",
+    countryIds: [
+      "208", // Denmark
+      "246", // Finland
+      "352", // Iceland
+      "578", // Norway
+      "752", // Sweden
+    ],
+  },
+  {
+    id: "stans",
+    name: "The -stans",
+    kind: "region",
+    countryIds: [
+      "004", // Afghanistan
+      "398", // Kazakhstan
+      "417", // Kyrgyzstan
+      "586", // Pakistan
+      "762", // Tajikistan
+      "795", // Turkmenistan
+      "860", // Uzbekistan
+    ],
+  },
+  {
+    id: "west_africa",
+    name: "West Africa",
+    kind: "region",
+    countryIds: [
+      "204", // Benin
+      "854", // Burkina Faso
+      "132", // Cabo Verde
+      "384", // Ivory Coast
+      "270", // Gambia
+      "288", // Ghana
+      "324", // Guinea
+      "624", // Guinea-Bissau
+      "430", // Liberia
+      "466", // Mali
+      "478", // Mauritania
+      "562", // Niger
+      "566", // Nigeria
+      "686", // Senegal
+      "694", // Sierra Leone
+      "768", // Togo
+    ],
+  },
+  {
+    id: "east_africa",
+    name: "East Africa",
+    kind: "region",
+    countryIds: [
+      "108", // Burundi
+      "174", // Comoros
+      "262", // Djibouti
+      "232", // Eritrea
+      "231", // Ethiopia
+      "404", // Kenya
+      "450", // Madagascar
+      "480", // Mauritius
+      "646", // Rwanda
+      "690", // Seychelles
+      "706", // Somalia
+      "728", // South Sudan
+      "834", // Tanzania
+      "800", // Uganda
+    ],
+  },
+  {
+    id: "southern_africa",
+    name: "Southern Africa",
+    kind: "region",
+    countryIds: [
+      "024", // Angola
+      "072", // Botswana
+      "748", // Eswatini
+      "426", // Lesotho
+      "454", // Malawi
+      "508", // Mozambique
+      "516", // Namibia
+      "710", // South Africa
+      "894", // Zambia
+      "716", // Zimbabwe
+    ],
+  },
+  {
+    id: "quick_10",
+    name: "Quick 10",
+    kind: "draw",
+    countryIds: null,
+    draw: { count: 10 },
+  },
+  {
+    id: "sprint_25",
+    name: "Sprint 25",
+    kind: "draw",
+    countryIds: null,
+    draw: { count: 25 },
+  },
+  {
+    id: "daily_20",
+    name: "Daily 20",
+    kind: "draw",
+    countryIds: null,
+    draw: { count: 20, daily: true },
+  },
 ];
 
 export function getCountrySet(id: CountrySetId): CountrySetConfig {
   return COUNTRY_SETS.find((set) => set.id === id) ?? COUNTRY_SETS[0];
 }
 
-export function getAvailableCountrySets(): CountrySetConfig[] {
-  // Return sets that have countries defined (or are "all")
-  return COUNTRY_SETS.filter(
-    (set) => set.id === "all" || (set.countryIds && set.countryIds.length > 0),
-  );
+export function isCountrySetId(value: string): value is CountrySetId {
+  return COUNTRY_SETS.some((set) => set.id === value);
 }
+
+export function setsOfKind(kind: CountrySetKind): CountrySetConfig[] {
+  return COUNTRY_SETS.filter((set) => set.kind === kind && set.id !== "all");
+}
+
+/** How many countries a set puts in play. Draws are their count; "all" is the world. */
+export function setSize(id: CountrySetId): number {
+  const set = getCountrySet(id);
+  if (set.draw) return Math.min(set.draw.count, GUESSABLE_IDS.size);
+  if (!set.countryIds) return GUESSABLE_IDS.size;
+  return set.countryIds.filter((c) => GUESSABLE_IDS.has(c)).length;
+}
+
+/** The whole guessable world as the continents list it: the pool draws come from. */
+export const WORLD_IDS: readonly string[] = COUNTRY_SETS.flatMap((set) =>
+  set.kind === "continent" ? (set.countryIds ?? []) : [],
+);

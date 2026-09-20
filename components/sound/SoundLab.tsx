@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { SOUND_CONFIG } from "@/lib/constants";
+import { useCopied } from "@/lib/hooks/useCopied";
 import { CUE_NAMES, CUES, type CueName } from "@/lib/sound/cues";
 import { SOUND_LIBRARY } from "@/lib/sound/library";
 import {
@@ -24,9 +25,6 @@ import {
 } from "@/lib/sound/engine";
 import { Slider } from "@/components/game/settings/SettingsControls";
 import { PlayIcon } from "@/components/ui/icons";
-
-/** How long "Copied" stays on the button before it offers the copy again. */
-const COPIED_MS = 2_000;
 
 /** The picked build ships one file per cue; the full library is hundreds. */
 const FULL_BUILD_MIN_FILES = 100;
@@ -61,7 +59,7 @@ export default function SoundLab() {
   const [picks, setPicks] = useState<Partial<Record<CueName, string>>>(() =>
     getOverrides(),
   );
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopied();
   const [volume, setVol] = useState<number>(SOUND_CONFIG.defaultVolume);
 
   function audition(cue: CueName, file: string) {
@@ -83,12 +81,7 @@ export default function SoundLab() {
   function copyConfig() {
     const config: Record<string, string> = {};
     for (const cue of CUE_NAMES) config[cue] = picks[cue] ?? CUES[cue].file;
-    void navigator.clipboard
-      .writeText(JSON.stringify(config, null, 2))
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPIED_MS);
-      });
+    copy(JSON.stringify(config, null, 2));
   }
 
   const changed = CUE_NAMES.filter(

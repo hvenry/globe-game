@@ -15,7 +15,7 @@ import type { GlobeScene } from "@/components/globe/Globe";
 import type { Resolution } from "@/lib/engine/types";
 import type { CountryFill } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
-import type { CountrySetId } from "@/lib/geo/country-sets";
+import { getCountrySet, isCountrySetId } from "@/lib/geo/country-sets";
 import { baseId } from "@/lib/geo/countries";
 import { RACE_SERVER_URL } from "@/lib/race/config";
 import {
@@ -129,18 +129,23 @@ export function useRaceGlobe(): RaceGlobeProps {
 
   // The globe is driven by the room, not the solo store: the lobby previews
   // the host's chosen set, the countdown flies to it, and results reframe.
-  const scene = useMemo<GlobeScene>(
-    () => ({
+  const scene = useMemo<GlobeScene>(() => {
+    // The set id comes off the wire as a plain string, so it is checked here
+    // rather than asserted.
+    const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
+    const countrySetId =
+      configured && isCountrySetId(configured) ? configured : "all";
+    return {
       phase: scenePhase(status),
-      countrySetId: (race?.config.countrySetId ??
-        lobby?.config.countrySetId ??
-        "all") as CountrySetId,
+      countrySetId,
+      // A draw set is only knowable from the race's order.
+      validIds:
+        race && getCountrySet(countrySetId).draw ? new Set(race.order) : null,
       gameKey: race?.startsAt ?? null,
       // A country nobody found is lit until someone finds it.
       pulseId: race?.phase === "reveal" ? race.currentId : null,
-    }),
-    [race, lobby, status],
-  );
+    };
+  }, [race, lobby, status]);
 
   return {
     resolvedCountries,

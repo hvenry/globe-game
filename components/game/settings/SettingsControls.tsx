@@ -1,11 +1,13 @@
 "use client";
 
 import { useStatsStore } from "@/lib/store/stats-store";
+import { dailyKey } from "@/lib/geo/draws";
 import {
-  getAvailableCountrySets,
+  setSize,
+  setsOfKind,
+  type CountrySetConfig,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
-import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import type { ThemeMode } from "@/lib/constants";
 import { MoonIcon, SunIcon } from "@/components/ui/icons";
 
@@ -384,6 +386,13 @@ export function ThemeSelect({
 // CountrySetSelect Component
 // ============================================================================
 
+/** The picker's rails, in the order they read. "all" heads none of them. */
+const SET_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
+  ["Continents", setsOfKind("continent")],
+  ["Regions", setsOfKind("region")],
+  ["Quick play", setsOfKind("draw")],
+];
+
 interface CountrySetSelectProps {
   value: CountrySetId;
   onChange: (value: CountrySetId) => void;
@@ -395,26 +404,19 @@ export function CountrySetSelect({
   onChange,
   expertMode,
 }: CountrySetSelectProps) {
-  const availableSets = getAvailableCountrySets();
   const bestScores = useStatsStore((s) => s.bestScores);
   const expertBestScores = useStatsStore((s) => s.expertBestScores);
+  const dailyToday = useStatsStore((s) => s.daily[dailyKey()]);
 
-  const getSetTotal = (setId: CountrySetId): number => {
-    const set = availableSets.find((s) => s.id === setId);
-    if (!set || !set.countryIds) return GUESSABLE_IDS.size;
-    return set.countryIds.filter((id) => GUESSABLE_IDS.has(id)).length;
-  };
-
-  const continentSets = availableSets.filter((s) => s.id !== "all");
-
-  const handleContinentClick = (setId: CountrySetId) => {
+  /** Picking the selected set again clears back to the whole world. */
+  const handleSetClick = (setId: CountrySetId) => {
     onChange(value === setId ? "all" : setId);
   };
 
-  const renderSetButton = (set: (typeof availableSets)[0]) => {
+  const renderSetButton = (set: CountrySetConfig) => {
     const normalBestScore = bestScores[set.id] || 0;
     const expertBestScore = expertBestScores[set.id] || 0;
-    const total = getSetTotal(set.id);
+    const total = setSize(set.id);
     const normalPercentage =
       total > 0 ? Math.floor((normalBestScore / total) * 100) : 0;
     const expertPercentage =
@@ -445,7 +447,7 @@ export function CountrySetSelect({
     return (
       <button
         key={set.id}
-        onClick={() => handleContinentClick(set.id)}
+        onClick={() => handleSetClick(set.id)}
         aria-pressed={isSelected}
         data-sound="toggle"
         className={`group relative rounded-control border p-3 text-left transition-all duration-200 cursor-pointer ${borderClass} ${
@@ -477,7 +479,11 @@ export function CountrySetSelect({
             >
               {set.name}
             </p>
-            <p className="readout text-label text-faint">{total} countries</p>
+            <p className="readout text-label text-faint">
+              {set.draw?.daily && dailyToday
+                ? `today ${dailyToday.correct}/${dailyToday.total}`
+                : `${total} countries`}
+            </p>
           </div>
           {(hasNormalScore || hasExpertScore) && (
             <div className="flex shrink-0 flex-row items-center gap-2.5 md:flex-col md:items-end md:gap-0.5">
@@ -505,11 +511,15 @@ export function CountrySetSelect({
   };
 
   return (
-    <div className="space-y-3">
-      <p className="hud-rule hud-label">Country set</p>
-      <div className="grid grid-cols-2 gap-2">
-        {continentSets.map((set) => renderSetButton(set))}
-      </div>
+    <div className="space-y-5">
+      {SET_GROUPS.map(([label, sets]) => (
+        <div key={label} className="space-y-3">
+          <p className="hud-rule hud-label">{label}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {sets.map((set) => renderSetButton(set))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
