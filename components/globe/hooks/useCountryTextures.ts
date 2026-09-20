@@ -68,10 +68,41 @@ function createLayer(mipmaps: boolean): Layer {
   return { canvas, ctx, texture, path: geoPath(projection, ctx ?? undefined) };
 }
 
-function paintFeature(layer: Layer, feature: CountryFeature, fill: string, alpha: number) {
+/**
+ * Dot stipple tile. Sized in texels of the 4096-wide map, so a mid-sized
+ * country shows a clear grid of dots rather than a blur or a single blob.
+ */
+const DOT_TILE = 6;
+const DOT_RADIUS = 1.1;
+const dotPatterns = new Map<string, CanvasPattern>();
+
+function dotPattern(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | null {
+  const cached = dotPatterns.get(color);
+  if (cached) return cached;
+  const tile = document.createElement("canvas");
+  tile.width = DOT_TILE;
+  tile.height = DOT_TILE;
+  const tctx = tile.getContext("2d");
+  if (!tctx) return null;
+  tctx.fillStyle = color;
+  tctx.beginPath();
+  tctx.arc(DOT_TILE / 2, DOT_TILE / 2, DOT_RADIUS, 0, Math.PI * 2);
+  tctx.fill();
+  const pattern = ctx.createPattern(tile, "repeat");
+  if (pattern) dotPatterns.set(color, pattern);
+  return pattern;
+}
+
+function paintFeature(
+  layer: Layer,
+  feature: CountryFeature,
+  fill: string,
+  alpha: number,
+  pattern?: CountryFill["pattern"],
+) {
   const ctx = layer.ctx;
   if (!ctx) return;
-  ctx.fillStyle = fill;
+  ctx.fillStyle = (pattern === "dots" && dotPattern(ctx, fill)) || fill;
   ctx.globalAlpha = alpha;
   ctx.beginPath();
   layer.path(feature as unknown as GeoJSON.Feature);
@@ -184,9 +215,9 @@ export function useCountryTextures({
         resolvedCountries[countryBase] ??
         (wrongGuessIds.includes(countryBase) ? "wrongGuess" : null);
       if (!state) continue;
-      const { color, opacity } = resolveFill(state, COLORS);
+      const { color, opacity, pattern } = resolveFill(state, COLORS);
       for (const feature of countryFeatures) {
-        paintFeature(base, feature, color, opacity);
+        paintFeature(base, feature, color, opacity, pattern);
       }
     }
     commitLayer(base);

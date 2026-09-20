@@ -29,6 +29,8 @@ export type RaceStatus =
   | "connecting"
   | "lobby"
   | "racing"
+  /** Stepped out mid-race. The seat is kept; `rejoin` reclaims it. */
+  | "left"
   | "finished"
   | "error";
 
@@ -51,11 +53,28 @@ interface RaceStoreState {
   /** `serverNow - Date.now()`, so absolute deadlines survive a skewed clock. */
   clockOffset: number;
 
+  /** What we joined as, so a rejoin needs no form. */
+  joinedAs: { name: string; color?: PlayerColorId } | null;
+
   join: (roomId: string, name: string, color?: PlayerColorId) => void;
+  /** Drop the socket but keep the room on screen, with a way back in. */
+  leaveRace: () => void;
+  rejoin: () => void;
   setReady: (ready: boolean) => void;
   setColor: (color: PlayerColorId) => void;
-  configure: (patch: { countrySetId?: CountrySetId; countryCount?: number }) => void;
+  configure: (patch: {
+    countrySetId?: CountrySetId;
+    countryCount?: number;
+    maxPlayers?: number;
+    showHints?: boolean;
+    countryWindowSec?: number;
+  }) => void;
+  kick: (playerId: string) => void;
   start: () => void;
+  /** Reopen a finished room for another round. */
+  rematch: () => void;
+  /** Host only: end the running race now. */
+  end: () => void;
   guess: (countryId: string) => void;
   leave: () => void;
 }
@@ -65,6 +84,12 @@ interface RaceStoreState {
  * WebSocket in it would be copied and compared on every update.
  */
 let client: RaceClient | null = null;
+
+/** Drop the socket for good. `join` reconnects by building a fresh client. */
+function closeClient(): void {
+  client?.close();
+  client = null;
+}
 
 export const useRaceStore = create<RaceStoreState>()((set, get) => ({
   status: "idle",
@@ -79,10 +104,17 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
   error: null,
   attemptIds: [],
   clockOffset: 0,
+  joinedAs: null,
 
   join: (roomId, name, color) => {
     client?.close();
-    set({ status: "connecting", roomId, error: null, attemptIds: [] });
+    set({
+      status: "connecting",
+      roomId,
+      error: null,
+      attemptIds: [],
+      joinedAs: { name, color },
+    });
 
     client = new RaceClient(roomId, {
       onStatus: (connection, attempts) => {
@@ -109,7 +141,18 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
 
   configure: (patch) => client?.send({ t: "configure", ...patch }),
 
+  kick: (playerId) => client?.send({ t: "kick", playerId }),
+
   start: () => client?.send({ t: "start" }),
+
+  rematch: () => {
+    // Reopens the room if nobody has yet (a no-op on the server otherwise),
+    // and moves this client to the waiting room now.
+    client?.send({ t: "rematch" });
+    set({ status: "lobby", race: null, standings: null, attemptIds: [] });
+  },
+
+  end: () => client?.send({ t: "end" }),
 
   guess: (countryId) => {
     // The client knows the answer — it is on screen — so your own miss can
@@ -126,9 +169,19 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
     client?.send({ t: "guess", countryId });
   },
 
+  leaveRace: () => {
+    closeClient();
+    set({ status: "left", connection: "closed", attempts: 0, attemptIds: [] });
+  },
+
+  rejoin: () => {
+    const { roomId, joinedAs } = get();
+    if (!roomId || !joinedAs) return;
+    get().join(roomId, joinedAs.name, joinedAs.color);
+  },
+
   leave: () => {
-    client?.close();
-    client = null;
+    closeClient();
     set({
       status: "idle",
       connection: "closed",
@@ -140,6 +193,7 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
       canStart: false,
       error: null,
       attemptIds: [],
+      joinedAs: null,
     });
   },
 }));
@@ -154,25 +208,37 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
       set({ playerId: msg.playerId, clockOffset: msg.serverNow - Date.now() });
       break;
 
-    case "lobby":
+    case "lobby": {
+      // A reopened room reaches everyone, but leaving the results is each
+      // player's own move: on the results screen the lobby is stored and the
+      // screen stays put until `rematch` is pressed here.
+      const { status } = get();
+      const reading = status === "finished" && !msg.lobby.started;
       set({
-        status: msg.lobby.started ? get().status : "lobby",
+        status: msg.lobby.started || reading ? status : "lobby",
         lobby: msg.lobby,
         canStart: msg.canStart,
         clockOffset: msg.serverNow - Date.now(),
+        // Otherwise a reopened room has no race: drop the old one, or its
+        // fills would stay painted behind the waiting room.
+        ...(msg.lobby.started || reading
+          ? null
+          : { race: null, standings: null, attemptIds: [] }),
       });
       break;
+    }
 
-    case "state":
+    case "state": {
+      const { race, attemptIds } = get();
       set({
         status: "racing",
         race: msg.state,
         // Misses belong to the country that was showing when they happened.
-        attemptIds:
-          msg.state.currentId === get().race?.currentId ? get().attemptIds : [],
+        attemptIds: msg.state.currentId === race?.currentId ? attemptIds : [],
         clockOffset: msg.serverNow - Date.now(),
       });
       break;
+    }
 
     case "finished":
       set({
@@ -187,9 +253,13 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
       // The code names no room the server ever minted. Retrying cannot help,
       // so drop the socket and hand the player back the join form with the
       // reason on it.
-      if (msg.code === "no_such_room") {
-        client?.close();
-        client = null;
+      // Being removed or turned away is the same shape: no seat, no retry.
+      if (
+        msg.code === "no_such_room" ||
+        msg.code === "kicked" ||
+        msg.code === "room_full"
+      ) {
+        closeClient();
         set({
           status: "idle",
           connection: "closed",
@@ -219,14 +289,11 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
 
 export { createRoom };
 
-/** Server deadlines are absolute; correct them into this browser's clock. */
-export function useServerNow(): () => number {
-  const offset = useRaceStore((s) => s.clockOffset);
-  return () => Date.now() + offset;
-}
-
 /** The hexes a colour id stands for, falling back to the first of them. */
-export function playerPalette(color: string): { claim: string; attempt: string } {
+export function playerPalette(color: string): {
+  claim: string;
+  attempt: string;
+} {
   return PLAYER_COLORS[isPlayerColorId(color) ? color : "blue"];
 }
 
@@ -241,8 +308,8 @@ export function usePlayerInk(): (color: string) => string {
 
 /**
  * What the globe paints during a race: every claimed country in its
- * claimant's colour, every player's misses on the live country in their
- * paler variant, and a country nobody reached in the palette's "missed" red.
+ * claimant's colour, every player's misses on the live country as dots in
+ * their colour, and a country nobody reached in the palette's "missed" red.
  *
  * Opacity comes from the caller because it is the theme's business, and this
  * module cannot see the theme.
@@ -265,9 +332,12 @@ export function raceFills(
       ? [...new Set([...player.attemptIds, ...ownAttemptIds])]
       : player.attemptIds;
     for (const countryId of attempts) {
+      // Stippled in the player's own colour: the dots say "tried", the
+      // colour says who, and neither can pass for a solid claim.
       fills[countryId] = {
-        color: playerPalette(player.color).attempt,
+        color: playerPalette(player.color).claim,
         opacity: opacity.attempt,
+        pattern: "dots",
       };
     }
   }

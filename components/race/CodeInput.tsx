@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { ROOM_CODE_LENGTH, normalizeRoomCode } from "@/lib/race/room-code";
 
+/** A cell: where the next character lands, one already typed, or still empty. */
+function cellTone(isCaret: boolean, filled: boolean): string {
+  if (isCaret) return "border-signal bg-signal-soft";
+  if (filled) return "border-hairline-strong bg-well";
+  return "border-hairline bg-well";
+}
+
 /**
  * Six-cell room code entry. One real, invisible input sits over the cells so
  * typing, paste (including a whole invite link), autofill and mobile
@@ -20,24 +27,25 @@ export default function CodeInput({
   onSubmit?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
-  const cells = Array.from({ length: ROOM_CODE_LENGTH }, (_, i) => value[i] ?? "");
+  const cells = Array.from(
+    { length: ROOM_CODE_LENGTH },
+    (_, i) => value[i] ?? "",
+  );
   const active = Math.min(value.length, ROOM_CODE_LENGTH - 1);
 
   return (
     <div className="relative">
       <div className="grid grid-cols-6 gap-1.5" aria-hidden="true">
         {cells.map((char, i) => {
-          const isCaret = focused && i === active && value.length < ROOM_CODE_LENGTH;
+          const isCaret =
+            focused && i === active && value.length < ROOM_CODE_LENGTH;
           return (
             <div
               key={i}
-              className={`readout flex aspect-square items-center justify-center rounded-control border text-lg text-hi transition-colors ${
-                isCaret
-                  ? "border-signal bg-signal-soft"
-                  : char
-                    ? "border-hairline-strong bg-well"
-                    : "border-hairline bg-well"
-              }`}
+              className={`readout flex aspect-square items-center justify-center rounded-control border text-lg text-hi transition-colors ${cellTone(
+                isCaret,
+                char !== "",
+              )}`}
             >
               {char}
             </div>

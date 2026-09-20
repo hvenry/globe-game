@@ -14,7 +14,12 @@ import CountryMesh from "./CountryMesh";
 import SmallCountryMarkers from "./SmallCountryMarkers";
 import PulseRing from "./PulseRing";
 import type { CountryFeature } from "@/lib/geo/types";
-import { GLOBE_CONFIG, GLOBE_LAYER, type CountryFill } from "@/lib/constants";
+import {
+  GLOBE_CONFIG,
+  GLOBE_LAYER,
+  type CountryFill,
+  PULSE_CONFIG,
+} from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
 import { useHeroFraming } from "@/lib/hooks/useHeroFraming";
 import { baseId } from "@/lib/geo/countries";
@@ -49,6 +54,12 @@ interface GlobeProps {
   zoomSpeed?: number;
   rotateSpeed?: number;
   /**
+   * Whether countries already painted (resolved or guessed wrong) still light
+   * up under the pointer. Off, the highlight only ever marks a live target,
+   * so nothing invites a click that cannot be answered.
+   */
+  hoverFilled?: boolean;
+  /**
    * Drive the scene from somewhere other than the solo game store. Race mode
    * passes this so set emphasis, hover gating and the camera flights follow
    * the room's settings rather than whatever the solo menu has selected.
@@ -61,6 +72,10 @@ export interface GlobeScene {
   countrySetId: CountrySetId;
   /** Identity of the current run; a change triggers the intro flight. */
   gameKey: number | null;
+  /** A country to pulse (race reveal), or null. Replaces the solo mustclick pulse. */
+  pulseId?: string | null;
+  /** The exact ids in play when the set alone cannot say (a draw set's sample). */
+  validIds?: ReadonlySet<string> | null;
 }
 
 // Mustclick pulse fill: the target country is painted white on its own
@@ -83,11 +98,21 @@ function PulseFillLayer({
     [COLORS.countryFailed, COLORS.countryHover],
   );
 
+  // Swaps colour on each beat of the same clock the radar ring and the
+  // repeating cue run on, started the frame the pulse becomes active.
+  const startRef = useRef<number | null>(null);
   useFrame((state) => {
     const material = materialRef.current;
-    if (!material || !active) return;
-    const flash = (Math.sin(state.clock.elapsedTime * 4) + 1) / 2;
-    material.color.copy(flash > 0.5 ? flashColors.alert : flashColors.alt);
+    if (!material || !active) {
+      startRef.current = null;
+      return;
+    }
+    startRef.current ??= state.clock.elapsedTime;
+    // Solid, and it alternates: red for one beat, white for the next.
+    const beat = Math.floor(
+      (state.clock.elapsedTime - startRef.current) / PULSE_CONFIG.periodSeconds,
+    );
+    material.color.copy(beat % 2 === 0 ? flashColors.alert : flashColors.alt);
   });
 
   return (
@@ -170,10 +195,15 @@ function GlobeScene({
   onRevealArrived,
   zoomSpeed = 0.53,
   rotateSpeed = 1.0,
+  hoverFilled = true,
   scene,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const pointerDownRef = useRef<{ x: number; y: number; isTouch: boolean } | null>(null);
+  const pointerDownRef = useRef<{
+    x: number;
+    y: number;
+    isTouch: boolean;
+  } | null>(null);
   const [hoveredCountryBase, setHoveredCountryBase] = useState<string | null>(
     null,
   );
@@ -209,6 +239,7 @@ function GlobeScene({
   // every phase — the solo store's set only means something in solo mode.
   const sceneSetIds = useMemo(() => {
     if (!scene) return null;
+    if (scene.validIds) return new Set(scene.validIds);
     const ids = getCountrySet(scene.countrySetId).countryIds;
     return new Set(ids ?? []);
   }, [scene]);
@@ -220,7 +251,11 @@ function GlobeScene({
   const showMustclickEffects =
     gamePhase === "mustclick" ||
     (gamePhase === "gameover" && expertMode && lastResolution === "failed");
-  const pulseBase = showMustclickEffects && currentCountry ? currentCountry.id : null;
+  const pulseBase = scene
+    ? (scene.pulseId ?? null)
+    : showMustclickEffects && currentCountry
+      ? currentCountry.id
+      : null;
 
   // Compute centroid position for pulse ring during mustclick phase or expert gameover
   const pulseRingPosition = useMemo(() => {
@@ -230,7 +265,8 @@ function GlobeScene({
     try {
       // For MultiPolygon features (e.g. France with French Guiana), use the
       // centroid of the largest polygon so the radar appears on the mainland.
-      let centroidTarget: GeoJSON.Feature = feature as unknown as GeoJSON.Feature;
+      let centroidTarget: GeoJSON.Feature =
+        feature as unknown as GeoJSON.Feature;
       if (feature.geometry.type === "MultiPolygon") {
         let largestArea = -1;
         for (const coords of feature.geometry.coordinates) {
@@ -300,25 +336,31 @@ function GlobeScene({
     return ids ? new Set(ids) : null;
   }, [settingsCountrySet]);
 
-  const emphasisIds = scene
-    ? scene.countrySetId !== "all"
-      ? sceneSetIds
-      : null
-    : gameCountrySetId !== "all" && validCountryIds.size > 0
-      ? validCountryIds
-      : gamePhase === "idle"
-        ? previewIds
-        : null;
+  // The ids the globe treats as the playfield — everything outside them dims
+  // to `outOfSetOpacityScale`. Null means the whole world is in play.
+  function activeEmphasisIds(): Set<string> | null {
+    if (scene) {
+      if (scene.countrySetId === "all") return null;
+      return sceneSetIds && sceneSetIds.size > 0 ? sceneSetIds : null;
+    }
+    if (gameCountrySetId !== "all" && validCountryIds.size > 0) {
+      return validCountryIds;
+    }
+    return gamePhase === "idle" ? previewIds : null;
+  }
 
-  const { landTexture, baseTexture, hoverTexture, pulseTexture } = useCountryTextures({
-    features,
-    resolvedCountries,
-    wrongGuessIds,
-    hoveredCountryBase,
-    pulseBase,
-    emphasisIds,
-    onFirstDraw: handleReady,
-  });
+  const emphasisIds = activeEmphasisIds();
+
+  const { landTexture, baseTexture, hoverTexture, pulseTexture } =
+    useCountryTextures({
+      features,
+      resolvedCountries,
+      wrongGuessIds,
+      hoveredCountryBase,
+      pulseBase,
+      emphasisIds,
+      onFirstDraw: handleReady,
+    });
 
   const findCountryAtPoint = useCountryPicking(features);
 
@@ -339,12 +381,32 @@ function GlobeScene({
       if (base && validCountryIds.size > 0 && !validCountryIds.has(base)) {
         base = null;
       }
+      // Without hints there is nothing to learn from a painted country — except
+      // the one pulsing to be clicked, which is the live target however it is
+      // painted.
+      if (
+        base &&
+        !hoverFilled &&
+        base !== pulseBase &&
+        (resolvedCountries[base] !== undefined || wrongGuessIds.includes(base))
+      ) {
+        base = null;
+      }
       if (base !== hoveredCountryBase) {
         setHoveredCountryBase(base);
         document.body.style.cursor = base ? "pointer" : "auto";
       }
     },
-    [interactive, findCountryAtPoint, hoveredCountryBase, validCountryIds],
+    [
+      interactive,
+      findCountryAtPoint,
+      hoveredCountryBase,
+      validCountryIds,
+      hoverFilled,
+      pulseBase,
+      resolvedCountries,
+      wrongGuessIds,
+    ],
   );
 
   const handlePointerOut = useCallback(() => {
@@ -438,7 +500,11 @@ function GlobeScene({
             ]}
           />
           {COLORS.unlit ? (
-            <meshBasicMaterial map={landTexture} transparent depthWrite={false} />
+            <meshBasicMaterial
+              map={landTexture}
+              transparent
+              depthWrite={false}
+            />
           ) : (
             <meshPhongMaterial
               map={landTexture}

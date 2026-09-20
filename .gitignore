@@ -48,3 +48,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Raw sound packs; scripts/build-audio.sh turns them into public/audio
+audio-wip/

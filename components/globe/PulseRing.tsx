@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { GLOBE_LAYER } from "@/lib/constants";
+import { GLOBE_LAYER, PULSE_CONFIG } from "@/lib/constants";
 
 const noopRaycast = () => {};
 
@@ -17,26 +17,39 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform float uTime;
+  uniform float uPeriod;
+  uniform float uRings;
   varying vec2 vUv;
+
+  // A band thin enough to read as a sweep rather than a disc.
+  const float RING_WIDTH = 0.035;
+  // GLSL ES needs a constant loop bound, so the loop runs to this cap and
+  // breaks at uRings. Raising PULSE_CONFIG.rings past it would truncate.
+  const float MAX_RINGS = 8.0;
+  // Below this a fragment contributes nothing, so it is cheaper to drop it.
+  const float MIN_ALPHA = 0.01;
+  // Red at the faint outer edge warming to near-white where rings overlap.
+  const vec3 RING_EDGE = vec3(1.0, 0.3, 0.3);
+  const vec3 RING_CORE = vec3(1.0, 0.8, 0.8);
+  // Additive over a lit globe: at full strength the radar blows out to white.
+  const float RING_OPACITY = 0.4;
 
   void main() {
     // Distance from center of the circle (0 at center, 1 at edge)
     float dist = length(vUv - 0.5) * 2.0;
 
-    // Number of concentric rings
-    float numRings = 3.0;
-    float speed = 0.25;
-    float ringWidth = 0.035;
-
     float alpha = 0.0;
 
-    for (float i = 0.0; i < 3.0; i++) {
-      // Each ring expands outward over time, staggered
-      float t = fract(uTime * speed - i / numRings);
+    for (float i = 0.0; i < MAX_RINGS; i++) {
+      if (i >= uRings) break;
+      // A ring is born every period and takes rings × period to reach the
+      // edge, so the beat the fill and the cue share is also the ring's birth.
+      float t = fract((uTime - i * uPeriod) / (uRings * uPeriod));
+      if (uTime < i * uPeriod) continue;
       float ringRadius = t;
 
       // Ring shape: thin band around ringRadius
-      float ring = 1.0 - smoothstep(0.0, ringWidth, abs(dist - ringRadius));
+      float ring = 1.0 - smoothstep(0.0, RING_WIDTH, abs(dist - ringRadius));
 
       // Fade out as ring expands
       float fade = 1.0 - t;
@@ -47,12 +60,12 @@ const fragmentShader = /* glsl */ `
     alpha = clamp(alpha, 0.0, 1.0);
 
     // Discard fully transparent fragments
-    if (alpha < 0.01) discard;
+    if (alpha < MIN_ALPHA) discard;
 
     // Red-white gradient: brighter near center rings
-    vec3 color = mix(vec3(1.0, 0.3, 0.3), vec3(1.0, 0.8, 0.8), alpha);
+    vec3 color = mix(RING_EDGE, RING_CORE, alpha);
 
-    gl_FragColor = vec4(color, alpha * 0.4);
+    gl_FragColor = vec4(color, alpha * RING_OPACITY);
   }
 `;
 
@@ -74,18 +87,25 @@ export default function PulseRing({ position }: PulseRingProps) {
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
+      uPeriod: { value: PULSE_CONFIG.periodSeconds },
+      uRings: { value: PULSE_CONFIG.rings },
     }),
     [],
   );
 
+  // Time runs from the first frame this ring is shown, so the first beat
+  // lands the moment the target appears — the same frame the fill starts.
+  const startRef = useRef<number | null>(null);
   useFrame((state) => {
-    if (matRef.current) {
-      matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-    }
+    if (!matRef.current) return;
+    startRef.current ??= state.clock.elapsedTime;
+    matRef.current.uniforms.uTime.value =
+      state.clock.elapsedTime - startRef.current;
   });
 
   return (
-    <mesh renderOrder={GLOBE_LAYER.pulseRing}
+    <mesh
+      renderOrder={GLOBE_LAYER.pulseRing}
       position={position}
       quaternion={quaternion}
       raycast={noopRaycast}

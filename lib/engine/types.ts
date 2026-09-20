@@ -66,7 +66,11 @@ export interface SoloState {
 // Race mode (head-to-head claim race on a shared seeded order)
 // ---------------------------------------------------------------------------
 
-export type RacePhase = "countdown" | "racing" | "intermission" | "finished";
+/**
+ * `reveal` follows a window nobody claimed: the country is shown on the globe
+ * and stays until someone clicks it. It has no deadline of its own.
+ */
+export type RacePhase = "countdown" | "racing" | "reveal" | "intermission" | "finished";
 
 export interface RaceConfig {
   countrySetId: string;
@@ -78,6 +82,11 @@ export interface RaceConfig {
   lockoutMs: number;
   /** Pause after a claim or expiry before the next country appears. */
   intermissionMs: number;
+  /**
+   * Same meaning as the solo setting: painted countries answer hover and
+   * click with their name. Set by the host; the engine never reads it.
+   */
+  showHints: boolean;
 }
 
 export interface RacePlayer {
@@ -94,17 +103,55 @@ export interface RacePlayer {
    * what an opponent has already ruled out is part of the race.
    */
   attemptIds: string[];
-  /** The score: one point per claimed country. */
+  /** Countries claimed inside their window. */
   claims: number;
+  /** Countries picked up during a reveal. Not a claim; tallied apart. */
+  recoveries: number;
+  /** Points, per `RACE_SCORING`. Standings order on this first. */
+  score: number;
+  /** Consecutive claims without another player or an expiry breaking the run. */
+  streak: number;
+  bestStreak: number;
   /** Tiebreak: sum of elapsed ms across this player's claims (lower wins). */
   totalClaimMs: number;
 }
+
+/** Where a claim's points came from, for the feed. */
+export interface ScoreBreakdown {
+  claim: number;
+  speed: number;
+  accuracy: number;
+  combo: number;
+  recovery: number;
+}
+
+export type RaceEvent =
+  | {
+      seq: number;
+      type: "claim" | "recovery";
+      playerId: string;
+      countryId: string;
+      elapsedMs: number;
+      points: number;
+      breakdown: ScoreBreakdown;
+      /** The claimant's streak after this event. */
+      streak: number;
+      at: number;
+    }
+  | { seq: number; type: "expired"; countryId: string; at: number };
+
+/** How many recent events the state carries. Enough for a feed, small on the wire. */
+export const RACE_EVENT_LOG = 20;
 
 export interface RaceResult {
   /** Claiming player id, or null when the window expired unclaimed. */
   by: string | null;
   /** Ms from the country appearing to the claim; null when unclaimed. */
   elapsedMs: number | null;
+  /** True when `by` clicked it during the reveal rather than the window. */
+  recovered?: boolean;
+  /** Points `by` earned for it. Absent when unclaimed. */
+  points?: number;
 }
 
 export interface RaceState {
@@ -132,4 +179,7 @@ export interface RaceState {
   startsAt: number;
   /** Epoch ms the race finished; null while running. */
   endedAt: number | null;
+  /** The last `RACE_EVENT_LOG` outcomes, oldest first. `seq` only ever grows. */
+  events: RaceEvent[];
+  nextSeq: number;
 }

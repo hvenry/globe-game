@@ -8,8 +8,11 @@ import {
   CheckIcon as PhosphorCheck,
   ExportIcon,
   MoonIcon as PhosphorMoon,
+  PlayIcon as PhosphorPlay,
   SlidersHorizontalIcon,
+  PlusIcon as PhosphorPlus,
   SunIcon as PhosphorSun,
+  XIcon as PhosphorX,
   UsersIcon as PhosphorUsers,
   type IconProps as PhosphorIconProps,
 } from "@phosphor-icons/react";
@@ -25,7 +28,10 @@ export interface IconProps extends PhosphorIconProps {
   size?: number;
 }
 
-const DEFAULTS = { size: 16, weight: "regular" } as const satisfies PhosphorIconProps;
+const DEFAULTS = {
+  size: 16,
+  weight: "regular",
+} as const satisfies PhosphorIconProps;
 
 export function ChevronLeftIcon(props: IconProps) {
   return <CaretLeftIcon {...DEFAULTS} {...props} />;
@@ -41,6 +47,21 @@ export function ChevronDownIcon(props: IconProps) {
 
 export function ArrowLeftIcon(props: IconProps) {
   return <PhosphorArrowLeft {...DEFAULTS} {...props} />;
+}
+
+/** Add / invite */
+export function PlusIcon(props: IconProps) {
+  return <PhosphorPlus {...DEFAULTS} {...props} />;
+}
+
+/** Play — audition a sound */
+export function PlayIcon(props: IconProps) {
+  return <PhosphorPlay {...DEFAULTS} {...props} />;
+}
+
+/** Close / remove */
+export function XIcon(props: IconProps) {
+  return <PhosphorX {...DEFAULTS} {...props} />;
 }
 
 /** Two people — multiplayer / live race */

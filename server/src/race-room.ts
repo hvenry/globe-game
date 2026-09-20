@@ -21,6 +21,7 @@ import { RACE_CONFIG } from "../../lib/constants";
 import { randomSeed } from "../../lib/engine/rng";
 import {
   createRace,
+  end as applyEnd,
   guess as applyGuess,
   leave as applyLeave,
   nextTransitionAt,
@@ -31,7 +32,7 @@ import {
 import type { RaceState } from "../../lib/engine/types";
 
 import { isPlayerColorId } from "../../lib/constants";
-import { isCountrySetId, poolFor } from "./country-pool";
+import { countFor, isCountrySetId, poolFor, raceSeed } from "./country-pool";
 import type { Env } from "./env";
 import { ROOM_LIMITS } from "./limits";
 import {
@@ -40,8 +41,10 @@ import {
   createLobby,
   defaultRaceConfig,
   join as joinLobby,
+  kick as kickLobby,
   leave as leaveLobby,
   markStarted,
+  reopen,
   setColor,
   setReady,
   toRacePlayers,
@@ -93,7 +96,11 @@ export class RaceRoom extends DurableObject<Env> {
     if (this.lobby || this.race) return false;
 
     const now = Date.now();
-    this.lobby = createLobby(roomId, { ...defaultRaceConfig(), countrySetId }, now);
+    this.lobby = createLobby(
+      roomId,
+      { ...defaultRaceConfig(), countrySetId },
+      now,
+    );
     await this.ctx.storage.put(KEY_LOBBY, this.lobby);
     // Nobody is connected yet, so the room starts out on the idle clock.
     this.refreshCleanup(now);
@@ -125,7 +132,10 @@ export class RaceRoom extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+  async webSocketMessage(
+    ws: WebSocket,
+    raw: string | ArrayBuffer,
+  ): Promise<void> {
     const size = typeof raw === "string" ? raw.length : raw.byteLength;
     if (size > ROOM_LIMITS.maxFrameBytes) {
       return this.fail(ws, "bad_message", "Message too large.");
@@ -152,27 +162,46 @@ export class RaceRoom extends DurableObject<Env> {
 
     switch (msg.t) {
       case "ready":
-        return this.mutateLobby((lobby) => setReady(lobby, playerId, msg.ready));
+        return this.mutateLobby((lobby) =>
+          setReady(lobby, playerId, msg.ready),
+        );
       case "color":
         // An unknown id is dropped rather than refused: the palette is the
         // client's, and a stale one is not worth an error frame.
         if (!isPlayerColorId(msg.color)) return;
-        return this.mutateLobby((lobby) => setColor(lobby, playerId, msg.color));
+        return this.mutateLobby((lobby) =>
+          setColor(lobby, playerId, msg.color),
+        );
       case "configure":
         if (this.lobby?.hostId !== playerId) {
-          return this.fail(ws, "not_host", "Only the host can change settings.");
+          return this.fail(
+            ws,
+            "not_host",
+            "Only the host can change settings.",
+          );
         }
         return this.mutateLobby((lobby) =>
           configure(lobby, playerId, {
             countrySetId:
-              msg.countrySetId && isCountrySetId(msg.countrySetId) ? msg.countrySetId : undefined,
+              msg.countrySetId && isCountrySetId(msg.countrySetId)
+                ? msg.countrySetId
+                : undefined,
             countryCount: msg.countryCount,
+            maxPlayers: msg.maxPlayers,
+            showHints: msg.showHints,
+            countryWindowSec: msg.countryWindowSec,
           }),
         );
+      case "kick":
+        return this.handleKick(ws, playerId, msg.playerId);
       case "start":
         return this.handleStart(ws, playerId);
       case "guess":
         return this.handleGuess(playerId, msg.countryId);
+      case "rematch":
+        return this.handleRematch(ws);
+      case "end":
+        return this.handleEnd(ws, playerId);
     }
   }
 
@@ -233,7 +262,10 @@ export class RaceRoom extends DurableObject<Env> {
     // a v4 UUID, so it doubles as the reconnect credential.
     const known = claimed !== undefined && this.holdsSeat(claimed);
     const playerId = known ? claimed : crypto.randomUUID();
-    ws.serializeAttachment({ ...this.attachmentOf(ws), playerId } satisfies Attachment);
+    ws.serializeAttachment({
+      ...this.attachmentOf(ws),
+      playerId,
+    } satisfies Attachment);
 
     this.send(ws, {
       t: "welcome",
@@ -254,12 +286,42 @@ export class RaceRoom extends DurableObject<Env> {
       name,
       color !== undefined && isPlayerColorId(color) ? color : undefined,
     );
-    if (next === this.lobby) return this.fail(ws, "room_full", "This room is full.");
+    if (next === this.lobby) {
+      // Refused means gone: an attached socket with no seat would still hear
+      // every broadcast, and the next one would drop it into a seatless room.
+      this.fail(ws, "room_full", "This room is full.");
+      this.closeSocket(ws, 4001, "room full");
+      return;
+    }
+    await this.mutateLobby(() => next);
+  }
+
+  private async handleKick(
+    ws: WebSocket,
+    hostId: string,
+    targetId: string,
+  ): Promise<void> {
+    const lobby = this.lobby;
+    if (!lobby || this.race) return;
+    if (lobby.hostId !== hostId) {
+      return this.fail(ws, "not_host", "Only the host can remove players.");
+    }
+    const next = kickLobby(lobby, hostId, targetId);
+    if (next === lobby) return;
+
+    // Tell the player why before the socket goes, so their client shows a
+    // reason instead of trying to reconnect into a seat that is gone.
+    for (const socket of this.ctx.getWebSockets()) {
+      if (this.playerIdOf(socket) !== targetId) continue;
+      this.fail(socket, "kicked", "The host removed you from the room.");
+      this.closeSocket(socket, 4000, "kicked");
+    }
     await this.mutateLobby(() => next);
   }
 
   private async handleStart(ws: WebSocket, playerId: string): Promise<void> {
-    if (this.race) return this.fail(ws, "already_started", "The race is already running.");
+    if (this.race)
+      return this.fail(ws, "already_started", "The race is already running.");
     const lobby = this.lobby;
     if (!lobby) return this.fail(ws, "bad_message", "Room is not ready.");
     if (lobby.hostId !== playerId) {
@@ -269,10 +331,17 @@ export class RaceRoom extends DurableObject<Env> {
       return this.fail(ws, "cannot_start", "Everyone needs to be ready first.");
     }
 
+    // A draw set brings its own seed (the day's, for Daily 20) and count;
+    // the pool is already the drawn countries, in seeded order.
+    const setId = lobby.config.countrySetId;
+    const seed = raceSeed(setId, randomSeed());
     const race = createRace(
-      poolFor(lobby.config.countrySetId),
-      lobby.config,
-      randomSeed(),
+      poolFor(setId, seed),
+      {
+        ...lobby.config,
+        countryCount: countFor(setId, lobby.config.countryCount),
+      },
+      seed,
       toRacePlayers(lobby),
       Date.now() + RACE_CONFIG.countdownMs,
     );
@@ -282,7 +351,37 @@ export class RaceRoom extends DurableObject<Env> {
     await this.commitRace(race);
   }
 
-  private async handleGuess(playerId: string, countryId: string): Promise<void> {
+  /**
+   * Any seated player can reopen a finished room: the race is over, and the
+   * alternative is everyone making a new room and sharing a new code.
+   */
+  private async handleRematch(ws: WebSocket): Promise<void> {
+    if (!this.lobby) return this.fail(ws, "bad_message", "Room is not ready.");
+    // Already reopened by someone else: nothing to do, and no error — every
+    // player sends this as they leave the results at their own pace.
+    if (!this.race) return;
+    if (this.race.phase !== "finished") {
+      return this.fail(ws, "already_started", "The race is still running.");
+    }
+    this.race = null;
+    await this.ctx.storage.delete(KEY_RACE);
+    await this.mutateLobby((lobby) => reopen(lobby));
+    this.refreshCleanup(Date.now());
+    await this.scheduleNext();
+  }
+
+  private async handleEnd(ws: WebSocket, playerId: string): Promise<void> {
+    if (this.lobby?.hostId !== playerId) {
+      return this.fail(ws, "not_host", "Only the host can end the race.");
+    }
+    if (!this.race || this.race.phase === "finished") return;
+    await this.commitRace(applyEnd(this.race, Date.now()));
+  }
+
+  private async handleGuess(
+    playerId: string,
+    countryId: string,
+  ): Promise<void> {
     if (!this.race) return;
     const next = applyGuess(this.race, playerId, countryId, Date.now());
     // Reference equality means the click changed nothing — do not wake everyone.
@@ -292,7 +391,9 @@ export class RaceRoom extends DurableObject<Env> {
 
   // ─── State plumbing ───
 
-  private async mutateLobby(fn: (lobby: LobbyState) => LobbyState): Promise<void> {
+  private async mutateLobby(
+    fn: (lobby: LobbyState) => LobbyState,
+  ): Promise<void> {
     if (!this.lobby) return;
     const next = fn(this.lobby);
     if (next === this.lobby) return;
@@ -321,7 +422,9 @@ export class RaceRoom extends DurableObject<Env> {
    */
   private async scheduleNext(): Promise<void> {
     const phaseAt = this.race ? nextTransitionAt(this.race) : null;
-    const due = [phaseAt, this.cleanupAt].filter((v): v is number => v !== null);
+    const due = [phaseAt, this.cleanupAt].filter(
+      (v): v is number => v !== null,
+    );
     await this.ctx.storage.put(KEY_CLEANUP, this.cleanupAt);
     if (due.length === 0) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(Math.min(...due));
@@ -345,11 +448,7 @@ export class RaceRoom extends DurableObject<Env> {
   /** Drop the room entirely. Without this, every race ever played persists. */
   private async destroy(): Promise<void> {
     for (const socket of this.ctx.getWebSockets()) {
-      try {
-        socket.close(1000, "room closed");
-      } catch {
-        // Already gone.
-      }
+      this.closeSocket(socket, 1000, "room closed");
     }
     // Also clears the alarm.
     await this.ctx.storage.deleteAll();
@@ -365,7 +464,10 @@ export class RaceRoom extends DurableObject<Env> {
   private spendToken(ws: WebSocket): boolean {
     const att = this.attachmentOf(ws);
     const now = Date.now();
-    const refill = Math.max(0, ((now - att.refilledAt) / 1000) * ROOM_LIMITS.refillPerSecond);
+    const refill = Math.max(
+      0,
+      ((now - att.refilledAt) / 1000) * ROOM_LIMITS.refillPerSecond,
+    );
     const tokens = Math.min(ROOM_LIMITS.burst, att.tokens + refill);
     const allowed = tokens >= 1;
     ws.serializeAttachment({
@@ -378,8 +480,13 @@ export class RaceRoom extends DurableObject<Env> {
 
   private attachmentOf(ws: WebSocket): Attachment {
     const raw = ws.deserializeAttachment();
-    if (raw && typeof raw === "object" && "tokens" in raw) return raw as Attachment;
-    return { playerId: null, tokens: ROOM_LIMITS.burst, refilledAt: Date.now() };
+    if (raw && typeof raw === "object" && "tokens" in raw)
+      return raw as Attachment;
+    return {
+      playerId: null,
+      tokens: ROOM_LIMITS.burst,
+      refilledAt: Date.now(),
+    };
   }
 
   private holdsSeat(playerId: string): boolean {
@@ -413,7 +520,9 @@ export class RaceRoom extends DurableObject<Env> {
   }
 
   private hasOtherSocket(playerId: string, except: WebSocket): boolean {
-    return this.ctx.getWebSockets().some((s) => s !== except && this.playerIdOf(s) === playerId);
+    return this.ctx
+      .getWebSockets()
+      .some((s) => s !== except && this.playerIdOf(s) === playerId);
   }
 
   private deliver(ws: WebSocket, payload: string): void {
@@ -421,6 +530,15 @@ export class RaceRoom extends DurableObject<Env> {
       ws.send(payload);
     } catch {
       // Socket closed between selection and send; the close handler reconciles.
+    }
+  }
+
+  /** Hang up, tolerating a socket that has already gone. */
+  private closeSocket(ws: WebSocket, code: number, reason: string): void {
+    try {
+      ws.close(code, reason);
+    } catch {
+      // Already gone.
     }
   }
 
@@ -434,6 +552,7 @@ export class RaceRoom extends DurableObject<Env> {
 
   private broadcast(msg: ServerMessage): void {
     const payload = encode(msg);
-    for (const socket of this.ctx.getWebSockets()) this.deliver(socket, payload);
+    for (const socket of this.ctx.getWebSockets())
+      this.deliver(socket, payload);
   }
 }

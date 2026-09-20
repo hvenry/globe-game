@@ -1,11 +1,13 @@
 "use client";
 
 import { useStatsStore } from "@/lib/store/stats-store";
+import { dailyKey } from "@/lib/geo/draws";
 import {
-  getAvailableCountrySets,
+  setSize,
+  setsOfKind,
+  type CountrySetConfig,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
-import { GUESSABLE_IDS } from "@/lib/geo/country-names";
 import type { ThemeMode } from "@/lib/constants";
 import { MoonIcon, SunIcon } from "@/components/ui/icons";
 
@@ -35,6 +37,8 @@ export function Toggle({
   return (
     <button
       onClick={() => !disabled && onChange(!enabled)}
+      aria-pressed={enabled}
+      data-sound="toggle"
       className={`flex w-full items-center justify-between rounded-control border p-3 transition-all duration-200 ${
         disabled ? "opacity-40 cursor-default" : "cursor-pointer"
       } ${
@@ -94,6 +98,8 @@ interface SliderProps {
   displayMin?: number;
   displayMax?: number;
   expertMode?: boolean;
+  /** Fires when the thumb is released (pointer up, or a key released). */
+  onCommit?: () => void;
 }
 
 export function Slider({
@@ -106,6 +112,7 @@ export function Slider({
   displayMin,
   displayMax,
   expertMode = false,
+  onCommit,
 }: SliderProps) {
   const actualMin = min;
   const actualMax = max;
@@ -132,9 +139,7 @@ export function Slider({
   const displayProgress =
     ((displayValue - dispMin) / (dispMax - dispMin)) * 100;
 
-  const fillColor = expertMode
-    ? "var(--color-expert)"
-    : "var(--color-signal)";
+  const fillColor = expertMode ? "var(--color-expert)" : "var(--color-signal)";
   const accentClass = expertMode ? "accent-expert" : "accent-signal";
 
   return (
@@ -150,6 +155,8 @@ export function Slider({
         step={step}
         value={displayValue}
         onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
         className={`h-1.5 w-full cursor-pointer appearance-none rounded-full bg-hairline ${accentClass} transition-colors`}
         style={{
           background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${displayProgress}%, var(--color-hairline) ${displayProgress}%, var(--color-hairline) 100%)`,
@@ -179,6 +186,8 @@ function OptionButton({
   return (
     <button
       onClick={() => !disabled && onClick()}
+      aria-pressed={selected}
+      data-sound="toggle"
       disabled={disabled}
       className={`flex min-h-8 items-center justify-center rounded-control border p-2 text-center transition-all duration-200 ${
         disabled ? "opacity-40 cursor-default" : "cursor-pointer"
@@ -263,26 +272,33 @@ interface TimerLimitSelectProps {
   onChange: (value: number | null) => void;
   disabled?: boolean;
   expertMode?: boolean;
+  /** Seconds on offer; `null` is "no limit". Race mode leaves `null` out. */
+  limits?: readonly (number | null)[];
 }
+
+const ALL_TIMER_LIMITS: readonly (number | null)[] = [5, 10, 15, 30, null];
 
 export function TimerLimitSelect({
   value,
   onChange,
   disabled = false,
   expertMode = false,
+  limits = ALL_TIMER_LIMITS,
 }: TimerLimitSelectProps) {
-  const options: Array<{ label: string; value: number | null }> = [
-    { label: "5s", value: 5 },
-    { label: "10s", value: 10 },
-    { label: "15s", value: 15 },
-    { label: "30s", value: 30 },
-    { label: "None", value: null },
-  ];
+  const options = limits.map((limit) => ({
+    label: limit === null ? "None" : `${limit}s`,
+    value: limit,
+  }));
 
   return (
     <div className="space-y-3">
       <p className="hud-rule hud-label">Time limit</p>
-      <div className="grid grid-cols-5 gap-2">
+      <div
+        className="grid gap-2"
+        style={{
+          gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+        }}
+      >
         {options.map((option) => {
           const isSelected = value === option.value;
           const useExpertStyling = expertMode && option.value === 5;
@@ -370,6 +386,13 @@ export function ThemeSelect({
 // CountrySetSelect Component
 // ============================================================================
 
+/** The picker's rails, in the order they read. "all" heads none of them. */
+const SET_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
+  ["Continents", setsOfKind("continent")],
+  ["Regions", setsOfKind("region")],
+  ["Quick play", setsOfKind("draw")],
+];
+
 interface CountrySetSelectProps {
   value: CountrySetId;
   onChange: (value: CountrySetId) => void;
@@ -381,26 +404,19 @@ export function CountrySetSelect({
   onChange,
   expertMode,
 }: CountrySetSelectProps) {
-  const availableSets = getAvailableCountrySets();
   const bestScores = useStatsStore((s) => s.bestScores);
   const expertBestScores = useStatsStore((s) => s.expertBestScores);
+  const dailyToday = useStatsStore((s) => s.daily[dailyKey()]);
 
-  const getSetTotal = (setId: CountrySetId): number => {
-    const set = availableSets.find((s) => s.id === setId);
-    if (!set || !set.countryIds) return GUESSABLE_IDS.size;
-    return set.countryIds.filter((id) => GUESSABLE_IDS.has(id)).length;
-  };
-
-  const continentSets = availableSets.filter((s) => s.id !== "all");
-
-  const handleContinentClick = (setId: CountrySetId) => {
+  /** Picking the selected set again clears back to the whole world. */
+  const handleSetClick = (setId: CountrySetId) => {
     onChange(value === setId ? "all" : setId);
   };
 
-  const renderSetButton = (set: (typeof availableSets)[0]) => {
+  const renderSetButton = (set: CountrySetConfig) => {
     const normalBestScore = bestScores[set.id] || 0;
     const expertBestScore = expertBestScores[set.id] || 0;
-    const total = getSetTotal(set.id);
+    const total = setSize(set.id);
     const normalPercentage =
       total > 0 ? Math.floor((normalBestScore / total) * 100) : 0;
     const expertPercentage =
@@ -431,7 +447,9 @@ export function CountrySetSelect({
     return (
       <button
         key={set.id}
-        onClick={() => handleContinentClick(set.id)}
+        onClick={() => handleSetClick(set.id)}
+        aria-pressed={isSelected}
+        data-sound="toggle"
         className={`group relative rounded-control border p-3 text-left transition-all duration-200 cursor-pointer ${borderClass} ${
           isSelected
             ? expertMode
@@ -461,7 +479,11 @@ export function CountrySetSelect({
             >
               {set.name}
             </p>
-            <p className="readout text-label text-faint">{total} countries</p>
+            <p className="readout text-label text-faint">
+              {set.draw?.daily && dailyToday
+                ? `today ${dailyToday.correct}/${dailyToday.total}`
+                : `${total} countries`}
+            </p>
           </div>
           {(hasNormalScore || hasExpertScore) && (
             <div className="flex shrink-0 flex-row items-center gap-2.5 md:flex-col md:items-end md:gap-0.5">
@@ -489,11 +511,15 @@ export function CountrySetSelect({
   };
 
   return (
-    <div className="space-y-3">
-      <p className="hud-rule hud-label">Country set</p>
-      <div className="grid grid-cols-2 gap-2">
-        {continentSets.map((set) => renderSetButton(set))}
-      </div>
+    <div className="space-y-5">
+      {SET_GROUPS.map(([label, sets]) => (
+        <div key={label} className="space-y-3">
+          <p className="hud-rule hud-label">{label}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {sets.map((set) => renderSetButton(set))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

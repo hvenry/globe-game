@@ -9,14 +9,27 @@ import { lngLatToCameraPos } from "@/lib/geo/coords";
 import type { GamePhase } from "@/lib/store/game-store";
 import type { CountrySetId } from "@/lib/geo/country-sets";
 
-/** Approximate [lng, lat] centers for each continent game mode */
-const CONTINENT_CENTERS: Partial<Record<CountrySetId, [number, number]>> = {
+/**
+ * Approximate [lng, lat] centres for the sets the intro can fly to. Draw sets
+ * and "all" have none and fall back to the hero framing.
+ */
+const SET_CENTERS: Partial<Record<CountrySetId, [number, number]>> = {
   africa: [20, 5],
   asia: [80, 30],
   europe: [15, 50],
   north_america: [-95, 35],
   south_america: [-58, -15],
   oceania: [145, -10],
+  caribbean: [-70, 17],
+  central_america: [-86, 13],
+  middle_east: [45, 28],
+  southeast_asia: [110, 5],
+  balkans: [21, 43],
+  nordics: [15, 63],
+  stans: [65, 40],
+  west_africa: [-3, 12],
+  east_africa: [38, 2],
+  southern_africa: [24, -22],
 };
 
 /**
@@ -74,8 +87,8 @@ function easeInOutCubic(t: number): number {
 
 /**
  * Phase-driven camera animation:
- * - game start (`gameKey` changes) → fly to the continent (or the hero
- *   framing for "all"); `onIntroArrived` fires when it settles, and the
+ * - game start (`gameKey` changes) → fly to the set's centre (or the hero
+ *   framing when it has none); `onIntroArrived` fires when it settles, and the
  *   gameplay clock stays held until then so fly-in time never eats the timer
  * - game end / menu → fly back to the hero framing (equator-level, standard
  *   zoom) so results and the menu always sit over a fresh-looking globe
@@ -159,16 +172,16 @@ export function useCameraAnimation(
   }, [camera, setControlsEnabled, heroDistance]);
 
   // Intro flight: every new game run (fresh start or restart) flies to the
-  // continent center, or back to the hero framing for "all". Keyed on the
+  // set's centre, or back to the hero framing when it has none. Keyed on the
   // run's identity so restarts re-trigger it and onIntroArrived always fires.
   useEffect(() => {
     if (gamePhase !== "playing" || gameKey === null) return;
     if (lastGameKeyRef.current === gameKey) return;
     lastGameKeyRef.current = gameKey;
 
-    const center = CONTINENT_CENTERS[gameCountrySetId];
+    const center = SET_CENTERS[gameCountrySetId];
     if (center) {
-      // Full flight to face the continent
+      // Full flight to face the set
       flightRef.current = planFlight(
         camera.position,
         lngLatToCameraPos(center[0], center[1], heroDistance),
@@ -181,7 +194,16 @@ export function useCameraAnimation(
       // Already framed — release the gameplay clock immediately
       onIntroArrived?.();
     }
-  }, [gameKey, gamePhase, gameCountrySetId, camera, setControlsEnabled, flyToHero, onIntroArrived, heroDistance]);
+  }, [
+    gameKey,
+    gamePhase,
+    gameCountrySetId,
+    camera,
+    setControlsEnabled,
+    flyToHero,
+    onIntroArrived,
+    heroDistance,
+  ]);
 
   useEffect(() => {
     const wasInGame =

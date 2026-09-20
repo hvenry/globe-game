@@ -19,8 +19,18 @@ interface StatsState {
   totalCorrect: number;
   bestScores: Record<CountrySetId, number>; // Normal mode: total points per set
   expertBestScores: Record<CountrySetId, number>; // Expert mode: country count per set
+  /** The Daily 20 result for each UTC date played, keyed `YYYY-MM-DD`. */
+  daily: Record<string, DailyResult>;
 
   recordGame: (record: GameRecord) => void;
+  /** Keep the day's best: more correct, or the same score faster. */
+  recordDaily: (date: string, result: DailyResult) => void;
+}
+
+export interface DailyResult {
+  correct: number;
+  total: number;
+  elapsedSeconds: number;
 }
 
 function emptyScores(): Record<CountrySetId, number> {
@@ -38,8 +48,25 @@ export const useStatsStore = create<StatsState>()(
       totalCorrect: 0,
       bestScores: emptyScores(),
       expertBestScores: emptyScores(),
+      daily: {},
 
-      recordGame: ({ score, countrySetId, expertMode, questionsAnswered, questionsCorrect }) => {
+      recordDaily: (date, result) => {
+        const prev = get().daily[date];
+        const better =
+          !prev ||
+          result.correct > prev.correct ||
+          (result.correct === prev.correct &&
+            result.elapsedSeconds < prev.elapsedSeconds);
+        if (better) set({ daily: { ...get().daily, [date]: result } });
+      },
+
+      recordGame: ({
+        score,
+        countrySetId,
+        expertMode,
+        questionsAnswered,
+        questionsCorrect,
+      }) => {
         const state = get();
         const key = expertMode ? "expertBestScores" : "bestScores";
         const scores = { ...state[key] };
@@ -56,8 +83,12 @@ export const useStatsStore = create<StatsState>()(
     }),
     {
       name: "globe-game-stats",
-      version: 1,
-      migrate: (persisted) => persisted as StatsState,
+      version: 2,
+      // v1 → v2: added `daily`
+      migrate: (persisted) => {
+        const p = persisted as Partial<StatsState>;
+        return { ...p, daily: p.daily ?? {} } as StatsState;
+      },
       // Deep-merge the score records so country sets added in later releases
       // get their default 0 entry instead of reading `undefined` (NaN% bug).
       merge: (persisted, current) => {
@@ -66,9 +97,12 @@ export const useStatsStore = create<StatsState>()(
           ...current,
           ...p,
           bestScores: { ...current.bestScores, ...p.bestScores },
-          expertBestScores: { ...current.expertBestScores, ...p.expertBestScores },
+          expertBestScores: {
+            ...current.expertBestScores,
+            ...p.expertBestScores,
+          },
         };
       },
-    }
-  )
+    },
+  ),
 );

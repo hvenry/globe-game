@@ -11,6 +11,7 @@ export default function MenuButton({ onClick }: MenuButtonProps) {
     <button
       onClick={onClick}
       aria-label="Menu"
+      data-sound="open"
       className="hud-card hud-top press group absolute left-4 z-10 cursor-pointer transition-all md:left-6"
     >
       <div className="hud-card-row flex-col justify-center gap-[5px]">

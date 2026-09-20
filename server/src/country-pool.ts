@@ -2,19 +2,37 @@
  * The country pool a race draws from.
  *
  * The client resolves "all countries" from the parsed TopoJSON, which is far
- * too large to ship in a Worker. It does not need to: the six continent sets
- * partition the 195 guessable countries exactly — no overlap, no remainder —
- * so their union is the same pool.
+ * too large to ship in a Worker. It does not need to: the continent sets
+ * partition the guessable world exactly, so `WORLD_IDS` is the same pool.
+ * Draw sets resolve through the shared `idsFor`, so a race and a solo game
+ * given the same seed play the same countries.
  */
 
-import { COUNTRY_SETS, type CountrySetId } from "../../lib/geo/country-sets";
+import {
+  getCountrySet,
+  isCountrySetId,
+  type CountrySetId,
+} from "../../lib/geo/country-sets";
+import { idsFor, seedFor } from "../../lib/geo/draws";
 
-const ALL_IDS: string[] = COUNTRY_SETS.flatMap((set) => set.countryIds ?? []);
+export { isCountrySetId };
 
-export function poolFor(setId: string): string[] {
-  return COUNTRY_SETS.find((s) => s.id === setId)?.countryIds ?? ALL_IDS;
+/** Set ids arrive over the wire, so an unknown one falls back to the world. */
+function toSetId(value: string): CountrySetId {
+  return isCountrySetId(value) ? value : "all";
 }
 
-export function isCountrySetId(value: string): value is CountrySetId {
-  return COUNTRY_SETS.some((s) => s.id === value);
+/** Countries in play for a set, resolved for `seed`. */
+export function poolFor(setId: string, seed: number): readonly string[] {
+  return idsFor(toSetId(setId), seed);
+}
+
+/** The seed a race on `setId` runs on: the day's for a daily draw, else `fallback`. */
+export function raceSeed(setId: string, fallback: number): number {
+  return seedFor(toSetId(setId), fallback);
+}
+
+/** A draw set fixes its own count; any other set plays what the host set. */
+export function countFor(setId: string, configured: number): number {
+  return getCountrySet(toSetId(setId)).draw?.count ?? configured;
 }

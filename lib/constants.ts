@@ -144,6 +144,34 @@ export const GLOBE_LAYER = {
   picker: 10,
 } as const;
 
+/** A new ring is born, the fill flashes, and the cue plays, every period. */
+const PULSE_PERIOD_MS = 1_200;
+
+/**
+ * The "find it" pulse: radar rings, the fill's red/white swap and the
+ * repeating cue all run on this one beat, so what you see and hear line up.
+ */
+export const PULSE_CONFIG = {
+  periodMs: PULSE_PERIOD_MS,
+  /** The same beat where three.js clocks are, so no caller divides by hand. */
+  periodSeconds: PULSE_PERIOD_MS / 1000,
+  /** Rings in flight at once; each takes `rings × period` to reach the edge. */
+  rings: 3,
+} as const;
+
+/**
+ * Master sound. The engine holds these until the settings store hydrates and
+ * tells it otherwise, so a cue fired before then is already at the right level.
+ */
+export const SOUND_CONFIG = {
+  /** Sound is part of the game, so it starts on; the toggle is one tap away. */
+  defaultEnabled: true,
+  /** Present without taking over a room the player is sitting in. */
+  defaultVolume: 0.7,
+  /** Volume changes ramp over this long, so dragging the slider never clicks. */
+  volumeRampSeconds: 0.02,
+} as const;
+
 export const GAME_CONFIG = {
   maxTries: 3,
   feedbackDuration: 800,
@@ -176,6 +204,11 @@ export const TIMER_CONFIG = {
 export interface CountryFill {
   color: string;
   opacity: number;
+  /**
+   * `dots` stipples the country instead of flooding it. A miss painted this
+   * way cannot be mistaken for a claim, whatever colour it takes.
+   */
+  pattern?: "dots";
 }
 
 /**
@@ -195,7 +228,10 @@ export const PLAYER_COLOR_IDS: readonly PlayerColorId[] = [
   "cyan",
 ];
 
-export const PLAYER_COLORS: Record<PlayerColorId, { claim: string; attempt: string }> = {
+export const PLAYER_COLORS: Record<
+  PlayerColorId,
+  { claim: string; attempt: string }
+> = {
   blue: { claim: "#1d4ed8", attempt: "#93c5fd" },
   purple: { claim: "#a855f7", attempt: "#d8b4fe" },
   orange: { claim: "#f97316", attempt: "#fdba74" },
@@ -239,6 +275,26 @@ export const RACE_CONFIG = {
   intermissionMs: 1_200,
   /** Lobby countdown before the first country appears. */
   countdownMs: 3_000,
+} as const;
+
+/**
+ * Race points. Awarded by the engine, so every client and the server agree
+ * to the point. Sized so a race of a few dozen countries lands in the
+ * thousands, with the bonuses worth chasing but never worth more than the
+ * claim itself.
+ */
+export const RACE_SCORING = {
+  /** A correct click inside the window. */
+  claim: 500,
+  /** Added on top, scaled by the fraction of the window still left. */
+  speedMax: 250,
+  /** No wrong clicks on the way to this claim. */
+  accuracy: 100,
+  /** Per consecutive claim beyond the first, up to `comboMax`. */
+  comboStep: 50,
+  comboMax: 250,
+  /** First to click a country everyone missed, once it is revealed. */
+  recovery: 100,
 } as const;
 
 export const GLOBE_CONFIG = {

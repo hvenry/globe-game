@@ -14,13 +14,52 @@
  */
 
 import { standings as rank } from "@/lib/engine/race";
-import { useRaceStore, playerPalette } from "@/lib/store/race-store";
+import { useRaceStore } from "@/lib/store/race-store";
 import ControlsSection from "@/components/game/settings/ControlsSection";
-import { ChevronLeftIcon, SlidersIcon } from "@/components/ui/icons";
+import { SlidersIcon } from "@/components/ui/icons";
+import PanelHeader from "@/components/ui/PanelHeader";
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
+import PlayerDot from "./PlayerDot";
 
 /** Null closes the menu; the rest are its rungs. */
-export type RaceMenuView = "menu" | "controls" | "confirm-leave" | "confirm-quit";
+export type RaceMenuView =
+  | "menu"
+  | "controls"
+  | "confirm-leave"
+  | "confirm-quit"
+  | "confirm-end";
+
+/**
+ * Both confirmations read the same way: what is about to happen, what it
+ * costs, and staying keeping the emphasis — leaving takes the quiet treatment
+ * solo gives "Quit game".
+ */
+function Confirm({
+  question,
+  consequence,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  question: string;
+  consequence: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mt-7 space-y-2 md:space-y-2.5">
+      <p className="text-center text-sm text-hi">{question}</p>
+      <p className="text-center text-label text-faint">{consequence}</p>
+      <button onClick={onCancel} className="btn-primary btn-signal press mt-1">
+        Keep racing
+      </button>
+      <button onClick={onConfirm} className="btn-quiet press">
+        {confirmLabel}
+      </button>
+    </div>
+  );
+}
 
 export default function RaceMenu({
   view,
@@ -37,6 +76,9 @@ export default function RaceMenu({
 
   const race = useRaceStore((s) => s.race);
   const playerId = useRaceStore((s) => s.playerId);
+  const hostId = useRaceStore((s) => s.lobby?.hostId);
+  const endRace = useRaceStore((s) => s.end);
+  const isHost = hostId === playerId;
 
   if (!race) return null;
 
@@ -53,18 +95,7 @@ export default function RaceMenu({
       >
         {view === "controls" ? (
           <div className="text-left">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => onView("menu")}
-                aria-label="Back"
-                className="btn-icon press"
-              >
-                <ChevronLeftIcon size={13} />
-              </button>
-              <h2 className="hud-label text-mid">Controls</h2>
-              {/* Balances the back button so the title stays centred. */}
-              <div className="h-7 w-7" />
-            </div>
+            <PanelHeader title="Controls" onBack={() => onView("menu")} />
 
             <div className="mt-6">
               <ControlsSection expertMode={false} />
@@ -79,6 +110,7 @@ export default function RaceMenu({
             <button
               onClick={() => onView("controls")}
               aria-label="Controls"
+              data-sound="open"
               className="btn-icon press absolute right-3 top-3 md:right-4 md:top-4"
             >
               <SlidersIcon size={13} />
@@ -86,7 +118,9 @@ export default function RaceMenu({
 
             <div className="text-center">
               <p className="hud-label text-signal">Race menu</p>
-              <p className="mt-1 text-label text-faint">The clock keeps running</p>
+              <p className="mt-1 text-label text-faint">
+                The clock keeps running
+              </p>
             </div>
 
             <div className="mt-5 space-y-2 text-center">
@@ -116,53 +150,76 @@ export default function RaceMenu({
                         p.id === playerId ? "text-hi" : "text-mid"
                       }`}
                     >
-                      <span
-                        aria-hidden
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: playerPalette(p.color).claim }}
-                      />
+                      <PlayerDot color={p.color} />
                       {p.name}
-                      {!p.connected && <span className="hud-label ml-2 text-faint">gone</span>}
+                      {!p.connected && (
+                        <span className="hud-label ml-2 text-faint">gone</span>
+                      )}
                     </span>
                   </span>
-                  <span className="readout text-hi">{p.claims}</span>
+                  <span className="readout text-signal">
+                    {p.score.toLocaleString()}
+                  </span>
                 </li>
               ))}
             </ul>
 
-            {view === "menu" ? (
+            {view === "menu" && (
               <div className="mt-7 space-y-2 md:space-y-2.5">
                 <button
                   onClick={() => onView(null)}
-                  className="btn-primary btn-signal press hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]"
+                  className="btn-primary btn-signal press"
                 >
                   Resume
                 </button>
-                <button onClick={() => onView("confirm-leave")} className="btn-ghost press">
+                <button
+                  onClick={() => onView("confirm-leave")}
+                  className="btn-ghost press"
+                >
                   Leave race
                 </button>
-                <button onClick={() => onView("confirm-quit")} className="btn-quiet press">
+                {isHost && (
+                  <button
+                    onClick={() => onView("confirm-end")}
+                    className="btn-danger press"
+                  >
+                    End race for everyone
+                  </button>
+                )}
+                <button
+                  onClick={() => onView("confirm-quit")}
+                  className="btn-quiet press"
+                >
                   Quit to menu
                 </button>
               </div>
-            ) : (
-              /* Staying is the safe answer, so it keeps the emphasis and
-                 leaving takes the quiet treatment solo gives "Quit game". */
-              <div className="mt-7 space-y-2 md:space-y-2.5">
-                <p className="text-center text-sm text-hi">Leave the race in progress?</p>
-                <p className="text-center text-label text-faint">
-                  Your claims stand, and the room code gets you back in.
-                </p>
-                <button
-                  onClick={() => onView("menu")}
-                  className="btn-primary btn-signal press mt-1 hover:brightness-110 hover:shadow-[0_0_24px_rgb(var(--signal)/0.4)]"
-                >
-                  Keep racing
-                </button>
-                <button onClick={onConfirmExit} className="btn-quiet press">
-                  {view === "confirm-quit" ? "Yes, quit to menu" : "Yes, leave the race"}
-                </button>
-              </div>
+            )}
+
+            {view === "confirm-end" && (
+              <Confirm
+                question="End the race for everyone?"
+                consequence="Standings are whatever has been played so far."
+                confirmLabel="Yes, end the race"
+                onCancel={() => onView("menu")}
+                onConfirm={() => {
+                  onView(null);
+                  endRace();
+                }}
+              />
+            )}
+
+            {(view === "confirm-leave" || view === "confirm-quit") && (
+              <Confirm
+                question="Leave the race in progress?"
+                consequence="Your claims stand, and the room code gets you back in."
+                confirmLabel={
+                  view === "confirm-quit"
+                    ? "Yes, quit to menu"
+                    : "Yes, leave the race"
+                }
+                onCancel={() => onView("menu")}
+                onConfirm={onConfirmExit}
+              />
             )}
           </>
         )}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { play } from "@/lib/sound/engine";
+
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
 import MainMenu from "./MainMenu";
 import SettingsView, { type SettingsFocus } from "./SettingsView";
@@ -37,6 +39,7 @@ export default function StartScreen({
         const now = Date.now();
         if (now - lastEscapePress.current < 300) return;
         lastEscapePress.current = now;
+        play("ui.click");
         setShowSettings(false);
       } else if (e.key === "Enter" && !showSettings) {
         e.preventDefault();

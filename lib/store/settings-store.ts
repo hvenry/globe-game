@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CountrySetId } from "@/lib/geo/country-sets";
-import { TIMER_CONFIG, type PlayerColorId, type ThemeMode } from "@/lib/constants";
+import {
+  SOUND_CONFIG,
+  TIMER_CONFIG,
+  type PlayerColorId,
+  type ThemeMode,
+} from "@/lib/constants";
 
 interface SettingsState {
   // Appearance
@@ -19,6 +24,11 @@ interface SettingsState {
   showHints: boolean; // Show country name on incorrect guesses
   timerLimit: number | null; // Countdown timer limit in seconds (null = disabled)
   maxTries: number; // Maximum attempts per country (1-5)
+
+  // Sound
+  soundEnabled: boolean;
+  /** Master volume, 0–1. */
+  soundVolume: number;
 
   // Camera controls
   zoomSpeed: number; // 0.1 to 1.0 (actual), default 0.53 (displays as 1.0x)
@@ -39,6 +49,8 @@ interface SettingsState {
   setExpertMode: (expert: boolean) => void;
   setShowHints: (show: boolean) => void;
   setTimerLimit: (limit: number | null) => void;
+  setSoundEnabled: (on: boolean) => void;
+  setSoundVolume: (volume: number) => void;
   setZoomSpeed: (speed: number) => void;
   setRotateSpeed: (speed: number) => void;
   setMaxTries: (tries: number) => void;
@@ -56,6 +68,8 @@ export const useSettingsStore = create<SettingsState>()(
       showHints: true,
       timerLimit: null,
       maxTries: 3,
+      soundEnabled: SOUND_CONFIG.defaultEnabled,
+      soundVolume: SOUND_CONFIG.defaultVolume,
       zoomSpeed: 0.53,
       rotateSpeed: 1.0,
 
@@ -98,23 +112,33 @@ export const useSettingsStore = create<SettingsState>()(
       setShowHints: (showHints) => set({ showHints }),
       setTimerLimit: (timerLimit) => set({ timerLimit }),
       setMaxTries: (maxTries) => set({ maxTries }),
+      setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+      setSoundVolume: (soundVolume) => set({ soundVolume }),
       setZoomSpeed: (zoomSpeed) => set({ zoomSpeed }),
       setRotateSpeed: (rotateSpeed) => set({ rotateSpeed }),
     }),
     {
       name: "globe-game-settings",
-      version: 3,
+      version: 4,
       // v0 → v1: shape unchanged (expert timer lock moved into setExpertMode)
       // v1 → v2: added `theme`; existing players keep the dark globe they
       // already know, so the default is applied rather than system preference
       // v2 → v3: added `playerColor`; the room reassigns it if it is taken,
       // so every returning player starting on blue costs nothing
+      // v3 → v4: added sound; on at a moderate level for everyone
       migrate: (persisted, version) => {
         let state = persisted as SettingsState;
         if (version < 2) state = { ...state, theme: "dark" as ThemeMode };
-        if (version < 3) state = { ...state, playerColor: "blue" as PlayerColorId };
+        if (version < 3)
+          state = { ...state, playerColor: "blue" as PlayerColorId };
+        if (version < 4)
+          state = {
+            ...state,
+            soundEnabled: SOUND_CONFIG.defaultEnabled,
+            soundVolume: SOUND_CONFIG.defaultVolume,
+          };
         return state;
       },
-    }
-  )
+    },
+  ),
 );
