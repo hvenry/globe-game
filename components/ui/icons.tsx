@@ -7,7 +7,6 @@ import {
   CaretRightIcon,
   CheckIcon as PhosphorCheck,
   ExportIcon,
-  GearIcon as PhosphorGear,
   MoonIcon as PhosphorMoon,
   PlayIcon as PhosphorPlay,
   SlidersHorizontalIcon,
@@ -68,11 +67,6 @@ export function XIcon(props: IconProps) {
 /** Two people — multiplayer / live race */
 export function UsersIcon(props: IconProps) {
   return <PhosphorUsers {...DEFAULTS} {...props} />;
-}
-
-/** Gear — configure a thing in place */
-export function GearIcon(props: IconProps) {
-  return <PhosphorGear {...DEFAULTS} {...props} />;
 }
 
 /** Sliders — settings/tuning */

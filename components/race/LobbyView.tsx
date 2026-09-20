@@ -22,7 +22,7 @@ import {
   setSize,
   type CountrySetId,
 } from "@/lib/geo/country-sets";
-import { GearIcon, SlidersIcon, XIcon } from "@/components/ui/icons";
+import { SlidersIcon, XIcon } from "@/components/ui/icons";
 import PanelHeader from "@/components/ui/PanelHeader";
 import ScrollColumn from "@/components/ui/ScrollColumn";
 import ControlsSection from "@/components/game/settings/ControlsSection";
@@ -507,30 +507,37 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       {/* One tile for the room's options: the map on show, hints and the
           picker one step in. Everyone can open it; only the host can change
           the map inside. */}
-      <div className="relative mb-6">
-        <button
-          onClick={() => setView("options")}
-          className="w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 pr-12 text-left transition-colors hover:border-hairline-strong hover:bg-panel md:px-3 md:py-2.5"
-        >
-          <p className="hud-label mb-1">Game options</p>
-          <p className="flex items-center justify-between gap-2 text-xs font-medium md:text-sm">
-            <span className="truncate text-mid">
-              {getCountrySet(setId).name}
+      {/* Everything the host has set, at a glance: the map, the window per
+          country, and hints. Opening it is the only way to change them. */}
+      <button
+        onClick={() => setView("options")}
+        className="mb-6 w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:border-hairline-strong hover:bg-panel md:px-3 md:py-2.5"
+      >
+        <p className="hud-label mb-1">Game options</p>
+        <p className="flex items-center justify-between gap-2 text-xs font-medium md:text-sm">
+          <span className="truncate text-mid">{getCountrySet(setId).name}</span>
+          <span className="readout shrink-0 text-label text-faint">
+            {inPlay}
+          </span>
+        </p>
+        <p className="mt-1.5 flex items-center gap-3 text-label text-faint">
+          <span>
+            <span className="readout text-mid">
+              {lobby.config.countryWindowMs / 1000}s
+            </span>{" "}
+            per country
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            hints{" "}
+            <span
+              className={`readout ${lobby.config.showHints ? "text-signal" : "text-mid"}`}
+            >
+              {lobby.config.showHints ? "on" : "off"}
             </span>
-            <span className="readout shrink-0 text-label text-faint">
-              {inPlay}
-            </span>
-          </p>
-        </button>
-        {/* Says "this opens something" without the card having to. */}
-        <button
-          onClick={() => setView("options")}
-          aria-label="Configure game options"
-          className="btn-icon press absolute right-2 top-1/2 -translate-y-1/2"
-        >
-          <GearIcon size={13} />
-        </button>
-      </div>
+          </span>
+        </p>
+      </button>
 
       {isHost && (
         <button
