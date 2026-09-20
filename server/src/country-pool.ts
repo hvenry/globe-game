@@ -12,6 +12,7 @@ import {
   getCountrySet,
   isCountrySetId,
   type CountrySetId,
+  fixedCountOf,
 } from "../../lib/geo/country-sets";
 import { idsFor, seedFor } from "../../lib/geo/draws";
 
@@ -32,7 +33,7 @@ export function raceSeed(setId: string, fallback: number): number {
   return seedFor(toSetId(setId), fallback);
 }
 
-/** A draw set fixes its own count; any other set plays what the host set. */
+/** A draw or ranked set fixes its own count; any other set plays what the host set. */
 export function countFor(setId: string, configured: number): number {
-  return getCountrySet(toSetId(setId)).draw?.count ?? configured;
+  return fixedCountOf(getCountrySet(toSetId(setId))) ?? configured;
 }

@@ -15,7 +15,11 @@ import type { GlobeScene } from "@/components/globe/Globe";
 import type { Resolution } from "@/lib/engine/types";
 import type { CountryFill } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
-import { getCountrySet, isCountrySetId } from "@/lib/geo/country-sets";
+import {
+  getCountrySet,
+  isCountrySetId,
+  fixedCountOf,
+} from "@/lib/geo/country-sets";
 import { baseId } from "@/lib/geo/countries";
 import { RACE_SERVER_URL } from "@/lib/race/config";
 import {
@@ -159,9 +163,11 @@ export function useRaceGlobe(): RaceGlobeProps {
   const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
   const countrySetId =
     configured && isCountrySetId(configured) ? configured : "all";
-  // A draw set's sample is only knowable from the race itself.
+  // A draw or ranked set's sample is only knowable from the race itself.
   const drawIds =
-    race && getCountrySet(countrySetId).draw ? race.inPlay.join(",") : null;
+    race && fixedCountOf(getCountrySet(countrySetId)) !== null
+      ? race.inPlay.join(",")
+      : null;
   const validIds = useMemo(
     () => (drawIds ? new Set(drawIds.split(",")) : null),
     [drawIds],

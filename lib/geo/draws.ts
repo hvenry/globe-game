@@ -7,7 +7,13 @@
  */
 
 import { seededShuffle } from "../engine/rng";
-import { WORLD_IDS, getCountrySet, type CountrySetId } from "./country-sets";
+import { COUNTRY_STATS } from "./country-stats";
+import {
+  WORLD_IDS,
+  getCountrySet,
+  type CountrySetId,
+  type RankSpec,
+} from "./country-sets";
 
 /** The UTC date a daily draw belongs to, as `YYYY-MM-DD`. */
 export function dailyKey(now = Date.now()): string {
@@ -38,5 +44,16 @@ export function seedFor(
 export function idsFor(setId: CountrySetId, seed: number): readonly string[] {
   const set = getCountrySet(setId);
   if (set.draw) return seededShuffle(WORLD_IDS, seed).slice(0, set.draw.count);
+  if (set.rank) return rankedIds(set.rank);
   return set.countryIds ?? WORLD_IDS;
+}
+
+/** The world sorted by a statistic, largest first, cut to `count`. Ties break by id. */
+export function rankedIds({ by, count }: RankSpec): readonly string[] {
+  return [...WORLD_IDS]
+    .sort(
+      (a, b) =>
+        COUNTRY_STATS[b][by] - COUNTRY_STATS[a][by] || a.localeCompare(b),
+    )
+    .slice(0, count);
 }

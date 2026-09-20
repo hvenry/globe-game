@@ -9,6 +9,8 @@
  * - `draw`: not a list but a rule — a random sample of the world, sized and
  *   seeded per `draw`. `daily` seeds from the UTC date so everyone gets the
  *   same countries; otherwise every game redraws.
+ * - `ranked`: the top N of the world by area or population, from
+ *   `country-stats`. Fixed, but derived rather than listed.
  *
  * Ids are ISO 3166-1 numeric codes as strings, plus "383" for Kosovo (which
  * has none). Sizes are derived, never written down, so they cannot drift.
@@ -16,7 +18,16 @@
 
 import { GUESSABLE_IDS } from "./country-names";
 
-export type CountrySetKind = "continent" | "region" | "draw";
+export type CountrySetKind = "continent" | "region" | "draw" | "ranked";
+
+/** The top `count` of the world by one statistic, largest first. */
+export interface RankSpec {
+  by: "area" | "population";
+  count: number;
+}
+
+/** The sizes a ranked set comes in. Each is its own set id: `area_25`, `population_100`. */
+export const RANK_COUNTS = [10, 25, 50, 100] as const;
 
 export interface DrawSpec {
   /** How many countries to draw from the whole world. */
@@ -29,9 +40,10 @@ export interface CountrySetConfig {
   id: CountrySetId;
   name: string;
   kind: CountrySetKind;
-  /** Fixed membership, or null for "all" and for draws. */
+  /** Fixed membership, or null for "all", draws and ranked sets. */
   countryIds: readonly string[] | null;
   draw?: DrawSpec;
+  rank?: RankSpec;
 }
 
 export type CountrySetId =
@@ -54,7 +66,9 @@ export type CountrySetId =
   | "southern_africa"
   | "quick_10"
   | "sprint_25"
-  | "daily_20";
+  | "daily_20"
+  | `area_${(typeof RANK_COUNTS)[number]}`
+  | `population_${(typeof RANK_COUNTS)[number]}`;
 
 export const COUNTRY_SETS: readonly CountrySetConfig[] = [
   // "all" is the deselected state rather than a tile in the picker, so
@@ -500,7 +514,30 @@ export const COUNTRY_SETS: readonly CountrySetConfig[] = [
     countryIds: null,
     draw: { count: 20, daily: true },
   },
+  ...RANK_COUNTS.map(
+    (count): CountrySetConfig => ({
+      id: `area_${count}`,
+      name: `Largest ${count}`,
+      kind: "ranked",
+      countryIds: null,
+      rank: { by: "area", count },
+    }),
+  ),
+  ...RANK_COUNTS.map(
+    (count): CountrySetConfig => ({
+      id: `population_${count}`,
+      name: `Most populous ${count}`,
+      kind: "ranked",
+      countryIds: null,
+      rank: { by: "population", count },
+    }),
+  ),
 ];
+
+/** The size a rule-based set fixes for itself; null for listed sets and "all". */
+export function fixedCountOf(set: CountrySetConfig): number | null {
+  return set.draw?.count ?? set.rank?.count ?? null;
+}
 
 export function getCountrySet(id: CountrySetId): CountrySetConfig {
   return COUNTRY_SETS.find((set) => set.id === id) ?? COUNTRY_SETS[0];
@@ -517,7 +554,8 @@ export function setsOfKind(kind: CountrySetKind): CountrySetConfig[] {
 /** How many countries a set puts in play. Draws are their count; "all" is the world. */
 export function setSize(id: CountrySetId): number {
   const set = getCountrySet(id);
-  if (set.draw) return Math.min(set.draw.count, GUESSABLE_IDS.size);
+  const fixed = fixedCountOf(set);
+  if (fixed !== null) return Math.min(fixed, GUESSABLE_IDS.size);
   if (!set.countryIds) return GUESSABLE_IDS.size;
   return set.countryIds.filter((c) => GUESSABLE_IDS.has(c)).length;
 }
