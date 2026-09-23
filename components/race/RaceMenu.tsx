@@ -110,7 +110,6 @@ export default function RaceMenu({
             <button
               onClick={() => onView("controls")}
               aria-label="Controls"
-              data-sound="open"
               className="btn-icon press absolute right-3 top-3 md:right-4 md:top-4"
             >
               <SlidersIcon size={13} />
