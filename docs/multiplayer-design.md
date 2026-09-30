@@ -114,8 +114,10 @@ Server → clients:
 - `welcome { playerId, roomId, serverNow }` — sent once per connection; the
   `playerId` is the reconnect credential
 - `lobby { lobby, canStart, serverNow }`
-- `state { state, serverNow }` — full `RaceState` after every accepted event
-- `finished { state, standings, serverNow }`
+- `state { state, serverNow }` — the race's `publicView` after every accepted
+  event: the full state minus the play order and seed, which never leave the
+  server (either one names every country before it appears)
+- `finished { state, standings, serverNow }` — the view with the whole order
 - `error { code, message }`, `pong { serverNow }`
 
 Two properties worth keeping: state is broadcast **whole**, not as deltas, so
@@ -130,7 +132,7 @@ deadlines are absolute epoch ms; a client with a skewed clock corrects with
 |---|---|
 | Race rules: claims, lockouts, windows, intermissions, leave/rejoin, standings | `lib/engine/race.ts` (tests: `lib/engine/race.test.ts`) |
 | Pure, serializable rules engine (no Map/Set/Date, no browser deps) | `lib/engine/` |
-| Seeded, deterministic country order (server sends a seed, both clients derive the same race) | `lib/engine/rng.ts` |
+| Seeded, deterministic country order (server-side only; a Daily 20 race picks its countries with the day's seed but shuffles them with its own, so the order is not today's solo order) | `lib/engine/rng.ts` |
 | Wall-clock deadline timers (tick-proof, background-tab-proof) | `lib/engine/solo.ts`, `lib/engine/race.ts`, `CountdownTimer` |
 | Store as thin adapter — a server-state applier can replace the local reducer per mode | `lib/store/game-store.ts` (`apply()`) |
 | Engine test harness (`pnpm test`) | `lib/engine/*.test.ts` |

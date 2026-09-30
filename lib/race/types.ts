@@ -7,7 +7,7 @@
  * (`server/src/protocol.ts`); this file is only the vocabulary.
  */
 
-import type { RaceConfig, RacePlayer, RaceState } from "../engine/types";
+import type { RaceConfig, RacePlayer, RaceView } from "../engine/types";
 import type { CountrySetId } from "../geo/country-sets";
 import type { PlayerColorId } from "../constants";
 
@@ -82,8 +82,8 @@ export type ServerMessage =
   /** Sent once per connection. `playerId` is the reconnect credential — keep it. */
   | { t: "welcome"; playerId: string; roomId: string; serverNow: number }
   | { t: "lobby"; lobby: LobbyState; canStart: boolean; serverNow: number }
-  | { t: "state"; state: RaceState; serverNow: number }
-  | { t: "finished"; state: RaceState; standings: RacePlayer[]; serverNow: number }
+  | { t: "state"; state: RaceView; serverNow: number }
+  | { t: "finished"; state: RaceView; standings: RacePlayer[]; serverNow: number }
   | { t: "error"; code: ErrorCode; message: string }
   | { t: "pong"; serverNow: number };
 

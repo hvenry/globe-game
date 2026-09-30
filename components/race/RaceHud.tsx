@@ -114,7 +114,7 @@ export default function RaceHud() {
           </p>
         </div>
         <p className="hud-pill readout text-faint">
-          {race.currentIndex + 1}/{race.order.length}
+          {race.currentIndex + 1}/{race.total}
         </p>
         {revealing ? (
           /* No bar: the reveal has no clock. The country is lit on the globe

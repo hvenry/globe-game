@@ -6,6 +6,7 @@ import {
   isDraw,
   leave,
   nextTransitionAt,
+  publicView,
   rejoin,
   scoreClaim,
   standings,
@@ -307,6 +308,25 @@ describe("claims", () => {
     expect(s2.phase).toBe("reveal");
     expect(player(s2, "a").lockedUntil).toBe(START + 11_600);
     expect(guess(s2, "a", s0.order[0], START + 10_200)).toBe(s2);
+  });
+
+  test("a click cannot claim a country its own settle just revealed", () => {
+    // Intermission ends at START + 2_200, but the server has not ticked yet:
+    // a click arriving now reaches a country no player has been shown.
+    const s0 = racing();
+    const s1 = guess(s0, "a", s0.order[0], START + 1_000);
+    const s2 = guess(s1, "b", s0.order[1], START + 2_250);
+    expect(s2.phase).toBe("racing");
+    expect(s2.currentId).toBe(s0.order[1]);
+    expect(s2.results[s0.order[1]]).toBeUndefined();
+    expect(player(s2, "b")).toEqual(player(s1, "b"));
+  });
+
+  test("a click cannot claim the first country as the countdown settles", () => {
+    const s = newRace();
+    const next = guess(s, "a", s.order[0], START + 1);
+    expect(next.phase).toBe("racing");
+    expect(next.results).toEqual({});
   });
 
   test("only the first click recovers; the country is then settled", () => {
@@ -652,5 +672,40 @@ describe("end", () => {
     const ended = end(revealing, START + 20_000);
     expect(ended.phase).toBe("finished");
     expect(end(ended, START + 30_000)).toBe(ended);
+  });
+});
+
+describe("publicView", () => {
+  test("shows only the countries revealed so far, and no seed", () => {
+    const s0 = newRace({ countryCount: 4 });
+    const countdown = publicView(s0);
+    expect(countdown.revealed).toEqual([]);
+    expect(countdown.total).toBe(4);
+    expect(countdown).not.toHaveProperty("order");
+    expect(countdown).not.toHaveProperty("seed");
+
+    const s1 = tick(s0, START);
+    expect(publicView(s1).revealed).toEqual([s0.order[0]]);
+    const s2 = tick(guess(s1, "a", s0.order[0], START + 1_000), START + 2_200);
+    expect(publicView(s2).revealed).toEqual(s0.order.slice(0, 2));
+  });
+
+  test("lists what is in play sorted, so it gives nothing of the order away", () => {
+    const s = newRace({ countryCount: 4 });
+    expect(publicView(s).inPlay).toEqual([...s.order].sort());
+  });
+
+  test("reveals the whole order once the race is finished", () => {
+    const s = end(racing({ countryCount: 4 }), START + 1_000);
+    expect(publicView(s).revealed).toEqual(s.order);
+  });
+
+  test("keeps everything else as the engine has it", () => {
+    const s = guess(racing(), "a", racing().order[0], START + 1_000);
+    const view = publicView(s);
+    expect(view.players).toBe(s.players);
+    expect(view.results).toBe(s.results);
+    expect(view.currentId).toBe(s.currentId);
+    expect(view.phaseDeadline).toBe(s.phaseDeadline);
   });
 });

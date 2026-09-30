@@ -183,3 +183,17 @@ export interface RaceState {
   events: RaceEvent[];
   nextSeq: number;
 }
+
+/**
+ * A race as players may see it. `order` and `seed` stay on the server: either
+ * one names every country before it appears, and whoever reads it can claim
+ * the next country the instant it opens.
+ */
+export type RaceView = Omit<RaceState, "order" | "seed"> & {
+  /** `order` up to the active country; the whole order once finished. */
+  revealed: string[];
+  /** Countries in the race, shown or not. */
+  total: number;
+  /** Every id in play, sorted so it says what is in the race but not when. */
+  inPlay: string[];
+};

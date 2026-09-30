@@ -83,7 +83,7 @@ export default function RaceMenu({
   if (!race) return null;
 
   const resolved = Object.keys(race.results).length;
-  const total = race.order.length;
+  const total = race.total;
   const progress = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
   return (

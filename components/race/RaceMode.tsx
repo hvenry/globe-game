@@ -159,12 +159,12 @@ export function useRaceGlobe(): RaceGlobeProps {
   const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
   const countrySetId =
     configured && isCountrySetId(configured) ? configured : "all";
-  // A draw set is only knowable from the race's order.
-  const drawOrder =
-    race && getCountrySet(countrySetId).draw ? race.order.join(",") : null;
+  // A draw set's sample is only knowable from the race itself.
+  const drawIds =
+    race && getCountrySet(countrySetId).draw ? race.inPlay.join(",") : null;
   const validIds = useMemo(
-    () => (drawOrder ? new Set(drawOrder.split(",")) : null),
-    [drawOrder],
+    () => (drawIds ? new Set(drawIds.split(",")) : null),
+    [drawIds],
   );
   const phase = scenePhase(status);
   const gameKey = race?.startsAt ?? null;

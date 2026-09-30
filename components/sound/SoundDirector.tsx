@@ -15,7 +15,7 @@
 import { useEffect } from "react";
 import { PULSE_CONFIG, TIMER_CONFIG } from "@/lib/constants";
 import { isDraw, standings as rank } from "@/lib/engine/race";
-import type { RaceState } from "@/lib/engine/types";
+import type { RaceView } from "@/lib/engine/types";
 import { CUE_NAMES, isCueName } from "@/lib/sound/cues";
 import {
   fileFor,
@@ -230,7 +230,7 @@ function useRaceCues(): void {
       timers.push(setTimeout(fn, Math.max(0, ms)));
     };
 
-    const onCountdown = (race: RaceState, offset: number) => {
+    const onCountdown = (race: RaceView, offset: number) => {
       clearTimers();
       if (race.phaseDeadline === null) return;
       const untilGo = race.phaseDeadline - (Date.now() + offset);
