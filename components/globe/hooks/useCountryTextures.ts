@@ -114,6 +114,94 @@ function clearLayer(layer: Layer) {
   layer.ctx?.clearRect(0, 0, TEX_W, TEX_H);
 }
 
+function paintCountry(layer: Layer, features: CountryFeature[], fill: CountryFill) {
+  for (const feature of features) {
+    paintFeature(layer, feature, fill.color, fill.opacity, fill.pattern);
+  }
+}
+
+/** Axis-aligned canvas rectangle: [x0, y0, x1, y1]. */
+type Rect = [number, number, number, number];
+
+/** Texels added around a country's bounds so its anti-aliased edge is inside. */
+const RECT_PAD = 2;
+
+/**
+ * Past this many changed countries a full repaint is cheaper than redrawing
+ * each one's neighbourhood (a theme switch changes every fill at once).
+ */
+const MAX_REGION_REPAINTS = 12;
+
+function featureRect(layer: Layer, features: CountryFeature[]): Rect {
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const feature of features) {
+    const [[fx0, fy0], [fx1, fy1]] = layer.path.bounds(feature as unknown as GeoJSON.Feature);
+    x0 = Math.min(x0, fx0);
+    y0 = Math.min(y0, fy0);
+    x1 = Math.max(x1, fx1);
+    y1 = Math.max(y1, fy1);
+  }
+  if (!isFinite(x0)) return [0, 0, 0, 0];
+  return [
+    Math.max(0, Math.floor(x0) - RECT_PAD),
+    Math.max(0, Math.floor(y0) - RECT_PAD),
+    Math.min(TEX_W, Math.ceil(x1) + RECT_PAD),
+    Math.min(TEX_H, Math.ceil(y1) + RECT_PAD),
+  ];
+}
+
+function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+}
+
+const sameFill = (a: CountryFill, b: CountryFill) =>
+  a.color === b.color && a.opacity === b.opacity && a.pattern === b.pattern;
+
+/** Countries whose fill was added, removed or changed between two paints. */
+function changedFills(
+  prev: Map<string, CountryFill>,
+  next: Map<string, CountryFill>,
+): string[] {
+  const dirty: string[] = [];
+  for (const [id, fill] of next) {
+    const before = prev.get(id);
+    if (!before || !sameFill(before, fill)) dirty.push(id);
+  }
+  for (const id of prev.keys()) {
+    if (!next.has(id)) dirty.push(id);
+  }
+  return dirty;
+}
+
+/**
+ * Clear `rect` and redraw every fill that reaches into it, clipped to it, in
+ * full-repaint order. The pixels inside come out as a full repaint would draw
+ * them, neighbours' shared edges included; nothing outside is touched.
+ */
+function repaintRegion(
+  layer: Layer,
+  rect: Rect,
+  fills: Map<string, CountryFill>,
+  featuresByBase: Map<string, CountryFeature[]>,
+  boundsByBase: Map<string, Rect>,
+) {
+  const ctx = layer.ctx;
+  if (!ctx) return;
+  const [x0, y0, x1, y1] = rect;
+  if (x1 <= x0 || y1 <= y0) return;
+  ctx.clearRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, y0, x1 - x0, y1 - y0);
+  ctx.clip();
+  for (const [countryBase, fill] of fills) {
+    const bounds = boundsByBase.get(countryBase);
+    if (!bounds || !rectsOverlap(rect, bounds)) continue;
+    paintCountry(layer, featuresByBase.get(countryBase) ?? [], fill);
+  }
+  ctx.restore();
+}
+
 /** Flag the layer's texture for re-upload after painting. */
 function commitLayer(layer: Layer) {
   layer.texture.needsUpdate = true;
@@ -203,30 +291,62 @@ export function useCountryTextures({
     commitLayer(land);
   }, [land, featuresByBase, COLORS.land, emphasisIds]);
 
-  // Base layer: resolved + wrong-guess fills
+  // Canvas-space bounds per country, traced once per feature set.
+  const boundsByBase = useMemo(() => {
+    const bounds = new Map<string, Rect>();
+    for (const [countryBase, countryFeatures] of featuresByBase) {
+      bounds.set(countryBase, featureRect(base, countryFeatures));
+    }
+    return bounds;
+  }, [base, featuresByBase]);
+
+  // Base layer: resolved + wrong-guess fills. Repainted in place: only the
+  // countries whose fill changed are redrawn, so a claim costs the same on
+  // the first country as on the hundredth.
+  const painted = useRef<{
+    fills: Map<string, CountryFill>;
+    featuresByBase: Map<string, CountryFeature[]>;
+  } | null>(null);
   const firstDrawSignaled = useRef(false);
   useEffect(() => {
-    clearLayer(base);
-
-    for (const [countryBase, countryFeatures] of featuresByBase) {
+    // Built in `featuresByBase` order, which is the paint order a full
+    // repaint uses — a redrawn region stacks exactly as it would from scratch.
+    const fills = new Map<string, CountryFill>();
+    for (const countryBase of featuresByBase.keys()) {
       // The pulsing country is painted by the pulse layer
       if (countryBase === pulseBase) continue;
       const state: StaticVisualState | CountryFill | null =
         resolvedCountries[countryBase] ??
         (wrongGuessIds.includes(countryBase) ? "wrongGuess" : null);
-      if (!state) continue;
-      const { color, opacity, pattern } = resolveFill(state, COLORS);
-      for (const feature of countryFeatures) {
-        paintFeature(base, feature, color, opacity, pattern);
-      }
+      if (state) fills.set(countryBase, resolveFill(state, COLORS));
     }
-    commitLayer(base);
+
+    const prev =
+      painted.current?.featuresByBase === featuresByBase
+        ? painted.current.fills
+        : null;
+    const dirty = prev ? changedFills(prev, fills) : null;
+    painted.current = { fills, featuresByBase };
+
+    if (dirty === null || dirty.length > MAX_REGION_REPAINTS) {
+      clearLayer(base);
+      for (const [countryBase, fill] of fills) {
+        paintCountry(base, featuresByBase.get(countryBase) ?? [], fill);
+      }
+      commitLayer(base);
+    } else if (dirty.length > 0) {
+      for (const countryBase of dirty) {
+        const rect = boundsByBase.get(countryBase);
+        if (rect) repaintRegion(base, rect, fills, featuresByBase, boundsByBase);
+      }
+      commitLayer(base);
+    }
 
     if (!firstDrawSignaled.current && onFirstDraw) {
       firstDrawSignaled.current = true;
       onFirstDraw();
     }
-  }, [base, featuresByBase, resolvedCountries, wrongGuessIds, pulseBase, onFirstDraw, COLORS]);
+  }, [base, featuresByBase, boundsByBase, resolvedCountries, wrongGuessIds, pulseBase, onFirstDraw, COLORS]);
 
   // Hover layer: the hovered country only
   useEffect(() => {

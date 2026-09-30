@@ -32,6 +32,13 @@ import { GAME_CONFIG, GLOBE_CONFIG } from "@/lib/constants";
 
 export type GameMode = "solo" | "race";
 
+/**
+ * Race mode has no wrong guesses of its own. A module constant, not an inline
+ * `[]`: the globe repaints its fill texture whenever this prop's identity
+ * changes, and an inline literal changes on every render.
+ */
+const NO_WRONG_GUESSES: string[] = [];
+
 interface GameContainerProps {
   initialMode?: GameMode;
   /** Room code from an invite link; only meaningful with `initialMode="race"`. */
@@ -345,7 +352,7 @@ export default function GameContainer({
         {mode === "race" ? (
           <GlobeDynamic
             features={allFeatures}
-            wrongGuessIds={[]}
+            wrongGuessIds={NO_WRONG_GUESSES}
             resolvedCountries={raceGlobe.resolvedCountries}
             interactive={raceGlobe.interactive}
             autoRotate={raceGlobe.autoRotate}

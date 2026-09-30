@@ -237,12 +237,19 @@ function GlobeScene({
 
   // With an override the playable set is fixed by the caller's set id, in
   // every phase — the solo store's set only means something in solo mode.
+  // Keyed on the set alone, not the whole scene: the scene changes with every
+  // race phase, and a new Set here repaints the land layer.
+  const hasScene = scene !== undefined;
+  const sceneCountrySetId = scene?.countrySetId;
+  const sceneValidIds = scene?.validIds;
   const sceneSetIds = useMemo(() => {
-    if (!scene) return null;
-    if (scene.validIds) return new Set(scene.validIds);
-    const ids = getCountrySet(scene.countrySetId).countryIds;
+    if (!hasScene) return null;
+    if (sceneValidIds) return new Set(sceneValidIds);
+    const ids = sceneCountrySetId
+      ? getCountrySet(sceneCountrySetId).countryIds
+      : null;
     return new Set(ids ?? []);
-  }, [scene]);
+  }, [hasScene, sceneCountrySetId, sceneValidIds]);
   const validCountryIds = sceneSetIds ?? storeValidCountryIds;
   const expertMode = useGameStore((s) => s.expertMode);
   const lastResolution = useGameStore((s) => s.lastResolution);
