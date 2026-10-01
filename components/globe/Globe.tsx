@@ -358,7 +358,7 @@ function GlobeScene({
 
   const emphasisIds = activeEmphasisIds();
 
-  const { landTexture, baseTexture, hoverTexture, pulseTexture } =
+  const { landTexture, baseTexture, hoverTexture, hoverMap, pulseTexture } =
     useCountryTextures({
       features,
       resolvedCountries,
@@ -536,7 +536,11 @@ function GlobeScene({
       </mesh>
 
       {/* Country fills: hover layer */}
-      <mesh raycast={noopRaycast} renderOrder={GLOBE_LAYER.hover}>
+      <mesh
+        raycast={noopRaycast}
+        renderOrder={GLOBE_LAYER.hover}
+        visible={hoverTexture !== null}
+      >
         <sphereGeometry
           args={[
             GLOBE_CONFIG.meshRadius + 0.05,
@@ -544,7 +548,7 @@ function GlobeScene({
             GLOBE_CONFIG.segments,
           ]}
         />
-        <meshBasicMaterial map={hoverTexture} transparent depthWrite={false} />
+        <meshBasicMaterial map={hoverMap} transparent depthWrite={false} />
       </mesh>
 
       {/* Country fills: mustclick pulse layer (flash via material tint) */}
