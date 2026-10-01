@@ -108,6 +108,7 @@ export function useRaceGlobe(): RaceGlobeProps {
   const playerId = useRaceStore((s) => s.playerId);
   const guess = useRaceStore((s) => s.guess);
   const attemptIds = useRaceStore((s) => s.attemptIds);
+  const pendingClaim = useRaceStore((s) => s.pendingClaim);
   const clockOffset = useRaceStore((s) => s.clockOffset);
 
   // A lockout takes the globe with it: no hover highlight and no clicks until
@@ -128,8 +129,8 @@ export function useRaceGlobe(): RaceGlobeProps {
     [COLORS],
   );
   const fills = useMemo(
-    () => raceFills(race, playerId, attemptIds, opacity),
-    [race, playerId, attemptIds, opacity],
+    () => raceFills(race, playerId, attemptIds, opacity, pendingClaim),
+    [race, playerId, attemptIds, opacity, pendingClaim],
   );
   // A new country, a lockout or a clock correction changes `race` but not a
   // single fill; only a claim, an expiry or a miss should repaint.

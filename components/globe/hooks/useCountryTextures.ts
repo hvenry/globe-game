@@ -47,7 +47,29 @@ interface Layer {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D | null;
   texture: THREE.CanvasTexture;
-  path: GeoPath;
+}
+
+/** Every layer shares one equirectangular mapping of the planet. */
+const texturePath: GeoPath = geoPath(
+  geoEquirectangular()
+    .rotate([-90, 0, 0])
+    .translate([TEX_W / 2, TEX_H / 2])
+    .scale(TEX_W / (2 * Math.PI)),
+);
+
+/**
+ * Each country's outline, projected once. Projecting the 50m geometry is the
+ * bulk of a paint, and a repaint only needs the same shapes filled again.
+ */
+const featurePaths = new WeakMap<CountryFeature, Path2D>();
+
+function featurePath(feature: CountryFeature): Path2D {
+  let path = featurePaths.get(feature);
+  if (!path) {
+    path = new Path2D(texturePath(feature as unknown as GeoJSON.Feature) ?? "");
+    featurePaths.set(feature, path);
+  }
+  return path;
 }
 
 function createLayer(mipmaps: boolean): Layer {
@@ -60,12 +82,7 @@ function createLayer(mipmaps: boolean): Layer {
   texture.generateMipmaps = mipmaps;
   texture.minFilter = mipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
-  const ctx = canvas.getContext("2d");
-  const projection = geoEquirectangular()
-    .rotate([-90, 0, 0])
-    .translate([TEX_W / 2, TEX_H / 2])
-    .scale(TEX_W / (2 * Math.PI));
-  return { canvas, ctx, texture, path: geoPath(projection, ctx ?? undefined) };
+  return { canvas, ctx: canvas.getContext("2d"), texture };
 }
 
 /**
@@ -104,9 +121,7 @@ function paintFeature(
   if (!ctx) return;
   ctx.fillStyle = (pattern === "dots" && dotPattern(ctx, fill)) || fill;
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  layer.path(feature as unknown as GeoJSON.Feature);
-  ctx.fill();
+  ctx.fill(featurePath(feature));
   ctx.globalAlpha = 1;
 }
 
@@ -132,10 +147,10 @@ const RECT_PAD = 2;
  */
 const MAX_REGION_REPAINTS = 12;
 
-function featureRect(layer: Layer, features: CountryFeature[]): Rect {
+function featureRect(features: CountryFeature[]): Rect {
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const feature of features) {
-    const [[fx0, fy0], [fx1, fy1]] = layer.path.bounds(feature as unknown as GeoJSON.Feature);
+    const [[fx0, fy0], [fx1, fy1]] = texturePath.bounds(feature as unknown as GeoJSON.Feature);
     x0 = Math.min(x0, fx0);
     y0 = Math.min(y0, fy0);
     x1 = Math.max(x1, fx1);
@@ -225,9 +240,62 @@ interface CountryTexturesParams {
 }
 
 /**
- * Four fill layers — land, resolved/wrong-guess, hover, mustclick pulse — each
- * repainted only when its own state changes. Nothing paints per frame; the
- * pulse flash is a material tint (PulseFillLayer), not a repaint.
+ * A 1×1 transparent stand-in while nothing is hovered. The hover material
+ * always has a map, so swapping textures never forces a shader recompile.
+ */
+const EMPTY_TEXTURE = (() => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  return new THREE.CanvasTexture(canvas);
+})();
+
+/**
+ * One country painted on a canvas cropped to its bounds, mapped back onto the
+ * sphere through the texture's repeat and offset. Uploading the crop costs a
+ * few hundred KB rather than the 32 MB of a full-planet canvas. The crop's
+ * padding is transparent, and clamp-to-edge stretches that transparency over
+ * the rest of the sphere.
+ */
+function cropTexture(
+  rect: Rect,
+  features: CountryFeature[],
+  fill: string,
+  alpha: number,
+  anisotropy: number,
+): THREE.CanvasTexture | null {
+  const [x0, y0, x1, y1] = rect;
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.translate(-x0, -y0);
+  ctx.fillStyle = fill;
+  ctx.globalAlpha = alpha;
+  for (const feature of features) ctx.fill(featurePath(feature));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = anisotropy;
+  // Global uv → crop uv. The canvas is flipped on upload, so v counts up
+  // from the crop's bottom edge, which sits at canvas row y1.
+  texture.repeat.set(TEX_W / w, TEX_H / h);
+  texture.offset.set(-x0 / w, (y1 - TEX_H) / h);
+  return texture;
+}
+
+/**
+ * Fill layers — land, resolved/wrong-guess and mustclick pulse as planet-sized
+ * canvases, hover as a crop of the one hovered country — each repainted only
+ * when its own state changes. Nothing paints per frame; the pulse flash is a
+ * material tint (PulseFillLayer), not a repaint.
  */
 export function useCountryTextures({
   features,
@@ -243,25 +311,23 @@ export function useCountryTextures({
 
   const land = useMemo(() => createLayer(true), []);
   const base = useMemo(() => createLayer(true), []);
-  const hover = useMemo(() => createLayer(false), []);
   const pulse = useMemo(() => createLayer(false), []);
 
   // Sharpen fills viewed at glancing angles (globe edges)
   useEffect(() => {
     const anisotropy = gl.capabilities.getMaxAnisotropy();
-    for (const layer of [land, base, hover, pulse]) {
+    for (const layer of [land, base, pulse]) {
       layer.texture.anisotropy = anisotropy;
     }
-  }, [gl, land, base, hover, pulse]);
+  }, [gl, land, base, pulse]);
 
   useEffect(() => {
     return () => {
       disposeLayer(land);
       disposeLayer(base);
-      disposeLayer(hover);
       disposeLayer(pulse);
     };
-  }, [land, base, hover, pulse]);
+  }, [land, base, pulse]);
 
   const featuresByBase = useMemo(() => {
     const map = new Map<string, CountryFeature[]>();
@@ -295,10 +361,10 @@ export function useCountryTextures({
   const boundsByBase = useMemo(() => {
     const bounds = new Map<string, Rect>();
     for (const [countryBase, countryFeatures] of featuresByBase) {
-      bounds.set(countryBase, featureRect(base, countryFeatures));
+      bounds.set(countryBase, featureRect(countryFeatures));
     }
     return bounds;
-  }, [base, featuresByBase]);
+  }, [featuresByBase]);
 
   // Base layer: resolved + wrong-guess fills. Repainted in place: only the
   // countries whose fill changed are redrawn, so a claim costs the same on
@@ -348,16 +414,23 @@ export function useCountryTextures({
     }
   }, [base, featuresByBase, boundsByBase, resolvedCountries, wrongGuessIds, pulseBase, onFirstDraw, COLORS]);
 
-  // Hover layer: the hovered country only
-  useEffect(() => {
-    clearLayer(hover);
-    if (hoveredCountryBase && hoveredCountryBase !== pulseBase) {
-      for (const feature of featuresByBase.get(hoveredCountryBase) ?? []) {
-        paintFeature(hover, feature, COLORS.countryHover, COLORS.hoverOpacity);
-      }
-    }
-    commitLayer(hover);
-  }, [hover, featuresByBase, hoveredCountryBase, pulseBase, COLORS]);
+  // Hover: the hovered country alone, on a texture cropped to its bounds.
+  // The pointer crosses borders constantly, so this is the layer that changes
+  // most often — it must never cost a full-planet upload.
+  const hoverTexture = useMemo(() => {
+    if (!hoveredCountryBase || hoveredCountryBase === pulseBase) return null;
+    const rect = boundsByBase.get(hoveredCountryBase);
+    const countryFeatures = featuresByBase.get(hoveredCountryBase);
+    if (!rect || !countryFeatures) return null;
+    return cropTexture(
+      rect,
+      countryFeatures,
+      COLORS.countryHover,
+      COLORS.hoverOpacity,
+      gl.capabilities.getMaxAnisotropy(),
+    );
+  }, [gl, boundsByBase, featuresByBase, hoveredCountryBase, pulseBase, COLORS]);
+  useEffect(() => () => hoverTexture?.dispose(), [hoverTexture]);
 
   // Pulse layer: the mustclick country in solid white; flashing happens via
   // material tint, so this repaints only when the target changes
@@ -374,7 +447,9 @@ export function useCountryTextures({
   return {
     landTexture: land.texture,
     baseTexture: base.texture,
-    hoverTexture: hover.texture,
+    /** Null while nothing is hovered; `hoverMap` is always safe to bind. */
+    hoverTexture,
+    hoverMap: hoverTexture ?? EMPTY_TEXTURE,
     pulseTexture: pulse.texture,
   };
 }
