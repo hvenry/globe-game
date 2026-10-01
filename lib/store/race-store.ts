@@ -50,6 +50,10 @@ interface RaceStoreState {
    *  echoes them back on every player — this is what makes your own click
    *  paint without waiting for the round trip. */
   attemptIds: string[];
+  /** The live country, clicked by you and not yet ruled on. Painted as yours
+   *  at once so a claim does not wait on the round trip; the next broadcast
+   *  that settles the country corrects it either way. */
+  pendingClaim: string | null;
   /** `serverNow - Date.now()`, so absolute deadlines survive a skewed clock. */
   clockOffset: number;
 
@@ -85,6 +89,12 @@ interface RaceStoreState {
  */
 let client: RaceClient | null = null;
 
+/**
+ * How long your own claim stays painted without the server ruling on it.
+ * Comfortably above a round trip; only a click the server ignored lasts it.
+ */
+const PENDING_CLAIM_TTL_MS = 1_500;
+
 /** Drop the socket for good. `join` reconnects by building a fresh client. */
 function closeClient(): void {
   client?.close();
@@ -103,6 +113,7 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
   standings: null,
   error: null,
   attemptIds: [],
+  pendingClaim: null,
   clockOffset: 0,
   joinedAs: null,
 
@@ -113,6 +124,7 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
       roomId,
       error: null,
       attemptIds: [],
+      pendingClaim: null,
       joinedAs: { name, color },
     });
 
@@ -149,19 +161,44 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
     // Reopens the room if nobody has yet (a no-op on the server otherwise),
     // and moves this client to the waiting room now.
     client?.send({ t: "rematch" });
-    set({ status: "lobby", race: null, standings: null, attemptIds: [] });
+    set({
+      status: "lobby",
+      race: null,
+      standings: null,
+      attemptIds: [],
+      pendingClaim: null,
+    });
   },
 
   end: () => client?.send({ t: "end" }),
 
   guess: (countryId) => {
-    // The client knows the answer — it is on screen — so your own miss can
+    // The client knows the answer — it is on screen — so your own click can
     // paint at once; the broadcast that follows carries everyone's.
-    const { race, attemptIds } = get();
-    if (
-      race?.phase === "racing" &&
+    const { race, attemptIds, playerId, clockOffset, pendingClaim } = get();
+    const live =
+      (race?.phase === "racing" || race?.phase === "reveal") &&
       race.currentId !== null &&
-      countryId !== race.currentId &&
+      !race.results[race.currentId];
+    if (live && countryId === race.currentId) {
+      // Optimistic only: an opponent's click may reach the server first, and
+      // then the broadcast repaints the country in their colour.
+      const lockedUntil = race.players.find(
+        (p) => p.id === playerId,
+      )?.lockedUntil;
+      const locked =
+        lockedUntil != null && lockedUntil > Date.now() + clockOffset;
+      if (!locked && pendingClaim === null) {
+        set({ pendingClaim: countryId });
+        // A click the server ignores gets no broadcast to settle it (a
+        // lockout by the server's clock, say); let the paint lapse.
+        setTimeout(() => {
+          if (get().pendingClaim === countryId) set({ pendingClaim: null });
+        }, PENDING_CLAIM_TTL_MS);
+      }
+    } else if (
+      live &&
+      race.phase === "racing" &&
       !attemptIds.includes(countryId)
     ) {
       set({ attemptIds: [...attemptIds, countryId] });
@@ -171,7 +208,13 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
 
   leaveRace: () => {
     closeClient();
-    set({ status: "left", connection: "closed", attempts: 0, attemptIds: [] });
+    set({
+      status: "left",
+      connection: "closed",
+      attempts: 0,
+      attemptIds: [],
+      pendingClaim: null,
+    });
   },
 
   rejoin: () => {
@@ -193,6 +236,7 @@ export const useRaceStore = create<RaceStoreState>()((set, get) => ({
       canStart: false,
       error: null,
       attemptIds: [],
+      pendingClaim: null,
       joinedAs: null,
     });
   },
@@ -223,18 +267,31 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
         // fills would stay painted behind the waiting room.
         ...(msg.lobby.started || reading
           ? null
-          : { race: null, standings: null, attemptIds: [] }),
+          : {
+              race: null,
+              standings: null,
+              attemptIds: [],
+              pendingClaim: null,
+            }),
       });
       break;
     }
 
     case "state": {
-      const { race, attemptIds } = get();
+      const { race, attemptIds, pendingClaim } = get();
       set({
         status: "racing",
         race: msg.state,
         // Misses belong to the country that was showing when they happened.
         attemptIds: msg.state.currentId === race?.currentId ? attemptIds : [],
+        // Held while the claimed country is still live and unsettled; a
+        // result for it, or a new country, means the server has ruled.
+        pendingClaim:
+          pendingClaim !== null &&
+          msg.state.currentId === pendingClaim &&
+          !msg.state.results[pendingClaim]
+            ? pendingClaim
+            : null,
         clockOffset: msg.serverNow - Date.now(),
       });
       break;
@@ -244,6 +301,7 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
       set({
         status: "finished",
         race: msg.state,
+        pendingClaim: null,
         standings: msg.standings,
         clockOffset: msg.serverNow - Date.now(),
       });
@@ -273,6 +331,7 @@ function applyMessage(msg: ServerMessage, set: Setter, get: Getter): void {
           standings: null,
           canStart: false,
           attemptIds: [],
+          pendingClaim: null,
           error: msg.message,
         });
         break;
@@ -319,6 +378,7 @@ export function raceFills(
   playerId: string | null,
   ownAttemptIds: readonly string[],
   opacity: { claim: number; attempt: number },
+  pendingClaim: string | null = null,
 ): Record<string, Resolution | CountryFill> {
   if (!race) return {};
   const fills: Record<string, Resolution | CountryFill> = {};
@@ -350,6 +410,15 @@ export function raceFills(
     const owner = race.players.find((p) => p.id === result.by);
     fills[countryId] = {
       color: playerPalette(owner?.color ?? "blue").claim,
+      opacity: opacity.claim,
+    };
+  }
+
+  // Your click on the live country, painted as yours until the server rules.
+  if (pendingClaim !== null && !race.results[pendingClaim]) {
+    const me = race.players.find((p) => p.id === playerId);
+    fills[pendingClaim] = {
+      color: playerPalette(me?.color ?? "blue").claim,
       opacity: opacity.claim,
     };
   }
