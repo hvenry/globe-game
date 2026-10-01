@@ -47,7 +47,29 @@ interface Layer {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D | null;
   texture: THREE.CanvasTexture;
-  path: GeoPath;
+}
+
+/** Every layer shares one equirectangular mapping of the planet. */
+const texturePath: GeoPath = geoPath(
+  geoEquirectangular()
+    .rotate([-90, 0, 0])
+    .translate([TEX_W / 2, TEX_H / 2])
+    .scale(TEX_W / (2 * Math.PI)),
+);
+
+/**
+ * Each country's outline, projected once. Projecting the 50m geometry is the
+ * bulk of a paint, and a repaint only needs the same shapes filled again.
+ */
+const featurePaths = new WeakMap<CountryFeature, Path2D>();
+
+function featurePath(feature: CountryFeature): Path2D {
+  let path = featurePaths.get(feature);
+  if (!path) {
+    path = new Path2D(texturePath(feature as unknown as GeoJSON.Feature) ?? "");
+    featurePaths.set(feature, path);
+  }
+  return path;
 }
 
 function createLayer(mipmaps: boolean): Layer {
@@ -60,12 +82,7 @@ function createLayer(mipmaps: boolean): Layer {
   texture.generateMipmaps = mipmaps;
   texture.minFilter = mipmaps ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
-  const ctx = canvas.getContext("2d");
-  const projection = geoEquirectangular()
-    .rotate([-90, 0, 0])
-    .translate([TEX_W / 2, TEX_H / 2])
-    .scale(TEX_W / (2 * Math.PI));
-  return { canvas, ctx, texture, path: geoPath(projection, ctx ?? undefined) };
+  return { canvas, ctx: canvas.getContext("2d"), texture };
 }
 
 /**
@@ -104,9 +121,7 @@ function paintFeature(
   if (!ctx) return;
   ctx.fillStyle = (pattern === "dots" && dotPattern(ctx, fill)) || fill;
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  layer.path(feature as unknown as GeoJSON.Feature);
-  ctx.fill();
+  ctx.fill(featurePath(feature));
   ctx.globalAlpha = 1;
 }
 
@@ -132,10 +147,10 @@ const RECT_PAD = 2;
  */
 const MAX_REGION_REPAINTS = 12;
 
-function featureRect(layer: Layer, features: CountryFeature[]): Rect {
+function featureRect(features: CountryFeature[]): Rect {
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const feature of features) {
-    const [[fx0, fy0], [fx1, fy1]] = layer.path.bounds(feature as unknown as GeoJSON.Feature);
+    const [[fx0, fy0], [fx1, fy1]] = texturePath.bounds(feature as unknown as GeoJSON.Feature);
     x0 = Math.min(x0, fx0);
     y0 = Math.min(y0, fy0);
     x1 = Math.max(x1, fx1);
@@ -295,10 +310,10 @@ export function useCountryTextures({
   const boundsByBase = useMemo(() => {
     const bounds = new Map<string, Rect>();
     for (const [countryBase, countryFeatures] of featuresByBase) {
-      bounds.set(countryBase, featureRect(base, countryFeatures));
+      bounds.set(countryBase, featureRect(countryFeatures));
     }
     return bounds;
-  }, [base, featuresByBase]);
+  }, [featuresByBase]);
 
   // Base layer: resolved + wrong-guess fills. Repainted in place: only the
   // countries whose fill changed are redrawn, so a claim costs the same on
