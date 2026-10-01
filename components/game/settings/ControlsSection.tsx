@@ -8,6 +8,7 @@
  */
 
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { FEATURES } from "@/lib/flags";
 import { Slider, ThemeSelect, Toggle } from "./SettingsControls";
 import { play } from "@/lib/sound/engine";
 
@@ -37,9 +38,9 @@ export default function ControlsSection({
             value={zoomSpeed}
             onChange={setZoomSpeed}
             min={0.1}
-            max={1.0}
+            max={2.0}
             displayMin={0.1}
-            displayMax={2.0}
+            displayMax={4.0}
             step={0.1}
             expertMode={expertMode}
           />
@@ -48,7 +49,7 @@ export default function ControlsSection({
             value={rotateSpeed}
             onChange={setRotateSpeed}
             min={0.1}
-            max={2.0}
+            max={4.0}
             step={0.1}
             expertMode={expertMode}
           />
@@ -78,7 +79,13 @@ export default function ControlsSection({
         )}
       </div>
 
-      <ThemeSelect value={theme} onChange={setTheme} expertMode={expertMode} />
+      {FEATURES.lightMode && (
+        <ThemeSelect
+          value={theme}
+          onChange={setTheme}
+          expertMode={expertMode}
+        />
+      )}
     </div>
   );
 }

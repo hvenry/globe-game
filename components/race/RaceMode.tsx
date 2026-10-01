@@ -15,7 +15,11 @@ import type { GlobeScene } from "@/components/globe/Globe";
 import type { Resolution } from "@/lib/engine/types";
 import type { CountryFill } from "@/lib/constants";
 import { useSceneColors } from "@/lib/hooks/useSceneColors";
-import { getCountrySet, isCountrySetId } from "@/lib/geo/country-sets";
+import {
+  getCountrySet,
+  isCountrySetId,
+  fixedCountOf,
+} from "@/lib/geo/country-sets";
 import { baseId } from "@/lib/geo/countries";
 import { RACE_SERVER_URL } from "@/lib/race/config";
 import {
@@ -33,6 +37,7 @@ import { useGameStore } from "@/lib/store/game-store";
 import { COUNTRY_NAMES } from "@/lib/geo/country-names";
 import RaceMenu, { type RaceMenuView } from "./RaceMenu";
 import RaceResults from "./RaceResults";
+import Confirm from "./Confirm";
 
 export interface RaceGlobeProps {
   resolvedCountries: Record<string, Resolution | CountryFill>;
@@ -134,16 +139,19 @@ export function useRaceGlobe(): RaceGlobeProps {
   // punish curiosity.
   const showHints = race?.config.showHints ?? lobby?.config.showHints ?? false;
   const addFloatingLabel = useGameStore((s) => s.addFloatingLabel);
+  const currentId = race?.currentId ?? null;
   const onCountryClick = useCallback(
     (countryId: string, position: [number, number, number]) => {
       const base = baseId(countryId);
-      if (showHints && resolvedCountries[base] !== undefined) {
+      // With hints on, every click that is not the target names the country,
+      // as solo does: a miss teaches, and a painted country just answers.
+      if (showHints && base !== currentId) {
         addFloatingLabel(COUNTRY_NAMES[base] ?? base, position);
-        return;
+        if (resolvedCountries[base] !== undefined) return;
       }
       guess(base);
     },
-    [guess, showHints, resolvedCountries, addFloatingLabel],
+    [guess, showHints, currentId, resolvedCountries, addFloatingLabel],
   );
 
   const racing = status === "racing" || status === "finished";
@@ -159,9 +167,11 @@ export function useRaceGlobe(): RaceGlobeProps {
   const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
   const countrySetId =
     configured && isCountrySetId(configured) ? configured : "all";
-  // A draw set's sample is only knowable from the race itself.
+  // A draw or ranked set's sample is only knowable from the race itself.
   const drawIds =
-    race && getCountrySet(countrySetId).draw ? race.inPlay.join(",") : null;
+    race && fixedCountOf(getCountrySet(countrySetId)) !== null
+      ? race.inPlay.join(",")
+      : null;
   const validIds = useMemo(
     () => (drawIds ? new Set(drawIds.split(",")) : null),
     [drawIds],
@@ -218,6 +228,37 @@ function LeftRaceView({
   const racePlayers = useRaceStore((s) => s.race?.players);
   const lobbyPlayers = useRaceStore((s) => s.lobby?.players);
   const players = racePlayers ?? lobbyPlayers ?? EMPTY_PLAYERS;
+  const [confirming, setConfirming] = useState(false);
+
+  // Escape asks before leaving, and backs out of the question. Document
+  // capture, so the overlay's window handler that would leave never sees it.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      play("ui.click");
+      setConfirming((open) => !open);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
+  if (confirming) {
+    return (
+      <div className="panel panel-ticks panel-dialog">
+        <p className="hud-label text-center text-mid">Room {roomId}</p>
+        <Confirm
+          question="Leave the room?"
+          consequence="Your seat and score stay while the race runs; the code gets you back in."
+          cancelLabel="Stay"
+          confirmLabel="Yes, leave the room"
+          onCancel={() => setConfirming(false)}
+          onConfirm={onLeaveRoom}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="panel panel-ticks panel-dialog">
@@ -249,7 +290,10 @@ function LeftRaceView({
       <button onClick={onRejoin} className="btn-primary btn-signal press">
         Rejoin race
       </button>
-      <button onClick={onLeaveRoom} className="btn-quiet press mt-3">
+      <button
+        onClick={() => setConfirming(true)}
+        className="btn-quiet press mt-3"
+      >
         Leave room
       </button>
     </div>

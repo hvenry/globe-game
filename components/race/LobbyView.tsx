@@ -27,6 +27,7 @@ import PanelHeader from "@/components/ui/PanelHeader";
 import ScrollColumn from "@/components/ui/ScrollColumn";
 import ControlsSection from "@/components/game/settings/ControlsSection";
 import PlayerDot from "./PlayerDot";
+import Confirm from "./Confirm";
 
 /** A seat count in the segmented chip: chosen, unreachable, or on offer. */
 function seatChipTone(selected: boolean, blocked: boolean): string {
@@ -159,21 +160,31 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   const { copied, copy } = useCopied();
   // The map picker is its own view, like the solo menu's game options, so the
   // lobby itself stays short: a summary tile here, the choices one step in.
-  const [view, setView] = useState<"lobby" | "options" | "controls">("lobby");
+  const [view, setView] = useState<
+    "lobby" | "options" | "controls" | "confirm-leave" | "countrySet"
+  >("lobby");
 
-  // Escape in the options view is one rung back to the room, not out of it.
-  // Capture phase, so the room-level handler that leaves never sees it.
+  // Escape steps one rung back: out of a sub-view to the room, and from the
+  // room to the leave question rather than straight out. On the document
+  // rather than the window so the colour picker's own Escape, which stops
+  // at the window, wins while it is open; and capture, so the room-level
+  // handler that would leave never sees it.
   useEffect(() => {
-    if (view === "lobby") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
       play("ui.click");
-      setView("lobby");
+      setView(
+        view === "lobby"
+          ? "confirm-leave"
+          : view === "countrySet"
+            ? "options"
+            : "lobby",
+      );
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [view]);
 
   if (!lobby) return null;
@@ -215,6 +226,53 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
     return isHost ? "Everyone is ready" : "Waiting for the host";
   }
 
+  if (view === "confirm-leave") {
+    return (
+      <div className="panel panel-ticks panel-dialog">
+        <p className="hud-label text-center text-mid">Room {roomId}</p>
+        <Confirm
+          question="Leave the room?"
+          consequence="Your seat is freed; the code gets you back in while the room lasts."
+          cancelLabel="Stay"
+          confirmLabel="Yes, leave the room"
+          onCancel={() => setView("lobby")}
+          onConfirm={onLeave}
+        />
+      </div>
+    );
+  }
+
+  if (view === "countrySet") {
+    return (
+      <div className="panel panel-ticks panel-dialog max-w-[22rem] md:max-w-2xl">
+        <ScrollColumn
+          header={
+            <PanelHeader
+              title="Country set"
+              onBack={() => setView("options")}
+            />
+          }
+          footer={
+            !isHost ? (
+              <p className="border-t border-hairline pt-3 text-center text-label text-faint">
+                Only the host can change this
+              </p>
+            ) : undefined
+          }
+        >
+          <div className={isHost ? "" : "pointer-events-none opacity-40"}>
+            <CountrySetSelect
+              value={setId}
+              onChange={(id) => configure({ countrySetId: id })}
+              expertMode={false}
+              columns={3}
+            />
+          </div>
+        </ScrollColumn>
+      </div>
+    );
+  }
+
   if (view === "controls") {
     return (
       <div className="panel panel-ticks panel-dialog text-left">
@@ -250,12 +308,22 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
           <div
             className={`space-y-8 ${isHost ? "" : "pointer-events-none opacity-40"}`}
           >
+            {/* The picker has its own, wider panel; this is the way in. */}
             <div className="space-y-3">
-              <CountrySetSelect
-                value={setId}
-                onChange={(id) => configure({ countrySetId: id })}
-                expertMode={false}
-              />
+              <p className="hud-rule hud-label">Country set</p>
+              <button
+                onClick={() => setView("countrySet")}
+                className="group w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:border-hairline-strong hover:bg-panel"
+              >
+                <p className="flex items-center justify-between gap-2 text-sm">
+                  <span className="font-medium text-hi group-hover:underline underline-offset-2">
+                    {getCountrySet(setId).name}
+                  </span>
+                  <span className="readout text-label text-faint">
+                    {inPlay}
+                  </span>
+                </p>
+              </button>
             </div>
 
             <TimerLimitSelect
@@ -285,14 +353,18 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
 
   return (
     <div className="panel panel-ticks panel-dialog">
-      {/* Camera, theme and sound: the same corner button the race menu has. */}
-      <button
-        onClick={() => setView("controls")}
-        aria-label="Controls"
-        className="btn-icon press absolute right-3 top-3 md:right-4 md:top-4"
-      >
-        <SlidersIcon size={13} />
-      </button>
+      {/* A header row rather than a floating corner button, so the controls
+          icon never sits over the invite box on a narrow panel. */}
+      <div className="mb-3 flex items-center justify-between">
+        <p className="hud-label text-mid">Room</p>
+        <button
+          onClick={() => setView("controls")}
+          aria-label="Controls"
+          className="btn-icon press"
+        >
+          <SlidersIcon size={13} />
+        </button>
+      </div>
 
       {/* The code and the way to share it are one target: the whole box is
           the copy button. Squared and hairline-bordered like the roster rows
@@ -435,17 +507,34 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       {/* One tile for the room's options: the map on show, hints and the
           picker one step in. Everyone can open it; only the host can change
           the map inside. */}
+      {/* Everything the host has set, at a glance: the map, the window per
+          country, and hints. Opening it is the only way to change them. */}
       <button
         onClick={() => setView("options")}
-        className="group mb-6 w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:bg-panel md:px-3 md:py-2.5"
+        className="mb-6 w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:border-hairline-strong hover:bg-panel md:px-3 md:py-2.5"
       >
         <p className="hud-label mb-1">Game options</p>
         <p className="flex items-center justify-between gap-2 text-xs font-medium md:text-sm">
-          <span className="truncate text-mid underline-offset-2 group-hover:text-hi group-hover:underline">
-            {getCountrySet(setId).name}
-          </span>
+          <span className="truncate text-mid">{getCountrySet(setId).name}</span>
           <span className="readout shrink-0 text-label text-faint">
             {inPlay}
+          </span>
+        </p>
+        <p className="mt-1.5 flex items-center gap-3 text-label text-faint">
+          <span>
+            <span className="readout text-mid">
+              {lobby.config.countryWindowMs / 1000}s
+            </span>{" "}
+            per country
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            hints{" "}
+            <span
+              className={`readout ${lobby.config.showHints ? "text-signal" : "text-mid"}`}
+            >
+              {lobby.config.showHints ? "on" : "off"}
+            </span>
           </span>
         </p>
       </button>
@@ -466,7 +555,10 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
 
       <p className="hud-label mt-4 text-center text-faint">{waitingOn()}</p>
 
-      <button onClick={onLeave} className="btn-quiet press mt-4">
+      <button
+        onClick={() => setView("confirm-leave")}
+        className="btn-quiet press mt-4"
+      >
         Leave room
       </button>
     </div>

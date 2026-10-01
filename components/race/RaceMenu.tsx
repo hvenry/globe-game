@@ -20,6 +20,7 @@ import { SlidersIcon } from "@/components/ui/icons";
 import PanelHeader from "@/components/ui/PanelHeader";
 import { usePinchZoomLock } from "@/lib/hooks/usePinchZoomLock";
 import PlayerDot from "./PlayerDot";
+import Confirm from "./Confirm";
 
 /** Null closes the menu; the rest are its rungs. */
 export type RaceMenuView =
@@ -34,33 +35,6 @@ export type RaceMenuView =
  * costs, and staying keeping the emphasis — leaving takes the quiet treatment
  * solo gives "Quit game".
  */
-function Confirm({
-  question,
-  consequence,
-  confirmLabel,
-  onCancel,
-  onConfirm,
-}: {
-  question: string;
-  consequence: string;
-  confirmLabel: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="mt-7 space-y-2 md:space-y-2.5">
-      <p className="text-center text-sm text-hi">{question}</p>
-      <p className="text-center text-label text-faint">{consequence}</p>
-      <button onClick={onCancel} className="btn-primary btn-signal press mt-1">
-        Keep racing
-      </button>
-      <button onClick={onConfirm} className="btn-quiet press">
-        {confirmLabel}
-      </button>
-    </div>
-  );
-}
-
 export default function RaceMenu({
   view,
   onView,
@@ -196,6 +170,7 @@ export default function RaceMenu({
 
             {view === "confirm-end" && (
               <Confirm
+                cancelLabel="Keep racing"
                 question="End the race for everyone?"
                 consequence="Standings are whatever has been played so far."
                 confirmLabel="Yes, end the race"
@@ -209,6 +184,7 @@ export default function RaceMenu({
 
             {(view === "confirm-leave" || view === "confirm-quit") && (
               <Confirm
+                cancelLabel="Keep racing"
                 question="Leave the race in progress?"
                 consequence="Your claims stand, and the room code gets you back in."
                 confirmLabel={

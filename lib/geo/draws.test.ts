@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { WORLD_IDS, COUNTRY_SETS, setSize } from "./country-sets";
 import { GUESSABLE_IDS } from "./country-names";
-import { dailyKey, dailySeed, idsFor, seedFor } from "./draws";
+import { dailyKey, dailySeed, idsFor, rankedIds, seedFor } from "./draws";
+import { COUNTRY_STATS } from "./country-stats";
 
 describe("country sets", () => {
   it("the continents partition the guessable world exactly", () => {
@@ -50,5 +51,41 @@ describe("draws", () => {
     expect(dailyKey(before)).toBe("2026-09-19");
     expect(seedFor("daily_20", 42, before)).toBe(20260919);
     expect(seedFor("quick_10", 42, before)).toBe(42);
+  });
+});
+
+describe("ranked sets", () => {
+  it("has a statistic for every guessable country", () => {
+    for (const id of GUESSABLE_IDS) {
+      expect(COUNTRY_STATS[id], id).toBeDefined();
+      expect(COUNTRY_STATS[id].area).toBeGreaterThan(0);
+      expect(COUNTRY_STATS[id].population).toBeGreaterThan(0);
+    }
+  });
+
+  it("largest by area opens with Russia, Canada, the United States and China", () => {
+    expect(rankedIds({ by: "area", count: 4 })).toEqual([
+      "643",
+      "124",
+      "840",
+      "156",
+    ]);
+  });
+
+  it("most populous opens with India and China, and Taiwan makes the top 75", () => {
+    expect(rankedIds({ by: "population", count: 2 })).toEqual(["356", "156"]);
+    expect(rankedIds({ by: "population", count: 75 })).toContain("158");
+  });
+
+  it("every size returns exactly that many, in order, ignoring the seed", () => {
+    for (const n of [10, 25, 50, 100] as const) {
+      const ids = idsFor(`area_${n}`, 1);
+      expect(ids).toHaveLength(n);
+      expect(new Set(ids).size).toBe(n);
+      expect(idsFor(`population_${n}`, 2)).toEqual(
+        idsFor(`population_${n}`, 3),
+      );
+    }
+    expect(setSize("population_100")).toBe(100);
   });
 });

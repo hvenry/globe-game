@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { getAppVersion } from "@/lib/version";
 import PanelHeader from "@/components/ui/PanelHeader";
@@ -10,56 +9,42 @@ import {
   Toggle,
   MaxTriesSelect,
   TimerLimitSelect,
-  CountrySetSelect,
 } from "../settings/SettingsControls";
-
-/** Which group the panel opens on. */
-export type SettingsFocus = "top" | "gameOptions";
+import { getCountrySet, setSize } from "@/lib/geo/country-sets";
 
 interface SettingsViewProps {
   onBack: () => void;
-  focus?: SettingsFocus;
+  onOpenCountrySet: () => void;
+  /** Scroll position to come back to, and where to report the current one. */
+  initialScrollTop?: number;
+  onScrollTop?: (top: number) => void;
   expertMode: boolean;
 }
 
 export default function SettingsView({
   onBack,
-  focus = "top",
+  onOpenCountrySet,
+  initialScrollTop,
+  onScrollTop,
   expertMode,
 }: SettingsViewProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const gameOptionsRef = useRef<HTMLElement>(null);
-
   const countrySet = useSettingsStore((s) => s.countrySet);
   const allowSkips = useSettingsStore((s) => s.allowSkips);
   const showHints = useSettingsStore((s) => s.showHints);
   const timerLimit = useSettingsStore((s) => s.timerLimit);
   const maxTries = useSettingsStore((s) => s.maxTries);
-  const setCountrySet = useSettingsStore((s) => s.setCountrySet);
   const setAllowSkips = useSettingsStore((s) => s.setAllowSkips);
   const setExpertMode = useSettingsStore((s) => s.setExpertMode);
   const setShowHints = useSettingsStore((s) => s.setShowHints);
   const setTimerLimit = useSettingsStore((s) => s.setTimerLimit);
   const setMaxTries = useSettingsStore((s) => s.setMaxTries);
 
-  // Opened from the country-set cell, the panel starts on the group that cell
-  // belongs to rather than making the player scroll past the live controls.
-  // Written to `scrollTop` rather than `scrollIntoView`, which would also
-  // scroll every ancestor that can take it.
-  useEffect(() => {
-    if (focus !== "gameOptions") return;
-    const box = scrollRef.current;
-    const section = gameOptionsRef.current;
-    if (!box || !section) return;
-    box.scrollTop +=
-      section.getBoundingClientRect().top - box.getBoundingClientRect().top;
-  }, [focus]);
-
   return (
     <ScrollColumn
       header={<PanelHeader title="Settings" onBack={onBack} />}
       accent={expertMode ? "expert" : "signal"}
-      scrollRef={scrollRef}
+      initialScrollTop={initialScrollTop}
+      onScrollTop={onScrollTop}
       footer={
         <div className="border-t border-hairline">
           <p className="readout pt-3 text-label text-faint text-center">
@@ -73,18 +58,27 @@ export default function SettingsView({
         <ControlsSection expertMode={expertMode} />
       </section>
 
-      <section
-        ref={gameOptionsRef}
-        className="border-t border-hairline-strong pt-7"
-      >
+      <section className="border-t border-hairline-strong pt-7">
         <p className="hud-label mb-5 text-center text-mid">Game options</p>
 
         <div className="space-y-7">
-          <CountrySetSelect
-            value={countrySet}
-            onChange={setCountrySet}
-            expertMode={expertMode}
-          />
+          {/* The picker has its own, wider panel; this is the way in. */}
+          <div className="space-y-3">
+            <p className="hud-rule hud-label">Country set</p>
+            <button
+              onClick={onOpenCountrySet}
+              className="group w-full cursor-pointer rounded-control border border-hairline bg-well px-3 py-2 text-left transition-colors hover:border-hairline-strong hover:bg-panel"
+            >
+              <p className="flex items-center justify-between gap-2 text-sm">
+                <span className="font-medium text-hi group-hover:underline underline-offset-2">
+                  {getCountrySet(countrySet).name}
+                </span>
+                <span className="readout text-label text-faint">
+                  {setSize(countrySet)} countries
+                </span>
+              </p>
+            </button>
+          </div>
 
           <TimerLimitSelect
             value={timerLimit}

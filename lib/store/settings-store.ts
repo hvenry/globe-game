@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { FEATURES } from "@/lib/flags";
 import { persist } from "zustand/middleware";
 import type { CountrySetId } from "@/lib/geo/country-sets";
 import {
@@ -31,8 +32,8 @@ interface SettingsState {
   soundVolume: number;
 
   // Camera controls
-  zoomSpeed: number; // 0.1 to 1.0 (actual), default 0.53 (displays as 1.0x)
-  rotateSpeed: number; // 0.1 to 2.0, default 1.0
+  zoomSpeed: number; // 0.1 to 2.0 (actual), default 0.53 (displays as 1.0x)
+  rotateSpeed: number; // 0.1 to 4.0, default 1.0
 
   // Saved settings from before expert mode was enabled
   preExpertAllowSkips: boolean;
@@ -78,7 +79,7 @@ export const useSettingsStore = create<SettingsState>()(
       preExpertTimerLimit: null,
       preExpertMaxTries: 3,
 
-      setTheme: (theme) => set({ theme }),
+      setTheme: (theme) => set({ theme: FEATURES.lightMode ? theme : "dark" }),
       setPlayerColor: (playerColor) => set({ playerColor }),
       setPlayerName: (playerName) => set({ playerName }),
       setCountrySet: (countrySet) => set({ countrySet }),
@@ -119,6 +120,14 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "globe-game-settings",
+      // A theme saved while the flag was on must not survive it being off:
+      // the persisted value is overruled on every hydration until then.
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as Partial<SettingsState>) };
+        return FEATURES.lightMode
+          ? merged
+          : { ...merged, theme: "dark" as ThemeMode };
+      },
       version: 4,
       // v0 → v1: shape unchanged (expert timer lock moved into setExpertMode)
       // v1 → v2: added `theme`; existing players keep the dark globe they

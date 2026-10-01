@@ -1,12 +1,14 @@
 "use client";
 
 import { useStatsStore } from "@/lib/store/stats-store";
+import { play } from "@/lib/sound/engine";
 import { dailyKey } from "@/lib/geo/draws";
 import {
   setSize,
   setsOfKind,
   type CountrySetConfig,
   type CountrySetId,
+  type RankSpec,
 } from "@/lib/geo/country-sets";
 import type { ThemeMode } from "@/lib/constants";
 import { MoonIcon, SunIcon } from "@/components/ui/icons";
@@ -154,7 +156,12 @@ export function Slider({
         max={dispMax}
         step={step}
         value={displayValue}
-        onChange={(e) => onChange(displayToActual(parseFloat(e.target.value)))}
+        onChange={(e) => {
+          // One tick per step: the browser fires change only when the value
+          // moves, so a held thumb at the end of the range stays quiet.
+          play("ui.tick");
+          onChange(displayToActual(parseFloat(e.target.value)));
+        }}
         onPointerUp={onCommit}
         onKeyUp={onCommit}
         className={`h-1.5 w-full cursor-pointer appearance-none rounded-full bg-hairline ${accentClass} transition-colors`}
@@ -387,23 +394,38 @@ export function ThemeSelect({
 // ============================================================================
 
 /** The picker's rails, in the order they read. "all" heads none of them. */
-const SET_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
+/** Ranked tiles pick this size when first switched on. */
+const RANK_DEFAULT_COUNT = 25;
+const RANKED_SETS = setsOfKind("ranked");
+
+/** Listed sets, in display order. Rankings render between quick play and continents. */
+const QUICK_PLAY: [label: string, sets: CountrySetConfig[]] = [
+  "Quick play",
+  setsOfKind("draw"),
+];
+const LISTED_GROUPS: [label: string, sets: CountrySetConfig[]][] = [
   ["Continents", setsOfKind("continent")],
   ["Regions", setsOfKind("region")],
-  ["Quick play", setsOfKind("draw")],
 ];
 
 interface CountrySetSelectProps {
   value: CountrySetId;
   onChange: (value: CountrySetId) => void;
   expertMode: boolean;
+  /** Tiles per row on desktop; phones always get two. */
+  columns?: 2 | 3;
 }
 
 export function CountrySetSelect({
   value,
   onChange,
   expertMode,
+  columns = 2,
 }: CountrySetSelectProps) {
+  const grid =
+    columns === 3
+      ? "grid grid-cols-2 gap-2 md:grid-cols-3"
+      : "grid grid-cols-2 gap-2";
   const bestScores = useStatsStore((s) => s.bestScores);
   const expertBestScores = useStatsStore((s) => s.expertBestScores);
   const dailyToday = useStatsStore((s) => s.daily[dailyKey()]);
@@ -510,16 +532,99 @@ export function CountrySetSelect({
     );
   };
 
+  // One tile per statistic; the size chips inside it pick which ranked set.
+  // The tile itself toggles between the default size and off, like any other.
+  const renderRankTile = (by: RankSpec["by"]) => {
+    const sets = RANKED_SETS.filter((set) => set.rank?.by === by);
+    const active = sets.find((set) => set.id === value);
+    const isSelected = active !== undefined;
+    const label = by === "area" ? "Largest by area" : "Most populous";
+    const fallback =
+      sets.find((set) => set.rank?.count === RANK_DEFAULT_COUNT) ?? sets[0];
+    const tone = isSelected
+      ? expertMode
+        ? "border-expert/60 bg-expert-soft"
+        : "border-signal/60 bg-signal-soft"
+      : "border-hairline bg-well hover:bg-panel " +
+        (expertMode ? "hover:border-expert/30" : "hover:border-signal/30");
+    return (
+      <div
+        key={by}
+        role="group"
+        aria-label={label}
+        className={`rounded-control border p-3 text-left transition-all duration-200 ${tone}`}
+      >
+        <button
+          onClick={() => onChange(isSelected ? "all" : fallback.id)}
+          aria-pressed={isSelected}
+          data-sound="toggle"
+          className="block w-full cursor-pointer text-left"
+        >
+          <p
+            className={`mb-0.5 text-sm font-medium transition-colors duration-200 ${
+              isSelected
+                ? expertMode
+                  ? "text-expert-ink"
+                  : "text-signal"
+                : "text-hi"
+            }`}
+          >
+            {label}
+          </p>
+          <p className="readout text-label text-faint">
+            {active ? `top ${active.rank?.count}` : "pick a size"}
+          </p>
+        </button>
+        <div
+          className="mt-2 flex overflow-hidden rounded-control border border-hairline"
+          role="group"
+          aria-label={`${label} size`}
+        >
+          {sets.map((set) => {
+            const on = set.id === value;
+            return (
+              <button
+                key={set.id}
+                onClick={() => onChange(set.id)}
+                aria-pressed={on}
+                data-sound="toggle"
+                className={`readout h-6 flex-1 text-xs transition-colors ${
+                  on
+                    ? expertMode
+                      ? "bg-expert-soft text-expert-ink"
+                      : "bg-signal-soft text-signal"
+                    : "cursor-pointer text-mid hover:bg-panel hover:text-hi"
+                }`}
+              >
+                {set.rank?.count}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderGroup = ([label, sets]: [string, CountrySetConfig[]]) => (
+    <div key={label} className="space-y-3">
+      <p className="hud-rule hud-label">{label}</p>
+      <div className={grid}>{sets.map((set) => renderSetButton(set))}</div>
+    </div>
+  );
+
+  // Short sessions first: quick play and rankings are what a returning player
+  // reaches for; the full continents and regions follow.
   return (
     <div className="space-y-5">
-      {SET_GROUPS.map(([label, sets]) => (
-        <div key={label} className="space-y-3">
-          <p className="hud-rule hud-label">{label}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {sets.map((set) => renderSetButton(set))}
-          </div>
+      {renderGroup(QUICK_PLAY)}
+      <div className="space-y-3">
+        <p className="hud-rule hud-label">Rankings</p>
+        <div className={grid}>
+          {renderRankTile("area")}
+          {renderRankTile("population")}
         </div>
-      ))}
+      </div>
+      {LISTED_GROUPS.map(renderGroup)}
     </div>
   );
 }
