@@ -133,7 +133,7 @@ export default function RaceResults({
               className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto pr-3"
               style={{ scrollbarGutter: "stable" }}
             >
-              {race.order.map((id) => {
+              {race.revealed.map((id) => {
                 const result = race.results[id];
                 const owner = result?.by
                   ? race.players.find((p) => p.id === result.by)

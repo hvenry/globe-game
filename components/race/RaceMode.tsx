@@ -71,6 +71,24 @@ function useLockedOut(
   return lockedUntil !== null && lockedUntil > now + clockOffset;
 }
 
+/**
+ * `value`, but keeping the previous reference while `key` is unchanged.
+ *
+ * Every broadcast is freshly parsed JSON, so nothing derived from it is ever
+ * reference-equal to the last one. The globe repaints a 4096×2048 texture
+ * whenever its fills change identity, so the fills keep theirs until what they
+ * paint actually differs. Held with the "adjust state on prop change" pattern,
+ * like `useBursts` in RaceHud, so render stays pure.
+ */
+function useStableByKey<T>(value: T, key: string): T {
+  const [held, setHeld] = useState({ key, value });
+  if (held.key !== key) {
+    setHeld({ key, value });
+    return value;
+  }
+  return held.value;
+}
+
 /** The room's status as a globe phase: the camera flies and reframes on it. */
 function scenePhase(status: RaceStatus): GlobeScene["phase"] {
   if (status === "finished") return "gameover";
@@ -104,10 +122,13 @@ export function useRaceGlobe(): RaceGlobeProps {
     }),
     [COLORS],
   );
-  const resolvedCountries = useMemo(
+  const fills = useMemo(
     () => raceFills(race, playerId, attemptIds, opacity),
     [race, playerId, attemptIds, opacity],
   );
+  // A new country, a lockout or a clock correction changes `race` but not a
+  // single fill; only a claim, an expiry or a miss should repaint.
+  const resolvedCountries = useStableByKey(fills, JSON.stringify(fills));
   // With hints on, a painted country answers a click with its name instead
   // of a guess — it can never be the target, and the lockout would only
   // punish curiosity.
@@ -129,23 +150,30 @@ export function useRaceGlobe(): RaceGlobeProps {
 
   // The globe is driven by the room, not the solo store: the lobby previews
   // the host's chosen set, the countdown flies to it, and results reframe.
-  const scene = useMemo<GlobeScene>(() => {
-    // The set id comes off the wire as a plain string, so it is checked here
-    // rather than asserted.
-    const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
-    const countrySetId =
-      configured && isCountrySetId(configured) ? configured : "all";
-    return {
-      phase: scenePhase(status),
-      countrySetId,
-      // A draw set is only knowable from the race's order.
-      validIds:
-        race && getCountrySet(countrySetId).draw ? new Set(race.order) : null,
-      gameKey: race?.startsAt ?? null,
-      // A country nobody found is lit until someone finds it.
-      pulseId: race?.phase === "reveal" ? race.currentId : null,
-    };
-  }, [race, lobby, status]);
+  //
+  // Built from primitives rather than `race` itself, which is a new object on
+  // every broadcast: a new scene means a new playable set, and a new set
+  // repaints the land layer.
+  // The set id comes off the wire as a plain string, so it is checked here
+  // rather than asserted.
+  const configured = race?.config.countrySetId ?? lobby?.config.countrySetId;
+  const countrySetId =
+    configured && isCountrySetId(configured) ? configured : "all";
+  // A draw set's sample is only knowable from the race itself.
+  const drawIds =
+    race && getCountrySet(countrySetId).draw ? race.inPlay.join(",") : null;
+  const validIds = useMemo(
+    () => (drawIds ? new Set(drawIds.split(",")) : null),
+    [drawIds],
+  );
+  const phase = scenePhase(status);
+  const gameKey = race?.startsAt ?? null;
+  // A country nobody found is lit until someone finds it.
+  const pulseId = race?.phase === "reveal" ? race.currentId : null;
+  const scene = useMemo<GlobeScene>(
+    () => ({ phase, countrySetId, validIds, gameKey, pulseId }),
+    [phase, countrySetId, validIds, gameKey, pulseId],
+  );
 
   return {
     resolvedCountries,

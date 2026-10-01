@@ -10,7 +10,11 @@
  * `phaseDeadline`, so an authoritative server needs one timer per room: sleep
  * until `nextTransitionAt`, then call `tick`. `guess` settles any due
  * deadlines itself before applying the click, so a late guess is always judged
- * against the state as of `now`.
+ * against the state as of `now` — except that it can never claim a country
+ * that settling has just revealed, since no player has seen that one yet.
+ *
+ * Players are sent `publicView`, never the state itself: the state carries
+ * the full play order.
  *
  * No browser, React, or store imports — this module runs on the server too.
  */
@@ -22,6 +26,7 @@ import {
   type RacePlayer,
   type RaceResult,
   type RaceState,
+  type RaceView,
   type ScoreBreakdown,
 } from "./types";
 import { seededShuffle } from "./rng";
@@ -70,6 +75,37 @@ export function createRace(
     endedAt: null,
     events: [],
     nextSeq: 0,
+  };
+}
+
+/**
+ * The race as players may see it: no upcoming countries and no seed until the
+ * race is over. Everything else is passed through by reference.
+ *
+ * Fields are listed rather than spread, so a field added to `RaceState` is not
+ * broadcast until someone decides players may see it.
+ */
+export function publicView(state: RaceState): RaceView {
+  const { order } = state;
+  return {
+    phase: state.phase,
+    config: state.config,
+    currentIndex: state.currentIndex,
+    currentId: state.currentId,
+    shownAt: state.shownAt,
+    phaseDeadline: state.phaseDeadline,
+    players: state.players,
+    results: state.results,
+    startsAt: state.startsAt,
+    endedAt: state.endedAt,
+    events: state.events,
+    nextSeq: state.nextSeq,
+    revealed:
+      state.phase === "finished"
+        ? order
+        : order.slice(0, state.currentIndex + 1),
+    total: order.length,
+    inPlay: [...order].sort(),
   };
 }
 
@@ -234,6 +270,9 @@ export function guess(
   const s = tick(state, now);
   if ((s.phase !== "racing" && s.phase !== "reveal") || s.currentId === null)
     return s;
+  // Settling just revealed a new country: nobody has been shown it yet, so
+  // this click was aimed at the state before. It cannot claim.
+  if (s.currentId !== state.currentId) return s;
 
   const index = s.players.findIndex((p) => p.id === playerId);
   if (index === -1) return s;
@@ -368,7 +407,7 @@ export function rejoin(state: RaceState, playerId: string): RaceState {
  * (asc), then id so the order is deterministic. Position 0 leads; a draw is
  * two players equal on all three. The engine does not declare a winner.
  */
-export function standings(state: RaceState): RacePlayer[] {
+export function standings(state: Pick<RaceState, "players">): RacePlayer[] {
   return [...state.players].sort(
     (a, b) =>
       b.score - a.score ||

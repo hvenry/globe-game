@@ -10,7 +10,7 @@
  */
 
 import { create } from "zustand";
-import type { RacePlayer, RaceState, Resolution } from "@/lib/engine/types";
+import type { RacePlayer, RaceView, Resolution } from "@/lib/engine/types";
 import {
   PLAYER_COLORS,
   PLAYER_INKS,
@@ -43,7 +43,7 @@ interface RaceStoreState {
   playerId: string | null;
   lobby: LobbyState | null;
   canStart: boolean;
-  race: RaceState | null;
+  race: RaceView | null;
   standings: RacePlayer[] | null;
   error: string | null;
   /** Your own misses on the country showing now, held only until the server
@@ -315,7 +315,7 @@ export function usePlayerInk(): (color: string) => string {
  * module cannot see the theme.
  */
 export function raceFills(
-  race: RaceState | null,
+  race: RaceView | null,
   playerId: string | null,
   ownAttemptIds: readonly string[],
   opacity: { claim: number; attempt: number },

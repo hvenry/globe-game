@@ -25,6 +25,7 @@ import {
   guess as applyGuess,
   leave as applyLeave,
   nextTransitionAt,
+  publicView,
   rejoin as applyRejoin,
   standings,
   tick,
@@ -331,17 +332,18 @@ export class RaceRoom extends DurableObject<Env> {
       return this.fail(ws, "cannot_start", "Everyone needs to be ready first.");
     }
 
-    // A draw set brings its own seed (the day's, for Daily 20) and count;
-    // the pool is already the drawn countries, in seeded order.
+    // A draw set brings its own seed (the day's, for Daily 20) and count.
+    // That seed picks which countries play, never the order they come in:
+    // the day's seed is public, and today's solo Daily 20 shuffles with it,
+    // so reusing it would hand everyone who played that the race's sequence.
     const setId = lobby.config.countrySetId;
-    const seed = raceSeed(setId, randomSeed());
     const race = createRace(
-      poolFor(setId, seed),
+      poolFor(setId, raceSeed(setId, randomSeed())),
       {
         ...lobby.config,
         countryCount: countFor(setId, lobby.config.countryCount),
       },
-      seed,
+      randomSeed(),
       toRacePlayers(lobby),
       Date.now() + RACE_CONFIG.countdownMs,
     );
@@ -498,9 +500,11 @@ export class RaceRoom extends DurableObject<Env> {
 
   private raceMessage(state: RaceState): ServerMessage {
     const serverNow = Date.now();
+    // Players get the view, never the state: the state holds the play order.
+    const view = publicView(state);
     return state.phase === "finished"
-      ? { t: "finished", state, standings: standings(state), serverNow }
-      : { t: "state", state, serverNow };
+      ? { t: "finished", state: view, standings: standings(state), serverNow }
+      : { t: "state", state: view, serverNow };
   }
 
   private broadcastLobby(): void {

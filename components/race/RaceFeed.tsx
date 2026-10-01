@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { RaceEvent, RaceState } from "@/lib/engine/types";
+import type { RaceEvent, RaceView } from "@/lib/engine/types";
 import { COUNTRY_NAMES } from "@/lib/geo/country-names";
 import PlayerDot from "./PlayerDot";
 
@@ -34,7 +34,7 @@ export default function RaceFeed({
   race,
   playerId,
 }: {
-  race: RaceState;
+  race: RaceView;
   playerId: string | null;
 }) {
   const [shown, setShown] = useState<RaceEvent[]>([]);
