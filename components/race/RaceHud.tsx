@@ -6,6 +6,7 @@ import { useRaceStore, usePlayerInk } from "@/lib/store/race-store";
 import { COUNTRY_NAMES } from "@/lib/geo/country-names";
 import type { RacePlayer, RaceResult } from "@/lib/engine/types";
 import ScoreRoller from "./ScoreRoller";
+import GameClock from "@/components/game/GameClock";
 import RaceFeed from "./RaceFeed";
 import PlayerDot from "./PlayerDot";
 
@@ -194,6 +195,12 @@ export default function RaceHud() {
             );
           })}
         </div>
+        {/* From the first country, on the server's clock; stops at the end. */}
+        <GameClock
+          startedAt={race.startsAt}
+          frozenAt={race.endedAt}
+          offsetMs={offset}
+        />
         <RaceFeed race={race} playerId={playerId} />
       </div>
     </>

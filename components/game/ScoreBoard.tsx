@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
 import { useGameStore } from "@/lib/store/game-store";
-import { formatTime, formatScore } from "@/lib/utils";
+import { formatScore } from "@/lib/utils";
+import GameClock from "./GameClock";
 
 export default function ScoreBoard() {
   const phase = useGameStore((s) => s.phase);
@@ -13,26 +13,6 @@ export default function ScoreBoard() {
   const gameStartTime = useGameStore((s) => s.gameStartTime);
   const totalPausedTime = useGameStore((s) => s.totalPausedTime);
   const gamePausedAt = useGameStore((s) => s.gamePausedAt);
-
-  const [currentTime, setCurrentTime] = useState(0);
-
-  useEffect(() => {
-    if (gameStartTime === null) {
-      return;
-    }
-
-    // Update every second - initial update happens via interval
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 100); // Update more frequently for smoother display
-    return () => clearInterval(interval);
-  }, [gameStartTime]);
-
-  const elapsedTime = useMemo(() => {
-    if (gameStartTime === null) return 0;
-    const pausedDuration = gamePausedAt !== null ? currentTime - gamePausedAt : 0;
-    return (currentTime - gameStartTime - totalPausedTime - pausedDuration) / 1000;
-  }, [gameStartTime, totalPausedTime, gamePausedAt, currentTime]);
 
   if (phase !== "playing" && phase !== "feedback" && phase !== "mustclick") return null;
 
@@ -61,8 +41,13 @@ export default function ScoreBoard() {
         <p className="readout font-semibold text-hi">{scoreDisplay}%</p>
       </div>
 
+      {/* Frozen while paused, which includes the intro flight. */}
       {gameStartTime !== null && (
-        <p className="hud-pill readout text-faint">{formatTime(elapsedTime)}</p>
+        <GameClock
+          startedAt={gameStartTime}
+          excludedMs={totalPausedTime}
+          frozenAt={gamePausedAt}
+        />
       )}
     </div>
   );

@@ -361,6 +361,7 @@ export default function GameContainer({
             zoomSpeed={zoomSpeed}
             rotateSpeed={rotateSpeed}
             hoverFilled={raceGlobe.hoverFilled}
+            blocked={raceGlobe.blocked}
             scene={raceGlobe.scene}
           />
         ) : (

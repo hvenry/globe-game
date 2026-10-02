@@ -10,6 +10,17 @@ export function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+/**
+ * A running game clock: `m:ss.mmm`, or `h:mm:ss.mmm` past the hour. Takes
+ * milliseconds, since the point of the readout is the part below a second.
+ */
+export function formatClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms));
+  const millis = total % 1000;
+  const seconds = Math.floor(total / 1000);
+  return `${formatTime(seconds)}.${millis.toString().padStart(3, "0")}`;
+}
+
 export function formatCountdown(seconds: number): string {
   if (seconds >= 10) {
     return Math.floor(seconds).toString();

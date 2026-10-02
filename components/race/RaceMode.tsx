@@ -43,6 +43,9 @@ export interface RaceGlobeProps {
   resolvedCountries: Record<string, Resolution | CountryFill>;
   hoverFilled: boolean;
   interactive: boolean;
+  /** In the race but unable to click right now: locked out, between
+   *  countries, or counting down. The globe shows a not-allowed cursor. */
+  blocked: boolean;
   autoRotate: boolean;
   scene: GlobeScene;
   onCountryClick: (
@@ -186,14 +189,17 @@ export function useRaceGlobe(): RaceGlobeProps {
     [phase, countrySetId, validIds, gameKey, pulseId],
   );
 
+  // Only while connected: after leaving, the race is on screen but not ours.
+  const interactive =
+    status === "racing" &&
+    (race?.phase === "racing" || race?.phase === "reveal") &&
+    !lockedOut;
+
   return {
     resolvedCountries,
     hoverFilled: showHints,
-    // Only while connected: after leaving, the race is on screen but not ours.
-    interactive:
-      status === "racing" &&
-      (race?.phase === "racing" || race?.phase === "reveal") &&
-      !lockedOut,
+    interactive,
+    blocked: status === "racing" && !interactive,
     autoRotate: !racing,
     scene,
     onCountryClick,

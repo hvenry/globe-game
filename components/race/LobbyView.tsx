@@ -43,6 +43,10 @@ function swatchTone(mine: boolean, taken: boolean): string {
   return "press border-hairline hover:border-hairline-strong";
 }
 
+/** A setting shown at a glance in the options tile. */
+const OPTION_CHIP =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-control border border-hairline bg-panel px-2 py-0.5 text-xs text-mid";
+
 function readyLabel(player: LobbyPlayer): string {
   if (!player.connected) return "gone";
   return player.ready ? "ready" : "waiting";
@@ -352,7 +356,9 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
   }
 
   return (
-    <div className="panel panel-ticks panel-dialog">
+    // Wider than the shared dialog: a roster row carries a colour, a name, a
+    // tag and a ready switch, and at dialog width the name wrapped.
+    <div className="panel panel-ticks panel-dialog max-w-[22rem] md:max-w-lg">
       {/* A header row rather than a floating corner button, so the controls
           icon never sits over the invite box on a narrow panel. */}
       <div className="mb-3 flex items-center justify-between">
@@ -425,7 +431,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
       <ul className="mb-6 flex flex-col gap-2">
         {lobby.players.map((p) => (
           <li key={p.id}>
-            <div className="flex items-center justify-between border border-hairline px-3 py-2">
+            <div className="flex items-center justify-between gap-3 border border-hairline px-3 py-2">
               <span
                 className={`flex min-w-0 items-center gap-1.5 ${
                   p.connected ? "text-hi" : "text-faint line-through"
@@ -443,12 +449,16 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
                     <PlayerDot color={p.color} className="h-2.5 w-2.5" />
                   </span>
                 )}
-                {p.name}
+                {/* One line whatever the name: it gives way with an ellipsis,
+                  and the tags beside it never wrap under it. */}
+                <span className="truncate" title={p.name}>
+                  {p.name}
+                </span>
                 {p.id === lobby.hostId && (
-                  <span className="hud-label ml-2 text-low">host</span>
+                  <span className="hud-label ml-2 shrink-0 text-low">host</span>
                 )}
                 {p.id === playerId && (
-                  <span className="hud-label ml-2 text-low">you</span>
+                  <span className="hud-label ml-2 shrink-0 text-low">you</span>
                 )}
               </span>
               {/* Your own status is the ready switch — toggled in line with
@@ -458,7 +468,7 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
                   onClick={() => setReady(!p.ready)}
                   aria-pressed={p.ready}
                   data-sound="toggle"
-                  className={`press hud-label cursor-pointer rounded-control border px-2 py-0.5 transition-colors ${
+                  className={`press hud-label shrink-0 cursor-pointer whitespace-nowrap rounded-control border px-2 py-0.5 transition-colors ${
                     p.ready
                       ? "border-signal/60 bg-signal-soft text-signal"
                       : "border-hairline text-mid hover:border-hairline-strong hover:text-hi"
@@ -467,9 +477,9 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
                   {p.ready ? "ready" : "Ready up!"}
                 </button>
               ) : (
-                <span className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center gap-2">
                   <span
-                    className={`hud-label ${p.ready ? "text-signal" : "text-faint"}`}
+                    className={`hud-label whitespace-nowrap ${p.ready ? "text-signal" : "text-faint"}`}
                   >
                     {readyLabel(p)}
                   </span>
@@ -520,23 +530,28 @@ export default function LobbyView({ onLeave }: { onLeave: () => void }) {
             {inPlay}
           </span>
         </p>
-        <p className="mt-1.5 flex items-center gap-3 text-label text-faint">
-          <span>
-            <span className="readout text-mid">
+        {/* Chips rather than a line of faint text: these are the two rules
+            a player most needs before the race starts. */}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className={OPTION_CHIP}>
+            <span className="readout text-hi">
               {lobby.config.countryWindowMs / 1000}s
-            </span>{" "}
+            </span>
             per country
           </span>
-          <span aria-hidden>·</span>
-          <span>
-            hints{" "}
+          <span
+            className={`${OPTION_CHIP} ${
+              lobby.config.showHints ? "border-signal/60 bg-signal-soft" : ""
+            }`}
+          >
+            hints
             <span
-              className={`readout ${lobby.config.showHints ? "text-signal" : "text-mid"}`}
+              className={`readout ${lobby.config.showHints ? "text-signal" : "text-hi"}`}
             >
               {lobby.config.showHints ? "on" : "off"}
             </span>
           </span>
-        </p>
+        </div>
       </button>
 
       {isHost && (
