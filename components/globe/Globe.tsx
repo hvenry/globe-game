@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useMemo, useState } from "react";
+import { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -65,6 +65,11 @@ interface GlobeProps {
    * the room's settings rather than whatever the solo menu has selected.
    */
   scene?: GlobeScene;
+  /**
+   * The player is in a game but cannot click right now (a race lockout or the
+   * gap between countries): the pointer shows not-allowed over the globe.
+   */
+  blocked?: boolean;
 }
 
 export interface GlobeScene {
@@ -197,6 +202,7 @@ function GlobeScene({
   rotateSpeed = 1.0,
   hoverFilled = true,
   scene,
+  blocked = false,
 }: GlobeProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const pointerDownRef = useRef<{
@@ -204,6 +210,9 @@ function GlobeScene({
     y: number;
     isTouch: boolean;
   } | null>(null);
+  // Whether the pointer is over the globe, so a cursor change that comes from
+  // the game (a lockout starting) lands without waiting for the next move.
+  const pointerOverRef = useRef(false);
   const [hoveredCountryBase, setHoveredCountryBase] = useState<string | null>(
     null,
   );
@@ -375,11 +384,11 @@ function GlobeScene({
     (e: ThreeEvent<PointerEvent>) => {
       // No hover on touch: dragging a finger across the globe is navigation,
       // not pointing, and the highlight just flashes under the drag
+      pointerOverRef.current = true;
       if (!interactive || e.pointerType === "touch") {
-        if (hoveredCountryBase) {
-          setHoveredCountryBase(null);
-          document.body.style.cursor = "auto";
-        }
+        if (hoveredCountryBase) setHoveredCountryBase(null);
+        document.body.style.cursor =
+          blocked && e.pointerType !== "touch" ? "not-allowed" : "auto";
         return;
       }
       const id = findCountryAtPoint(e.point);
@@ -406,6 +415,7 @@ function GlobeScene({
     },
     [
       interactive,
+      blocked,
       findCountryAtPoint,
       hoveredCountryBase,
       validCountryIds,
@@ -417,9 +427,20 @@ function GlobeScene({
   );
 
   const handlePointerOut = useCallback(() => {
+    pointerOverRef.current = false;
     setHoveredCountryBase(null);
     document.body.style.cursor = "auto";
   }, []);
+
+  // A lockout or the next country can start with the pointer standing still:
+  // drop a highlight that can no longer be clicked, and swap the cursor now.
+  if (!interactive && hoveredCountryBase !== null) setHoveredCountryBase(null);
+  useEffect(() => {
+    if (!pointerOverRef.current) return;
+    // Unblocked, the next move restores the pointer over a live country.
+    document.body.style.cursor = blocked ? "not-allowed" : "auto";
+  }, [blocked]);
+  useEffect(() => () => void (document.body.style.cursor = "auto"), []);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     pointerDownRef.current = {
