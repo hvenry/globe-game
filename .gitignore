@@ -3,7 +3,6 @@
 /data/countries-50m.json
 # dependencies
 node_modules/
-CLAUDE.md
 /.pnp
 .pnp.*
 .yarn/*

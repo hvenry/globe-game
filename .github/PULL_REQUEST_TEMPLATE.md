@@ -17,6 +17,9 @@
 <!-- Mark completed items with an "x" -->
 
 - [ ] I have tested this change locally
+- [ ] Bug fixes include a regression test that failed before the fix
+- [ ] Docs in `docs/` and their triggers in `AGENTS.md` are updated in this PR
+- [ ] Any spec this PR completes is rewritten into docs and removed from `docs/specs/`
 - [ ] I have reviewed the preview deployment
 - [ ] My commit messages follow the conventional commit format
 - [ ] This PR is ready to merge

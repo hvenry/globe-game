@@ -193,7 +193,7 @@ export const TIMER_CONFIG = {
 } as const;
 
 /**
- * Head-to-head race defaults (see docs/multiplayer-design.md). The engine never
+ * Head-to-head race defaults (see docs/race-mode.md). The engine never
  * reads these; whoever creates a race passes them in, so a room can override.
  */
 /**

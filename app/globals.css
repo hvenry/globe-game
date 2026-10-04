@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* globe.expert design tokens. Documented in docs/design-system.md.
+/* globe.expert design tokens. Documented in docs/design-tokens.md.
 
    Raw values live as plain custom properties; @theme inline maps them onto
    Tailwind utilities. Because it is `inline`, utilities emit the raw var()
